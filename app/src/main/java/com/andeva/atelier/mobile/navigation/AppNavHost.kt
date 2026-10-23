@@ -1,2 +1,62 @@
 package com.andeva.atelier.mobile.navigation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
+import androidx.navigation.compose.rememberNavController
+import kotlinx.serialization.Serializable
+
+/** Grafo sin sesión. La feature `auth` reemplaza [AuthStartRoute] por sus pantallas. */
+@Serializable
+data object AuthNavGraphRoute
+
+@Serializable
+data object AuthStartRoute
+
+/** Grafo con sesión. La feature `main` reemplaza [MainStartRoute] por el Scaffold con pestañas. */
+@Serializable
+data object MainNavGraphRoute
+
+@Serializable
+data object MainStartRoute
+
+@Composable
+fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
+    val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
+    if (sessionState == SessionState.Loading) return
+
+    val signedIn = sessionState == SessionState.SignedIn
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = if (signedIn) MainNavGraphRoute else AuthNavGraphRoute
+    ) {
+        navigation<AuthNavGraphRoute>(startDestination = AuthStartRoute) {
+            composable<AuthStartRoute> { }
+        }
+        navigation<MainNavGraphRoute>(startDestination = MainStartRoute) {
+            composable<MainStartRoute> { }
+        }
+    }
+
+    // Login, logout o sesión vencida: se cambia de grafo limpiando la pila.
+    var shownSignedIn by rememberSaveable { mutableStateOf(signedIn) }
+    LaunchedEffect(signedIn) {
+        if (signedIn == shownSignedIn) return@LaunchedEffect
+        val target: Any = if (signedIn) MainNavGraphRoute else AuthNavGraphRoute
+        navController.navigate(target) {
+            popUpTo(navController.graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
+        shownSignedIn = signedIn
+    }
+}

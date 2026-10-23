@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">Atelier Workshop</string>
+
+    <!-- Canales de notificación -->
+    <string name="notification_channel_tasks">Tareas</string>
+    <string name="notification_channel_attendance">Asistencia</string>
+    <string name="notification_channel_inventory">Inventario</string>
+
+    <!-- Núcleo: red y sincronización -->
+    <string name="error_requires_connection">Requiere conexión</string>
+    <string name="error_generic">Ocurrió un error. Inténtalo de nuevo.</string>
+    <string name="error_device_clock">Revisa la hora de tu teléfono</string>
+    <string name="sync_failed_max_attempts">No se pudo sincronizar</string>
+    <string name="error_storage_not_configured">Falta configurar el almacenamiento de fotos</string>
+    <string name="error_pending_photo_missing">La foto ya no está en el teléfono</string>
 </resources>
