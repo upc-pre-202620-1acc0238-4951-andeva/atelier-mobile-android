@@ -1,4 +1,4 @@
-package tech.andeva.atelier.atelier_workshop.ui.theme
+package tech.andeva.atelier.atelier_workshop.core.data.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

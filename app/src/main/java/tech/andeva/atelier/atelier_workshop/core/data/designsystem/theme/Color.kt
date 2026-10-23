@@ -1,4 +1,4 @@
-package tech.andeva.atelier.atelier_workshop.ui.theme
+package tech.andeva.atelier.atelier_workshop.core.data.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
 
