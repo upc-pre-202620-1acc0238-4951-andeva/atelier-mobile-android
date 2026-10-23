@@ -317,16 +317,27 @@ com.andeva.atelier.mobile/
 │   ├── data/
 │   │   ├── local/
 │   │   │   ├── AppDatabase.kt         # Única base Room de la app (todas las Entities)
+│   │   │   ├── JwtClaims.kt           # Lee `exp` del JWT para token_expires_at
 │   │   │   └── SessionManager.kt      # token, refreshToken, permisos, tenant, membershipId (DataStore)
 │   │   ├── remote/
 │   │   │   ├── AuthInterceptor.kt     # Agrega "Authorization: Bearer" y "Accept-Language: es"
-│   │   │   ├── TokenAuthenticator.kt  # 401 → POST /auth/refresh una vez → reintenta
+│   │   │   ├── PublicEndpoints.kt     # Rutas sin token (/auth/*, /invitations/validate|accept, GET /billing/plans)
+│   │   │   ├── TokenRefresher.kt      # Un solo refresh aunque haya varios 401 a la vez (synchronized)
+│   │   │   ├── TokenAuthenticator.kt  # 401 → TokenRefresher → reintenta una vez
 │   │   │   ├── ErrorResponseDto.kt    # { code, message, details, timestamp }
-│   │   │   └── ApiResult.kt           # Mapea Response<T> → Result<T> con ApiException(code, message, details)
+│   │   │   ├── ApiResult.kt           # apiCall / apiCallUnit: Response → Result con ApiException(code, message, details)
+│   │   │   ├── ConnectivityObserver.kt # StateFlow<Boolean> para deshabilitar acciones en línea
+│   │   │   └── session/               # AuthRefreshService (@RefreshClient), DeviceTokenService y sus DTOs
 │   │   └── sync/
-│   │       ├── PendingOperationEntity.kt
-│   │       ├── PendingOperationDao.kt
-│   │       └── SyncWorker.kt          # @HiltWorker: vacía la cola cuando hay red
+│   │       ├── PendingOperationEntity.kt / PendingUploadEntity.kt / CacheMetadataEntity.kt
+│   │       ├── PendingOperationDao.kt / PendingUploadDao.kt / CacheMetadataDao.kt
+│   │       ├── CacheMaintenanceDao.kt # Borra las cachés al cerrar sesión (no la cola)
+│   │       ├── PendingOperationQueue.kt # Punto único para encolar (usa la sesión y dispara el sync)
+│   │       ├── OperationHandler.kt    # Un handler por `type`, registrado por cada feature (@IntoMap)
+│   │       ├── UploadFileHandler.kt   # UPLOAD_FILE (núcleo)
+│   │       ├── SyncProcessor.kt       # Algoritmo de 06-offline-sync.md §3, sin Android (testeable)
+│   │       ├── SyncScheduler.kt       # Trabajo único, reintento tras backoff y periódico de 15 min
+│   │       └── SyncWorker.kt          # @HiltWorker: renueva el token y ejecuta SyncProcessor
 │   ├── designsystem/
 │   │   ├── icon/Icons.kt
 │   │   ├── component/                 # AtelierTopBar, StatusChip, MoneyText, EmptyState, ErrorState
@@ -337,15 +348,20 @@ com.andeva.atelier.mobile/
 │   │   ├── NetworkModule.kt           # OkHttp (interceptor + authenticator + logging) y Retrofit
 │   │   └── WorkModule.kt
 │   ├── domain/
-│   │   ├── Money.kt                   # amount + currency (PEN/USD)
+│   │   ├── ApiException.kt            # httpStatus + code + message + details (el caso de uso decide por HTTP)
+│   │   ├── Money.kt                   # amount (BigDecimal) + currency (PEN/USD)
 │   │   ├── Permission.kt              # value class + constantes del catálogo usadas por la app
+│   │   ├── Plan.kt
 │   │   └── Session.kt                 # userId, tenant, membershipId, permissions; hasPermission()
 │   ├── media/
-│   │   └── SupabaseUploader.kt        # POST al bucket y devuelve la URL pública
+│   │   ├── StoragePaths.kt            # Rutas del bucket con UUID por foto
+│   │   └── SupabaseUploader.kt        # Comprime, sube con x-upsert y arma la URL pública (determinista)
 │   └── notifications/
 │       ├── AtelierMessagingService.kt # FirebaseMessagingService: onNewToken / onMessageReceived
+│       ├── DeviceTokenRegistrar.kt    # PUT /users/me/device-token tras login y con null al salir
 │       ├── NotificationChannels.kt
-│       └── PushRouter.kt              # data.type → ruta de navegación
+│       ├── PushInbox.kt               # Push tocado pendiente de abrir (lo consume cada feature)
+│       └── PushRouter.kt              # data.type → PushDestination
 │
 ├── navigation/
 │   └── AppNavHost.kt
@@ -469,14 +485,19 @@ Reglas extra de este proyecto:
 ### 5.1. Dominio
 
 ```kotlin
-// core/domain/Money.kt
+// core/domain/Money.kt — BigDecimal (no Double) para no perder céntimos; Room lo guarda como String (06 §5)
 data class Money(
-    val amount: Double,
+    val amount: BigDecimal,
     val currency: String
 ) {
     init {
-        require(amount >= 0) { "Amount must be greater than or equal to 0" }
-        require(currency == "PEN" || currency == "USD") { "Currency must be PEN or USD" }
+        require(amount >= BigDecimal.ZERO) { "Amount must be greater than or equal to 0" }
+        require(currency == PEN || currency == USD) { "Currency must be PEN or USD" }
+    }
+
+    companion object {
+        const val PEN = "PEN"
+        const val USD = "USD"
     }
 }
 
@@ -623,19 +644,24 @@ data class ErrorResponseDto(
     @SerializedName("details") val details: List<String> = emptyList()
 )
 
+// core/domain/ApiException.kt — en el dominio para que los casos de uso decidan por HTTP sin importar Retrofit
 class ApiException(val httpStatus: Int, val code: String, override val message: String, val details: List<String>) : Exception(message)
 
 // core/data/remote/ApiResult.kt
 suspend fun <T, R> apiCall(gson: Gson, call: suspend () -> Response<T>, map: (T) -> R): Result<R> = try {
     val response = call()
     val body = response.body()
-    if (response.isSuccessful && body != null) {
-        Result.success(map(body))
-    } else {
-        val error = response.errorBody()?.charStream()?.let { gson.fromJson(it, ErrorResponseDto::class.java) }
-        Result.failure(ApiException(response.code(), error?.code ?: "HTTP_${response.code()}",
-            error?.message ?: "Error ${response.code()}", error?.details.orEmpty()))
-    }
+    if (response.isSuccessful && body != null) Result.success(map(body))
+    else if (response.isSuccessful) Result.failure(ApiException(response.code(), "EMPTY_BODY", "Respuesta vacía del servidor"))
+    else Result.failure(response.toApiException(gson))
+} catch (e: IOException) {
+    Result.failure(e)
+}
+
+// Para endpoints sin cuerpo (204), como PUT /users/me/device-token: apiCall fallaría porque body() es null.
+suspend fun apiCallUnit(gson: Gson, call: suspend () -> Response<*>): Result<Unit> = try {
+    val response = call()
+    if (response.isSuccessful) Result.success(Unit) else Result.failure(response.toApiException(gson))
 } catch (e: IOException) {
     Result.failure(e)
 }
@@ -688,26 +714,44 @@ class AuthInterceptor @Inject constructor(
     }
 }
 
-// core/data/remote/TokenAuthenticator.kt — se ejecuta solo ante un 401
-class TokenAuthenticator @Inject constructor(
+// core/data/remote/TokenRefresher.kt — el refresh ROTA el refreshToken (api/README.md §2):
+// dos 401 simultáneos no pueden refrescar dos veces o el segundo cerraría la sesión.
+@Singleton
+class TokenRefresher @Inject constructor(
     private val sessionManager: SessionManager,
     @RefreshClient private val refreshService: AuthRefreshService
-) : Authenticator {
-    override fun authenticate(route: Route?, response: okhttp3.Response): Request? {
-        if (response.request.header("X-Retry-After-Refresh") != null) return null   // ya se intentó
+) {
+    private val lock = Any()
+
+    fun refreshIfStale(staleToken: String?): String? = synchronized(lock) {
+        val current = runBlocking { sessionManager.getAuthToken() } ?: return null
+        if (staleToken != null && current != staleToken) return current        // otro hilo ya renovó
         val refreshToken = runBlocking { sessionManager.getRefreshToken() } ?: return null
-        val renewed = runBlocking { refreshService.refresh(RefreshTokenRequestDto(refreshToken)) }
-        val body = renewed.body() ?: run { runBlocking { sessionManager.clear() }; return null }
-        runBlocking { sessionManager.save(body.token, body.refreshToken, body.permissions, body.activeTenant?.id, body.membershipId) }
-        return response.request.newBuilder()
-            .header("Authorization", "Bearer ${body.token}")
+        val response = try { refreshService.refresh(RefreshTokenRequestDto(refreshToken)).execute() }
+                       catch (_: IOException) { return null }                   // sin red: se conserva la sesión
+        val body = response.body()
+        if (response.isSuccessful && body != null) { runBlocking { sessionManager.save(body) }; return body.token }
+        if (response.code() == 401) runBlocking { sessionManager.clear() }
+        null
+    }
+}
+
+// core/data/remote/TokenAuthenticator.kt — se ejecuta solo ante un 401
+class TokenAuthenticator @Inject constructor(private val tokenRefresher: TokenRefresher) : Authenticator {
+    override fun authenticate(route: Route?, response: okhttp3.Response): Request? {
+        val request = response.request
+        if (request.header("X-Retry-After-Refresh") != null) return null       // ya se intentó
+        if (PublicEndpoints.isPublic(request)) return null                      // 401 de credenciales, no de sesión
+        val token = tokenRefresher.refreshIfStale(request.header("Authorization")?.removePrefix("Bearer ")) ?: return null
+        return request.newBuilder()
+            .header("Authorization", "Bearer $token")
             .header("X-Retry-After-Refresh", "1")
             .build()
     }
 }
 ```
 
-El `AuthRefreshService` se crea con un `Retrofit` **sin** el `TokenAuthenticator` (calificador `@RefreshClient`) para no entrar en bucle. Cuando el refresh falla, la sesión se borra y `AppNavHost` vuelve al login observando el `SessionManager`.
+`refresh` es síncrono (`Call<…>`) y usa `synchronized`, no un `Mutex`: el authenticator corre en un hilo de OkHttp y un `Mutex` con `runBlocking` ahí arriesga bloqueos. El `AuthRefreshService` se crea con un `Retrofit` **sin** el `TokenAuthenticator` (calificador `@RefreshClient`) para no entrar en bucle. Cuando el refresh falla con 401, la sesión se borra y `AppNavHost` vuelve al login observando el `SessionManager`. `SyncWorker` usa el mismo `TokenRefresher.ensureFresh()` antes de vaciar la cola.
 
 #### Hilt
 

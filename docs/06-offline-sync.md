@@ -121,7 +121,30 @@ Una sola tabla para todo lo que se captura sin red. Reemplaza `pending_sync_even
 | `REGISTER_FAULT` | `POST /iot/faults` | `{ vehicleId, dtcCode, severity, description }` | ✅ Si el vehículo ya tiene ese DTC activo, devuelve esa falla (R3) |
 | `RESOLVE_FAULT` | `POST /iot/faults/{id}/resolve` | `{}` | ✅ Resolver dos veces devuelve 200 |
 
-`ATTACH_*` y `SUBMIT_PROPOSAL` dependen (`depends_on`) de su `UPLOAD_FILE`: el worker no los envía hasta tener la URL pública.
+`ATTACH_*` y `SUBMIT_PROPOSAL` dependen (`depends_on`) de su `UPLOAD_FILE`: el worker no los envía hasta que la subida termine. La URL pública es determinista (`{SUPABASE_URL}/storage/v1/object/public/{bucket}/{storage_path}`, `SupabaseUploader.publicUrlFor`), así que el payload de `ATTACH_*` se arma con la URL final **al capturar** y no hay que reescribirlo después. Si `UPLOAD_FILE` queda `FAILED`, sus dependientes pasan a `FAILED` con el mismo mensaje.
+
+### Cómo registra cada feature su tipo
+
+El núcleo no conoce endpoints de features. Cada feature implementa `OperationHandler` (`core/data/sync/OperationHandler.kt`) y lo registra en su módulo de Hilt:
+
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+interface AttendanceSyncModule {
+    @Binds @IntoMap @StringKey("CLOCK_IN")
+    fun bindClockIn(handler: ClockInHandler): OperationHandler
+}
+
+class ClockInHandler @Inject constructor(private val service: AttendanceService, private val gson: Gson) : OperationHandler {
+    override suspend fun send(operation: PendingOperationEntity): OperationResult {
+        val body = gson.fromJson(operation.payload, ClockInRequestDto::class.java)
+        val result = apiCall(gson, { service.clockIn(body) }) { it }
+        return OperationResult.from(result) { it.httpStatus == 409 }    // 409 = ya existe la jornada → aplicada
+    }
+}
+```
+
+`OperationResult.from` aplica la tabla de respuestas del algoritmo (2xx → `Applied`, 401 → `Unauthorized`, 5xx/408/429/sin red → `Retry`, otro 4xx → `Failed`). Cada handler solo indica qué errores cuentan como "ya aplicada". Para encolar se usa `PendingOperationQueue.enqueue(type, payload, dedupeKey, dependsOn)`, que completa `user_id`/`tenant_id` desde la sesión y dispara el sync. Un `type` sin handler registrado queda `PENDING` (no se pierde).
 
 ### Algoritmo del `SyncWorker`
 
@@ -140,7 +163,7 @@ Una sola tabla para todo lo que se captura sin red. Reemplaza `pending_sync_even
 6. Al terminar, refrescar las cachés afectadas (asistencia de hoy, tarea, fallas del vehículo).
 ```
 
-Disparadores: al encolar algo, al recuperar red, al volver la app a primer plano, y uno periódico cada 15 min (`PeriodicWorkRequest`).
+Disparadores: al encolar algo, al recuperar red, al volver la app a primer plano, y uno periódico cada 15 min (`PeriodicWorkRequest`). Tras el backoff, `SyncScheduler.requestSyncAt` programa otro trabajo único (`atelier-sync-retry`) para el próximo `next_attempt_at`, así un `KEEP` no bloquea el envío inmediato. Al empezar, el worker devuelve a `PENDING` lo que quedó en `SYNCING` si el proceso murió a mitad de un envío.
 
 ### Reglas de producto
 
@@ -543,10 +566,9 @@ La salida igual, con `CLOCK_OUT { clockOutTime }`. Si el ingreso de ese día aú
 ```text
 CameraX → comprimir (JPEG 1600 px, 80 %) → guardar en filesDir/pending/{uuid}.jpg
  → pending_uploads { storage_path = {tenantId}/work-orders/{woId}/{intake|tasks/{taskId}|proposals}/{uuid}.jpg }
- → pending_operations UPLOAD_FILE + ATTACH_… (depends_on = UPLOAD_FILE)
+ → pending_operations UPLOAD_FILE { uploadId } + ATTACH_… { imageUrl = publicUrlFor(storage_path) } (depends_on = UPLOAD_FILE)
  → La galería de la tarea muestra la foto local con un ícono de "pendiente"
- → Al subir: public_url = {SUPABASE_URL}/storage/v1/object/public/atelier/{storage_path}; se envía ATTACH_…
- → Al confirmar: borrar el archivo local
+ → Al subir: la foto ya está en Supabase → se borran el archivo local y la fila de pending_uploads; luego se envía ATTACH_…
 ```
 
 La propuesta adicional (US14) puede **capturarse** sin red, pero su envío y la notificación al cliente ocurren al sincronizar.
