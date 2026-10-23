@@ -1,4 +1,4 @@
-package tech.andeva.atelier.atelier_workshop
+package com.andeva.atelier.mobile
 
 import org.junit.Test
 

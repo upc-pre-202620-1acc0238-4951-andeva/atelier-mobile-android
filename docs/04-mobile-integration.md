@@ -28,7 +28,9 @@ SUPABASE_BUCKET=atelier
 
 ```kotlin
 // app/build.gradle.kts (fragmento)
-val localProps = java.util.Properties().apply {
+import java.util.Properties   // con AGP 9, `java.util` sin import choca con la extensión `java`
+
+val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 android {
