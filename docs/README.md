@@ -14,6 +14,7 @@ Documentación para construir la app Android de staff. Está escrita en Markdown
 | 6 | [04-mobile-integration.md](04-mobile-integration.md) | Configuración, push FCM, fotos en Supabase, OBD-II, offline, permisos de Android, cuentas de prueba |
 | 7 | [05-android-architecture.md](05-android-architecture.md) | **Cómo** se programa: librerías, carpetas, nombres y patrones (estilo del curso) |
 | 8 | [06-offline-sync.md](06-offline-sync.md) | **Sin red**: tablas Room, cola de operaciones, idempotencia por endpoint y flujos offline (revisión del modelo local del informe) |
+| 9 | [07-roadmap.md](07-roadmap.md) | **En qué paso va** la construcción: orden de features, estado, rama y qué reutilizar del núcleo |
 | — | [01-requirements/technical-stories.md](01-requirements/technical-stories.md) | Historias técnicas TS01–TS24 del backend (contexto) |
 
 ## Fuentes y cómo se generaron

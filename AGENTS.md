@@ -2,6 +2,7 @@
 
 Este repositorio es la app Android de staff de Atelier. Antes de escribir código, lee:
 
+0. `docs/07-roadmap.md` — en qué paso va la construcción, qué hace cada paso y qué reutilizar del núcleo `core/`. Al terminar un paso, márcalo ahí.
 1. `docs/05-android-architecture.md` — arquitectura, librerías, carpetas y nombres. **Síguela al pie de la letra.**
 2. `docs/03-traceability.md` — qué endpoint y permiso cubre cada escenario de la historia que estás implementando.
 3. `docs/api/<contexto>.md` — campos exactos de request y response (los DTOs salen de la sección *Modelos*).
