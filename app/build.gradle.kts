@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,27 +8,43 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// FCM: el plugin google-services solo se aplica si existe app/google-services.json (no se versiona).
+// Sin el archivo el proyecto compila igual, pero las notificaciones push no funcionan.
+if (file("google-services.json").exists()) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+}
+
+// Valores locales (no versionados): ver docs/04-mobile-integration.md §1
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
 android {
-    namespace = "tech.andeva.atelier.atelier_workshop"
+    namespace = "com.andeva.atelier.mobile"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "tech.andeva.atelier.atelier_workshop"
-        minSdk = 24
+        applicationId = "com.andeva.atelier.mobile"
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "API_BASE_URL", "\"${localProps.getProperty("API_BASE_URL", "http://10.0.2.2:8080/")}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProps.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        buildConfigField("String", "SUPABASE_BUCKET", "\"${localProps.getProperty("SUPABASE_BUCKET", "atelier")}\"")
     }
 
     buildTypes {
         release {
             optimization {
                 enable = false
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
@@ -36,19 +54,34 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    // Jetpack Compose y Core
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.ui)
+
+    // Navegación type-safe
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
+
+    // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -56,24 +89,48 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Coil
+    // Carga de imágenes remotas (Coil 3)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
-    // Retrofit
+    // Red y consumo de APIs (Retrofit + Gson + OkHttp)
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
 
-    // Hilt
+    // Inyección de dependencias (Hilt + KSP)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
-    // Room
+    // Base de datos local (Room 3 + KSP)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
 
-    // Data Store
+    // Almacenamiento clave-valor reactivo (DataStore Preferences)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.core)
+
+    // Trabajo en segundo plano (cola offline)
+    implementation(libs.androidx.work.runtime.ktx)
+
+    // Notificaciones push (FCM)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+
+    // Ubicación (asistencia con geocerca)
+    implementation(libs.play.services.location)
+
+    // Cámara (evidencias)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.compose)
+
+    // Google Sign-In
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
 }
