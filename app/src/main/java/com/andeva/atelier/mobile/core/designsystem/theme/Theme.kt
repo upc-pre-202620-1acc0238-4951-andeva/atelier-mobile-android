@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:app/src/main/java/tech/andeva/atelier/atelier_workshop/core/data/designsystem/theme/Theme.kt
-package tech.andeva.atelier.atelier_workshop.core.data.designsystem.theme
-========
 package com.andeva.atelier.mobile.core.designsystem.theme
->>>>>>>> e73cb05 (chore: setup dependencies and package structure):app/src/main/java/com/andeva/atelier/mobile/core/designsystem/theme/Theme.kt
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

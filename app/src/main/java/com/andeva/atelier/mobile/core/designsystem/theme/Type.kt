@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:app/src/main/java/tech/andeva/atelier/atelier_workshop/core/data/designsystem/theme/Type.kt
-package tech.andeva.atelier.atelier_workshop.core.data.designsystem.theme
-========
 package com.andeva.atelier.mobile.core.designsystem.theme
->>>>>>>> e73cb05 (chore: setup dependencies and package structure):app/src/main/java/com/andeva/atelier/mobile/core/designsystem/theme/Type.kt
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
