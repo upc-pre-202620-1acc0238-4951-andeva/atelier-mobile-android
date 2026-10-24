@@ -64,6 +64,12 @@
             </intent-filter>
         </service>
 
+        <!-- Sesión OBD-II en vivo: mantiene el socket del ELM327 (docs/04-mobile-integration.md §4) -->
+        <service
+            android:name=".features.diagnostics.infrastructure.bluetooth.ObdSessionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
         <!-- PDFs descargados en cacheDir/pdfs (docs/04-mobile-integration.md §8) -->
         <provider
             android:name="androidx.core.content.FileProvider"
