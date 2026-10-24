@@ -108,9 +108,9 @@ La lectura del vehículo ocurre **en la app**; el backend solo recibe los result
 
 | Paso | Comandos ELM327 / OBD-II | Endpoint |
 | --- | --- | --- |
-| Emparejar y abrir socket SPP (UUID `00001101-0000-1000-8000-00805F9B34FB`) | `ATZ`, `ATE0`, `ATL0`, `ATS0`, `ATH0`, `ATSP0` | `GET /iot/installations/vehicle/{vehicleId}/active` (o `POST /iot/installations/install`) |
-| Leer DTC (US17) | Modo `03` → decodificar a `P0xxx` / `Cxxxx` / `Bxxxx` / `Uxxxx` | `POST /iot/faults` por código (`severity`: `LOW`, `MEDIUM` o `CRITICAL`) |
-| Telemetría en vivo (US18) | Modo `01`: `010C` RPM, `010D` velocidad, `0105` temperatura refrigerante, `012F` combustible, `ATRV` voltaje | Se encola localmente |
+| Emparejar y abrir socket SPP (UUID `00001101-0000-1000-8000-00805F9B34FB`) | `ATZ`, `ATE0`, `ATL0`, `ATS0`, `ATH0`, `ATSP0`; luego `0100` (si no contesta, la ECU no responde: US16 E2), `ATDPN` (protocolo) y `0902` (VIN, opcional) | `GET /iot/installations/vehicle/{vehicleId}/active` (o `POST /iot/installations/install`) |
+| Leer DTC (US17) | Modo `03` → decodificar a `P0xxx` / `Cxxxx` / `Bxxxx` / `Uxxxx` (`NO DATA` = sin códigos); cuadro congelado con modo `02` (`0202`, `020500`, `020C00`, `020D00`), solo se muestra | `POST /iot/faults` por código (`severity`: `LOW`, `MEDIUM` o `CRITICAL`, de `DtcCatalog`: H20 de [03](03-traceability.md#huecos-abiertos)) |
+| Telemetría en vivo (US18) | Modo `01`: `010C` RPM, `010D` velocidad, `0105` temperatura refrigerante, `012F` combustible, `010B` presión de admisión (solo se muestra: el lote no tiene ese campo), `ATRV` voltaje | Se encola localmente |
 | Enviar lote (US19) | — | `POST /iot/telemetry/batch { vehicleId, readings[] }` |
 | Borrar fallas (US20) | Modo `04` y luego `03` para comprobar | `POST /iot/faults/{id}/resolve` por cada DTC que ya no aparece |
 | Informe IA (US21) | — | `POST /iot/health-reports/generate?vehicleId=` |
