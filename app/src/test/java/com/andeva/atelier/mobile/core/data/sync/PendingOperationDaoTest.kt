@@ -79,4 +79,37 @@ class PendingOperationDaoTest {
         assertEquals(0, dao.countPending("u1").first())
         assertEquals(1, dao.countPending("u2").first())
     }
+
+    @Test
+    fun `resetFailed solo reactiva FAILED y allDependentIds incluye FAILED`() = runTest {
+        dao.enqueue(op("upload"))
+        dao.enqueue(op("attach", dependsOn = "upload"))
+        dao.markFailed("upload", 3, 500, "INTERNAL_ERROR", "Error")
+        dao.failAsDependent("attach", "INTERNAL_ERROR", "Error")
+        assertEquals(emptyList<String>(), dao.dependentIds("upload"))
+        assertEquals(listOf("attach"), dao.allDependentIds("upload"))
+
+        dao.resetFailed("upload", now = 50)
+        val upload = dao.findById("upload")!!
+        assertEquals(PendingOperationEntity.STATUS_PENDING, upload.status)
+        assertEquals(0, upload.attempts)
+        assertEquals(50L, upload.nextAttemptAt)
+
+        dao.markSyncing("upload")
+        dao.resetFailed("upload", now = 99)
+        assertEquals(PendingOperationEntity.STATUS_SYNCING, dao.findById("upload")!!.status)
+    }
+
+    @Test
+    fun `deleteAll borra solo los ids indicados`() = runTest {
+        dao.enqueue(op("a"))
+        dao.enqueue(op("b"))
+        dao.enqueue(op("c"))
+
+        dao.deleteAll(listOf("a", "b"))
+
+        assertNull(dao.findById("a"))
+        assertNull(dao.findById("b"))
+        assertEquals("c", dao.findById("c")!!.id)
+    }
 }

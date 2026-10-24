@@ -19,4 +19,7 @@ data class Session(
 
     /** Informe de salud con IA: permiso del rol y módulo incluido en el plan. */
     fun canUseAiDiagnostics() = has(Permission.HEALTH_REPORTS_GENERATE) && (plan?.aiDiagnosticsEnabled ?: true)
+
+    /** false solo si el plan dice que la suscripción no está vigente; sin plan conocido no se avisa (api/README.md §2). */
+    fun hasSubscriptionAccess() = plan?.accessGranted != false
 }

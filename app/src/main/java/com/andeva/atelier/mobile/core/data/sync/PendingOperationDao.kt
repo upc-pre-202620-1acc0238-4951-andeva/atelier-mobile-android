@@ -56,8 +56,20 @@ interface PendingOperationDao {
     @Query("UPDATE pending_operations SET status = 'PENDING', attempts = 0, next_attempt_at = :now WHERE id = :id")
     suspend fun retry(id: String, now: Long)
 
+    /** Cascada de "Reintentar": solo reactiva lo que quedó FAILED, nunca algo PENDING o SYNCING. */
+    @Query("UPDATE pending_operations SET status = 'PENDING', attempts = 0, next_attempt_at = :now WHERE id = :id AND status = 'FAILED'")
+    suspend fun resetFailed(id: String, now: Long)
+
+    /** Hijos directos en cualquier estado (a diferencia de [dependentIds]), para las cascadas de la pantalla de pendientes. */
+    @Query("SELECT id FROM pending_operations WHERE depends_on = :parentId")
+    suspend fun allDependentIds(parentId: String): List<String>
+
     @Query("DELETE FROM pending_operations WHERE id = :id")
     suspend fun delete(id: String)
+
+    /** "Descartar" con sus dependientes en una sola sentencia. */
+    @Query("DELETE FROM pending_operations WHERE id IN (:ids)")
+    suspend fun deleteAll(ids: List<String>)
 
     @Query("SELECT COUNT(*) FROM pending_operations WHERE user_id = :userId")
     fun countPending(userId: String): Flow<Int>

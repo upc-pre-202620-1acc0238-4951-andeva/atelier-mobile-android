@@ -37,6 +37,13 @@ class SessionTest {
     }
 
     @Test
+    fun `aviso de suscripcion solo con accessGranted false`() {
+        assertFalse(session(emptySet(), Plan("PRO", "PAST_DUE", false, true, true)).hasSubscriptionAccess())
+        assertTrue(session(emptySet(), plan(iot = true, ai = true)).hasSubscriptionAccess())
+        assertTrue(session(emptySet(), null).hasSubscriptionAccess())
+    }
+
+    @Test
     fun `informe IA requiere plan con IA`() {
         val permissions = setOf(Permission.HEALTH_REPORTS_GENERATE.value)
         assertFalse(session(permissions, plan(iot = true, ai = false)).canUseAiDiagnostics())
