@@ -27,7 +27,7 @@ Reglas para todas las sesiones:
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
-| 6 | `reception` + `workorders` — recepción y órdenes | ⬜ Pendiente | `feature/reception-workorders` |
+| 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ⬜ Pendiente | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ⬜ Pendiente | `feature/diagnostics` |
 | 9 | `bays`, `cashier`, `reports`, `team` | ⬜ Pendiente | una rama por feature |
@@ -161,7 +161,7 @@ Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `B
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador. Los huecos H3, H4, H7 y H8 ya están confirmados contra el código del backend ([03](03-traceability.md#huecos-cerrados)). Queda H9: tras cambiar la cantidad de un repuesto, recargar la tarea en vez de usar la respuesta del `PUT` ([03](03-traceability.md#huecos-abiertos)).
 
-## Paso 6 — `reception` + `workorders` ⬜
+## Paso 6 — `reception` + `workorders` ✅
 
 - **Historias:** US11, US44, US12–US15, US22, US24, US25, US36, US33 E2, US35 E2 · **API:** [api/crm.md](api/crm.md), [api/operations.md](api/operations.md)
 - **Reutiliza** `VehicleDao` y `BayDao` del paso 5 (ampliarlos, no crear otros).
@@ -169,6 +169,37 @@ Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarl
 - **Propuestas:** `severity` solo `LOW`, `MEDIUM` o `CRITICAL`; la petición rechaza `HIGH` con 400 aunque el enum lo tenga ([api/README.md](api/README.md) §8).
 - **Suspensiones (H5):** mostrar en el detalle de la orden las tareas con `pendingSuspensionReason` para que el supervisor las apruebe o rechace ([03](03-traceability.md#huecos-abiertos)).
 - **Cachés:** `customers`, `vehicles`, `appointments`, `work_orders`. **PDF:** proforma ([04](04-mobile-integration.md) §8).
+- **Llegada de cita (H10):** `arrive` devuelve la cita; la orden en borrador la crea el backend después, con kilometraje 0.
+- **Fuera de este paso:** iniciar, completar o cancelar la orden, bahía (US40) y entrega, pago y pase de salida (paso 9). Agendar, confirmar, reprogramar o cancelar citas y flotas no tienen historia móvil.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` la hace la otra parte del equipo: agenda, búsqueda por placa, altas, afiliación, lista y detalle de orden, galería, propuesta, proforma, rutas, textos, el pedido de `CAMERA` y abrir o compartir el PDF con FileProvider (`ACTION_VIEW` / `ACTION_SEND`). Las acciones en línea se deshabilitan sin red con `ConnectivityObserver`.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `FindVehicleByPlateUseCase(placa)` → `VehicleWithOwner?` | `features/reception/application` | US11 E1. Normaliza la placa (mayúsculas, sin espacios). null = primer ingreso (US11 E2). Sin red responde con la caché si la placa ya se vio |
+| `SearchCustomersUseCase(texto)`, `GetCustomerVehiclesUseCase(id)` | `features/reception/application` | US11 E1 por documento. Sin red la búsqueda usa los clientes ya vistos |
+| `ObserveCustomerUseCase(id)` / `ObserveVehicleUseCase(id)` | `features/reception/application` | Fichas desde Room |
+| `RegisterIndividualCustomerUseCase`, `RegisterCompanyCustomerUseCase`, `RegisterVehicleUseCase` | `features/reception/application` | US11 E2, US44 E2. `InvalidReceptionInputException(field)` antes de llamar |
+| `LookupAffiliationUseCase(correo)` → `nextStep` + `AffiliateCustomerUseCase(correo, taxId, teléfono?)` | `features/reception/application` | US44 E1/E2: `ALREADY_CUSTOMER`, `AFFILIATE` (afiliar; `taxId` obligatorio) o `REGISTER_WALK_IN` (altas) |
+| `RefreshAppointmentsUseCase(fecha)` / `ObserveAppointmentsUseCase(fecha)` | `features/reception/application` | Agenda de la sede (hoy y mañana) con placa y cliente. `MissingBranchException` sin sede |
+| `MarkAppointmentArrivedUseCase(id)` → `ArrivalResult` | `features/reception/application` | US11 E1, US12 E1. `WorkOrderReady(workOrderId)` → completar con `UpdateWorkOrderUseCase`; `WorkOrderPending` → volver a buscar con `FindDraftWorkOrderForVehicleUseCase` (H10) |
+| `RefreshBranchWorkOrdersUseCase` / `ObserveBranchWorkOrdersUseCase` / `ObserveWorkOrderUseCase(id)` | `features/workorders/application` | Órdenes no cerradas de la sede y cabecera con totales e IGV (US36), sin red desde Room |
+| `GetWorkOrderDetailUseCase(id)` | `features/workorders/application` | Tareas (`TaskDetail` de `tasks`), propuestas y fotos de recepción (US13 E2). Destino de `WORK_ORDER_COMPLETED`. `tasksAwaitingSuspensionReview` para el supervisor (H5), que actúa con `ApproveSuspensionUseCase` / `RejectSuspensionUseCase` de `tasks`. Volver a llamarlo tras imputar o retirar repuestos |
+| `OpenWorkOrderUseCase(NewWorkOrder)` / `UpdateWorkOrderUseCase(id, km?, diagnóstico?)` | `features/workorders/application` | US12 E1, en la sede de la sesión. 409 = el vehículo ya tiene una orden abierta (`message`) |
+| `AddWorkOrderTaskUseCase` / `UpdateWorkOrderTaskUseCase` → detalle recargado | `features/workorders/application` | US12 E2, US22 E1/E2. Mecánico opcional (`mechanicId` = membershipId) |
+| `GetServiceCatalogUseCase` / `GetBranchMechanicsUseCase` | `features/workorders/application` | Listas para elegir servicio y mecánico, y nombre del servicio por `serviceId` (H11). Vacías sin `services:read` / `iam:members:read` |
+| `AttachIntakePhotoUseCase(id, foto, descripción?)` + `ObservePendingIntakePhotosUseCase(id)` | `features/workorders/application` | US13 E1. Siempre por la cola (con o sin red); la foto local aparece "pendiente" hasta subir |
+| `SubmitProposalUseCase(id, descripción, severidad, foto?, servicio?)` + `ObservePendingProposalsUseCase(id)` | `features/workorders/application` | US14. Sin foto → `InvalidWorkOrderInputException("photo")` (E2); `HIGH` no se envía. Por la cola, con el mecánico de la sesión |
+| `NotifyProposalUseCase`, `ApproveProposalUseCase` (→ detalle), `RejectProposalUseCase` | `features/workorders/application` | US15 E1/E2 |
+| `DownloadQuotationPdfUseCase(id)` → `File` · `SendQuotationUseCase(id)` → correo | `features/workorders/application` | US24. El PDF queda en `cacheDir/pdfs`; 422 sin correo del cliente (`message`) |
+| `ApproveQuotationUseCase` / `RejectQuotationUseCase(id, motivo)` | `features/workorders/application` | US25: `IN_PROGRESS` o `CANCELED` (sale de la lista) |
+| `GetPartMovementsUseCase(id)` / `GetProfitabilityUseCase(id)` | `features/workorders/application` | US33 E2 / US35 E2 (permisos de lotes o flujo de caja). La ganancia puede ser negativa: `BigDecimal` + `currency` |
+
+Núcleo extendido: `PhotoCapture` (`core/media`, ahora también la usa `tasks`), `PdfDownloader` (`core/data/remote`, para los PDFs de los pasos 8 y 9), `MissingBranchException`, `EmployeeService.getByBranch`, permisos `MEMBERS_READ` y `SERVICES_READ`, y en `AppDatabase` los DAOs `CustomerDao`, `AppointmentDao` y `WorkOrderDao`. `VehicleService` reemplaza a `VehicleLookupService` de `tasks` y `VehicleDao.saveFromServer` evita el choque de placa. Sin cambios en el esquema Room.
+
+También en este paso: `attendance` trata solo el 404 de `status-today` como "sin jornada" (H2), `UpdateTaskPartQuantityUseCase` devuelve la tarea recargada (H9) y `auth` acepta el enlace completo del correo como token (H1).
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial H10 (cuánto tarda en aparecer la orden de una cita) y H11.
 
 ## Paso 7 — `inventory` ⬜
 

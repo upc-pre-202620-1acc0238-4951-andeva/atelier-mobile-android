@@ -485,7 +485,7 @@ Audit trail of the parts charged to the work order and returned to their batch (
 Parts revenue against their FIFO cost of sales and gross profit of the work order (US35)
 
 - **Permiso:** `inventory:batches:read` o `invoicing:cashflow:export_pdf`
-- **Respuesta exitosa:** 200 — `array<WorkOrderProfitabilityResource>`
+- **Respuesta exitosa:** 200 — `WorkOrderProfitabilityResource` (un objeto, no un array)
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |

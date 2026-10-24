@@ -327,7 +327,8 @@ com.andeva.atelier.mobile/
 │   │   │   ├── ErrorResponseDto.kt    # { code, message, details, timestamp }
 │   │   │   ├── ApiResult.kt           # apiCall / apiCallUnit: Response → Result con ApiException(code, message, details)
 │   │   │   ├── ConnectivityObserver.kt # StateFlow<Boolean> para deshabilitar acciones en línea
-│   │   │   ├── employee/              # EmployeeService: perfil laboral (sede y turno), lo usan auth y attendance
+│   │   │   ├── PdfDownloader.kt       # PDFs del backend → cacheDir/pdfs (04 §8); abrirlo es de la UI
+│   │   │   ├── employee/              # EmployeeService: perfil laboral (sede y turno) y colaboradores de la sede; lo usan auth, attendance y workorders
 │   │   │   └── session/               # AuthRefreshService (@RefreshClient), DeviceTokenService y sus DTOs
 │   │   └── sync/
 │   │       ├── PendingOperationEntity.kt / PendingUploadEntity.kt / CacheMetadataEntity.kt
@@ -352,11 +353,13 @@ com.andeva.atelier.mobile/
 │   ├── domain/
 │   │   ├── ApiException.kt            # httpStatus + code + message + details (el caso de uso decide por HTTP)
 │   │   ├── BusinessTime.kt            # Día de Lima (America/Lima): "hoy", dedupe_key, rangos de fechas
+│   │   ├── MissingBranchException.kt  # La sesión no tiene sede y la acción la necesita
 │   │   ├── Money.kt                   # amount (BigDecimal) + currency (PEN/USD)
 │   │   ├── Permission.kt              # value class + constantes del catálogo usadas por la app
 │   │   ├── Plan.kt
 │   │   └── Session.kt                 # userId, tenant, membershipId, permissions; hasPermission()
 │   ├── media/
+│   │   ├── PhotoCapture.kt            # Foto → pending_uploads → UPLOAD_FILE + ATTACH_* (06 §6); lo usan tasks y workorders
 │   │   ├── StoragePaths.kt            # Rutas del bucket con UUID por foto
 │   │   └── SupabaseUploader.kt        # Comprime, sube con x-upsert y arma la URL pública (determinista)
 │   └── notifications/
