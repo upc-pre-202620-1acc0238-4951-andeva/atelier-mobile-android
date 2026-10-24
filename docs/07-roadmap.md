@@ -25,7 +25,7 @@ Reglas para todas las sesiones:
 | 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
 | 2 | `auth` — sesión y acceso | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
-| 4 | `attendance` — asistencia y turnos | ⬜ Pendiente | `feature/attendance` |
+| 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ⬜ Pendiente | `feature/tasks` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ⬜ Pendiente | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ⬜ Pendiente | `feature/inventory` |
@@ -106,12 +106,31 @@ Núcleo extendido: `PendingOperationDao.resetFailed`, `allDependentIds` y `delet
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo).
 
-## Paso 4 — `attendance` ⬜
+## Paso 4 — `attendance` ✅
 
 - **Historias:** US06, US08, US09, US10 · **API:** [api/hr.md](api/hr.md) · [04](04-mobile-integration.md) §7 (geocerca)
 - **Primera feature con cola offline:** `CLOCK_IN`, `CLOCK_OUT`, `SUBMIT_JUSTIFICATION` (handlers + `dedupe_key` de [06](06-offline-sync.md) §3 y §6).
 - **Cachés:** `branches`, `shifts`, `attendances`.
 - **Ubicación:** `LocationProvider` (interfaz en dominio, implementación con `FusedLocationProviderClient`), ubicación fresca, precisión ≤ 50 m, detectar ubicación simulada.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (pantallas de asistencia y de mi turno, ViewModels, rutas, textos y el pedido de `ACCESS_FINE_LOCATION`) la hace la otra parte del equipo.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `RefreshAttendanceUseCase` → `Result<Unit>` | `features/attendance/application` | Al abrir Asistencia. Recarga perfil laboral (sede y turno de la sesión), sedes y turno (24 h) y los últimos 30 días. Falla solo si no se pudo leer la asistencia: seguir con la caché y mostrar "Actualizado hace N min" |
+| `ObserveTodayAttendanceUseCase` → `Flow<TodayAttendance>` | `features/attendance/application` | Botón de marcar: `NotClockedIn`, `ClockInQueued`, `ClockedIn`, `ClockOutQueued` o `Completed`. Incluye lo que espera señal, así no se marca dos veces |
+| `ObserveAttendanceHistoryUseCase` → `Flow<List<Attendance>>` | `features/attendance/application` | Historial con `status`, minutos trabajados, regulares y sobretiempo, y estado del descargo |
+| `ObserveWeeklyScheduleUseCase` → `Flow<WeeklySchedule?>` | `features/attendance/application` | US09: turno, sede, tolerancia y `days` de lunes a domingo; trae `branchId`/`shiftId` para marcar. null sin turno asignado |
+| `ClockInUseCase(branchId, shiftId)` → `ClockInResult` | `features/attendance/application` | US06. `outcome` (`Recorded`, `Queued`, `AlreadyQueued`) y `geofence` (distancia, si está dentro y si la ubicación es simulada: solo avisos, decide el backend) |
+| `ClockOutUseCase` → `SubmitOutcome` | `features/attendance/application` | US08. Sin red se encola detrás del ingreso pendiente |
+| `SubmitJustificationUseCase(id, reason)` → `SubmitOutcome` | `features/attendance/application` | US10 E1. El dictamen llega por push `JUSTIFICATION_REVIEWED` (`PushDestination.MyAttendance`) |
+| Excepciones | `features/attendance/domain` | `LocationPermissionDeniedException` (pedir permiso), `LocationUnavailableException` (activar ubicación), `LocationTooInaccurateException` (salir a cielo abierto), `MissingAssignmentException` (sin sede o turno), `InvalidJustificationException`. El resto es `ApiException` (mostrar `message`) |
+
+`AlreadyQueued` significa que ese hecho ya está en la cola, pendiente o fallido: llevar a "Pendientes de sincronizar" (paso 3) para *Reintentar* o *Descartar*.
+
+Núcleo extendido: `BusinessTime` (día de Lima), `ClockModule` (`Clock` inyectable), `PendingOperationDao.findByDedupeKey` / `observeByDedupeKey`, y `EmployeeService` movido de `auth` a `core/data/remote/employee/` (lo usan `auth` y `attendance`).
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial qué responde `status-today` sin jornada (hueco H2 en [03](03-traceability.md#huecos-abiertos)).
 
 ## Paso 5 — `tasks` ⬜
 

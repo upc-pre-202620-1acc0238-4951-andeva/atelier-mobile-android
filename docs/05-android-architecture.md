@@ -327,6 +327,7 @@ com.andeva.atelier.mobile/
 │   │   │   ├── ErrorResponseDto.kt    # { code, message, details, timestamp }
 │   │   │   ├── ApiResult.kt           # apiCall / apiCallUnit: Response → Result con ApiException(code, message, details)
 │   │   │   ├── ConnectivityObserver.kt # StateFlow<Boolean> para deshabilitar acciones en línea
+│   │   │   ├── employee/              # EmployeeService: perfil laboral (sede y turno), lo usan auth y attendance
 │   │   │   └── session/               # AuthRefreshService (@RefreshClient), DeviceTokenService y sus DTOs
 │   │   └── sync/
 │   │       ├── PendingOperationEntity.kt / PendingUploadEntity.kt / CacheMetadataEntity.kt
@@ -343,12 +344,14 @@ com.andeva.atelier.mobile/
 │   │   ├── component/                 # AtelierTopBar, StatusChip, MoneyText, EmptyState, ErrorState
 │   │   └── theme/                     # Color.kt, Theme.kt, Type.kt
 │   ├── di/
+│   │   ├── ClockModule.kt             # java.time.Clock inyectable (hora de captura de la cola, tests)
 │   │   ├── DataStoreModule.kt
 │   │   ├── DatabaseModule.kt
 │   │   ├── NetworkModule.kt           # OkHttp (interceptor + authenticator + logging) y Retrofit
 │   │   └── WorkModule.kt
 │   ├── domain/
 │   │   ├── ApiException.kt            # httpStatus + code + message + details (el caso de uso decide por HTTP)
+│   │   ├── BusinessTime.kt            # Día de Lima (America/Lima): "hoy", dedupe_key, rangos de fechas
 │   │   ├── Money.kt                   # amount (BigDecimal) + currency (PEN/USD)
 │   │   ├── Permission.kt              # value class + constantes del catálogo usadas por la app
 │   │   ├── Plan.kt

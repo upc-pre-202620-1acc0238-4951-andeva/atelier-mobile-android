@@ -9,8 +9,11 @@ import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationEntity
 import com.andeva.atelier.mobile.core.data.sync.PendingUploadDao
 import com.andeva.atelier.mobile.core.data.sync.PendingUploadEntity
+import com.andeva.atelier.mobile.features.attendance.infrastructure.local.AttendanceDao
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.AttendanceEntity
+import com.andeva.atelier.mobile.features.attendance.infrastructure.local.BranchDao
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.BranchEntity
+import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftDao
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftEntity
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEntity
@@ -43,6 +46,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingUploadDao(): PendingUploadDao
     abstract fun cacheMetadataDao(): CacheMetadataDao
     abstract fun cacheMaintenanceDao(): CacheMaintenanceDao
+    abstract fun attendanceDao(): AttendanceDao
+    abstract fun shiftDao(): ShiftDao
+    abstract fun branchDao(): BranchDao
 
     companion object {
         const val NAME = "atelier.db"

@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.auth.infrastructure.repository
 
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.apiCall
+import com.andeva.atelier.mobile.core.data.remote.employee.EmployeeService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthRefreshService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthenticatedUserDto
 import com.andeva.atelier.mobile.core.data.remote.session.RefreshTokenRequestDto
@@ -15,7 +16,6 @@ import com.andeva.atelier.mobile.features.auth.domain.InvalidInvitationException
 import com.andeva.atelier.mobile.features.auth.domain.InvitationPreview
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.AcceptInvitationRequestDto
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.AuthService
-import com.andeva.atelier.mobile.features.auth.infrastructure.remote.EmployeeService
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.ForgotPasswordRequestDto
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.GoogleSignInRequestDto
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.ResendVerificationRequestDto

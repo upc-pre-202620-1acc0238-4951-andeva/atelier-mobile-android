@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.core.di
 import com.andeva.atelier.mobile.BuildConfig
 import com.andeva.atelier.mobile.core.data.remote.AuthInterceptor
 import com.andeva.atelier.mobile.core.data.remote.TokenAuthenticator
+import com.andeva.atelier.mobile.core.data.remote.employee.EmployeeService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthRefreshService
 import com.andeva.atelier.mobile.core.data.remote.session.DeviceTokenService
 import com.google.gson.Gson
@@ -94,4 +95,9 @@ object NetworkModule {
     @Singleton
     fun provideDeviceTokenService(retrofit: Retrofit): DeviceTokenService =
         retrofit.create(DeviceTokenService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideEmployeeService(retrofit: Retrofit): EmployeeService =
+        retrofit.create(EmployeeService::class.java)
 }

@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.auth.infrastructure.repository
 import com.andeva.atelier.mobile.core.data.local.InMemoryPreferencesDataStore
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.AuthInterceptor
+import com.andeva.atelier.mobile.core.data.remote.employee.EmployeeService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthRefreshService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthenticatedUserDto
 import com.andeva.atelier.mobile.core.data.sync.CacheMaintenanceDao
@@ -12,7 +13,6 @@ import com.andeva.atelier.mobile.core.notifications.DeviceTokenRegistrar
 import com.andeva.atelier.mobile.features.auth.domain.AcceptInvitation
 import com.andeva.atelier.mobile.features.auth.domain.InvalidInvitationException
 import com.andeva.atelier.mobile.features.auth.infrastructure.remote.AuthService
-import com.andeva.atelier.mobile.features.auth.infrastructure.remote.EmployeeService
 import com.google.gson.Gson
 import io.mockk.coEvery
 import io.mockk.coVerify
