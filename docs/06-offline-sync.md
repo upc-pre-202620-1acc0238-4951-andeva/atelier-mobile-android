@@ -75,6 +75,7 @@ El informe define 26 tablas locales. Contrastadas con el código actual:
 | Enviar descargo de tardanza (US10) | ✅ Envío diferido | `SUBMIT_JUSTIFICATION` |
 | Iniciar, pausar, suspender o cerrar tarea (US27, US29, US30) | ❌ En línea | El backend usa su hora y valida el turno |
 | Imputar o retirar repuestos (US23, US33) | ❌ En línea | Stock FIFO y reglas de la tarea en vivo |
+| Recibir una orden de compra con su comprobante (US34 E2) | ❌ En línea | Crea lotes y cambia el stock; el backend no es idempotente (H15) |
 | Abrir orden, llegada de cita, registrar cliente/vehículo (US11, US12, US44) | ❌ En línea | Generan ids y correlativos del servidor |
 | Proforma, aprobar propuestas, emitir comprobante, cobrar, pase de salida (US15, US24, US37–US39) | ❌ En línea | Documentos fiscales y dinero |
 | Informe de salud con IA (US21) | ❌ En línea | Inferencia en el servidor y cuota mensual |
@@ -199,8 +200,8 @@ La UI muestra "Actualizado hace N min" cuando la caché tiene más de 5 min y no
 | `tasks` | `GET /tasks/my` (+ `GET /tasks/{id}` al abrir) | Mis tareas abiertas · al abrir y tras cada acción | Mecánico, jefe |
 | `work_orders` | `GET /work-orders?branchId=` y `GET /work-orders/{id}` | Órdenes no cerradas de la sede · 5 min | Asesor, jefe, admin |
 | `bays` | `GET /work-bays?branchId=` | Sede · 30 s con pantalla visible | Jefe, admin |
-| `parts` | `GET /inventory/items` | Catálogo · 1 h | Mecánico, almacén |
-| `batches` | `GET /inventory/items/{id}/batches` | Por repuesto consultado · 1 h | Almacén, admin |
+| `parts` | `GET /inventory/items?page=&size=100`, página por página hasta recibir menos de 100 (el backend pagina en memoria y no da el total) | Catálogo · 1 h | Mecánico, almacén |
+| `batches` | `GET /inventory/items/{id}/batches` (todos los lotes, también agotados; la app los ordena FIFO por `arrival_date`) | Por repuesto consultado · 1 h | Almacén, admin |
 | `customers` | `GET /customers?search=` y `GET /customers/{id}` | Clientes vistos o buscados · 7 días | Recepción, asesor |
 | `vehicles` | `GET /vehicles/by-plate/{plate}`, `GET /vehicles/{id}` | Vehículos vistos · 7 días | Recepción, mecánico |
 | `appointments` | `GET /appointments?branchId=&date=` | Hoy y mañana · 5 min | Recepción, asesor |

@@ -45,6 +45,7 @@ List items that have reached or dropped below reorder threshold
 - **Permiso:** `inventory:alerts:read`
 - **Cabecera opcional:** `X-Tenant-Id` (si se omite se usa el taller del JWT)
 - **Respuesta exitosa:** 200 — `array<StockAlertResource>`
+- **Nota (backend):** las alertas **no se guardan**: se calculan al consultar con `totalStock <= minimumStock` (incluye repuestos inactivos) y no tienen id; `evaluatedAt` es la hora de la consulta. Salen solas cuando una compra recibida sube el stock (US34 E2)
 
 ### POST /api/v1/inventory/alerts/evaluate
 
@@ -61,6 +62,7 @@ Acknowledge and mark low stock alert as resolved or replenishment in progress
 - **Permiso:** `inventory:alerts:resolve`
 - **Body** (application/json): `ResolveAlertResource` (opcional)
 - **Respuesta exitosa:** 200 — `{ alertId, itemId, itemName, sku, status: "RESOLVED", notes, resolvedAt }`
+- **Nota (backend):** `{id}` es el **id del repuesto**. No guarda nada: solo responde el eco y el repuesto sigue en `GET /alerts` mientras su stock no supere el mínimo (hueco H13). La app no lo usa
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -72,6 +74,7 @@ List all active batches for an inventory item ordered by FIFO
 
 - **Permiso:** `inventory:batches:read`
 - **Respuesta exitosa:** 200 — `array<BatchResource>`
+- **Nota (backend):** incluye lotes agotados y ordena del más nuevo al más viejo, pese al resumen "ordered by FIFO"
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -108,6 +111,7 @@ List and filter parts catalog
 - **Permiso:** `inventory:parts:read`
 - **Cabecera opcional:** `X-Tenant-Id` (si se omite se usa el taller del JWT)
 - **Respuesta exitosa:** 200 — `array<PartResource>`
+- **Nota (backend):** array plano pero **paginado en memoria** (`page` 0 y `size` 20 por defecto, sin total): para el catálogo completo se piden páginas hasta recibir menos de `size`. `search` busca en nombre **o** SKU sin distinguir mayúsculas. Sin filtro de estado por defecto (incluye `INACTIVE` y `DISCONTINUED`). `unitOfMeasure` vale siempre `"UNIT"` (hueco H12)
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -146,6 +150,7 @@ Lookup part by commercial SKU barcode
 - **Permiso:** `inventory:parts:read`
 - **Cabecera opcional:** `X-Tenant-Id` (si se omite se usa el taller del JWT)
 - **Respuesta exitosa:** 200 — `PartResource`
+- **Nota (backend):** el SKU se pasa a mayúsculas; 404 sin cuerpo si no existe y 400 si no cumple `^[A-Z0-9_-]{3,50}$`
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -195,7 +200,8 @@ Update technical specifications, base price, or minimum stock
 List batches for an inventory item
 
 - **Permiso:** `inventory:batches:read`
-- **Respuesta exitosa:** 200 — `BatchResource`
+- **Respuesta exitosa:** 200 — `array<BatchResource>` (un array, no un objeto)
+- **Nota (backend):** mismo resultado que `GET /batches/by-part/{partId}`: todos los lotes, **también los agotados**, del más nuevo al más viejo (no FIFO). Repuesto inexistente → `[]`. La app ordena FIFO por `arrivalDate` y marca activos los de `remainingQty > 0`
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -208,6 +214,7 @@ List purchase orders filtered by status or supplier
 - **Permiso:** `inventory:purchase_orders:read`
 - **Cabecera opcional:** `X-Tenant-Id` (si se omite se usa el taller del JWT)
 - **Respuesta exitosa:** 200 — `array<PurchaseOrderResource>`
+- **Nota (backend):** sin filtro por sede; ordenadas de la más nueva a la más vieja. `expectedDeliveryDate` y `notes` del alta se ignoran y no vuelven en la respuesta
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
@@ -280,6 +287,7 @@ Confirm technical goods reception, physical count, and invoice registration
 - **Cabecera opcional:** `X-Tenant-Id` (si se omite se usa el taller del JWT)
 - **Body** (application/json): `ReceivePurchaseOrderResource` (opcional)
 - **Respuesta exitosa:** 200 — `PurchaseOrderResource`
+- **Nota (backend):** solo una orden `ISSUED` se recibe; crea un lote por línea (cantidad y costo de la línea, `arrivalDate` = `receivedAt`) y la orden pasa a `RECEIVED`. Sin cuerpo el backend inventa comprobante y número: enviar **siempre** el cuerpo. **Todo error responde 400** (estado inválido, recibir dos veces); no hay idempotencia, así que tras un 400 o un corte de red se relee la orden (hueco H15 de [03](../03-traceability.md#huecos-abiertos)). `receiptImageUrl` no se valida contra Supabase; la app usa la ruta de [04](../04-mobile-integration.md) §3
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |
