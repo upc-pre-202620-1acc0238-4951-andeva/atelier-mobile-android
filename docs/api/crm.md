@@ -72,7 +72,8 @@ Retrieve appointment details by identifier
 Mark appointment as arrived at the workshop bay
 
 - **Permiso:** `crm:appointments:update`
-- **Respuesta exitosa:** 200 — `AppointmentResource`
+- **Respuesta exitosa:** 200 — `AppointmentResource` (la cita, sin id de orden)
+- **Nota:** la orden de trabajo en borrador se crea **después, de forma asíncrona**, con `mileageIn = 0` y diagnóstico "Ingreso por cita programada: {appointmentId}". Se encuentra en `GET /work-orders?branchId=` por `vehicleId` y estado `DRAFT` (hueco H10 de [03](../03-traceability.md#huecos-abiertos))
 
 | Parámetro | En | Tipo | Requerido |
 | --- | --- | --- | --- |

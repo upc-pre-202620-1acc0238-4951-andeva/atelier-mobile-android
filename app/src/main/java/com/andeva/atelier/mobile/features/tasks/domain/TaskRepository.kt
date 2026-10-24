@@ -42,7 +42,7 @@ interface TaskRepository {
 
     suspend fun addPart(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct>
 
-    suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct>
+    suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskDetail>
 
     suspend fun removePart(id: TaskId, productId: String): Result<Unit>
 }

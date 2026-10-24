@@ -11,6 +11,8 @@ import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleDao
+import com.andeva.atelier.mobile.features.reception.infrastructure.local.toEntity as toVehicleEntity
+import com.andeva.atelier.mobile.features.reception.infrastructure.repository.ReceptionCachePolicy
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.PendingEvidence
@@ -33,7 +35,7 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartSearch
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PauseTaskRequestDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.UpdateTaskProductRequestDto
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.VehicleLookupService
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.sync.AttachTaskEvidenceHandler
@@ -56,7 +58,7 @@ import javax.inject.Inject
 class TaskRepositoryImpl @Inject constructor(
     private val taskService: TaskService,
     private val partSearchService: PartSearchService,
-    private val vehicleService: VehicleLookupService,
+    private val vehicleService: VehicleService,
     private val bayService: WorkBayLookupService,
     private val taskDao: TaskDao,
     private val vehicleDao: VehicleDao,
@@ -142,8 +144,10 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun addPart(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct> =
         apiCall(gson, { taskService.addProduct(id.value, AddTaskProductRequestDto(productId, quantity)) }) { it.toDomain() }
 
-    override suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct> =
-        apiCall(gson, { taskService.updateProduct(id.value, productId, UpdateTaskProductRequestDto(quantity)) }) { it.toDomain() }
+    /** El `PUT` responde 200 con una línea armada a mano (H9 de docs/03): se ignora su cuerpo y se recarga la tarea. */
+    override suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskDetail> =
+        apiCallUnit(gson) { taskService.updateProduct(id.value, productId, UpdateTaskProductRequestDto(quantity)) }
+            .fold(onSuccess = { getDetail(id) }, onFailure = { Result.failure(it) })
 
     override suspend fun removePart(id: TaskId, productId: String): Result<Unit> =
         apiCallUnit(gson) { taskService.removeProduct(id.value, productId) }
@@ -182,7 +186,7 @@ class TaskRepositoryImpl @Inject constructor(
         }
         if (session.has(Permission.VEHICLES_READ)) {
             rows.map { it.vehicleId }.distinct()
-                .filter { isStale(vehicleScope(it), VEHICLES_TTL_MILLIS, now) }
+                .filter { isStale(ReceptionCachePolicy.vehicleScope(it), ReceptionCachePolicy.VEHICLES_TTL_MILLIS, now) }
                 .forEach { refreshVehicle(it, now) }
         }
     }
@@ -197,10 +201,8 @@ class TaskRepositoryImpl @Inject constructor(
 
     private suspend fun refreshVehicle(vehicleId: String, now: Long) {
         apiCall(gson, { vehicleService.getVehicle(vehicleId) }) { it }.onSuccess { dto ->
-            // La placa es única en la caché: un choque con otro id no debe tumbar el refresco de tareas
-            runCatching { vehicleDao.upsert(dto.toEntity(now)) }.onSuccess {
-                cacheMetadataDao.upsert(CacheMetadataEntity(vehicleScope(vehicleId), now, 1))
-            }
+            vehicleDao.saveFromServer(dto.toVehicleEntity(now))
+            cacheMetadataDao.upsert(CacheMetadataEntity(ReceptionCachePolicy.vehicleScope(vehicleId), now, 1))
         }
     }
 
@@ -212,11 +214,9 @@ class TaskRepositoryImpl @Inject constructor(
     companion object {
         const val SCOPE_MY_TASKS = "tasks:my"
 
-        /** Vigencias de docs/06-offline-sync.md §4. */
+        /** Vigencia de docs/06-offline-sync.md §4 (la de vehículos está en [ReceptionCachePolicy]). */
         const val BAYS_TTL_MILLIS = 30 * 1000L
-        const val VEHICLES_TTL_MILLIS = 7 * 24 * 60 * 60 * 1000L
 
         fun bayScope(branchId: String) = "bays:$branchId"
-        fun vehicleScope(vehicleId: String) = "vehicles:$vehicleId"
     }
 }

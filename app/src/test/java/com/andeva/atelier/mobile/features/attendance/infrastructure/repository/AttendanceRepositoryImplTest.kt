@@ -169,7 +169,7 @@ class AttendanceRepositoryImplTest {
         env.responses["GET /api/v1/hr/attendances/employee/m1/history"] = env.json(
             listOf(env.attendance(id = "old", clockIn = "2026-10-20T13:00:00Z", clockOut = "2026-10-20T22:00:00Z", status = "LATE"))
         )
-        // status-today sin jornada: 404 (no documentado), se ignora
+        // status-today sin jornada: 404 (H2), se ignora
 
         assertTrue(repository.refresh().isSuccess)
 
@@ -191,6 +191,20 @@ class AttendanceRepositoryImplTest {
         assertEquals(1, env.requested("GET", "/api/v1/branches").size)
         assertEquals(1, env.requested("GET", "/api/v1/hr/work-shifts/s1").size)
         assertEquals(2, env.requested("GET", "/api/v1/hr/attendances/employee/m1/history").size)
+    }
+
+    @Test
+    fun `un error de status-today distinto de 404 no se toma como sin jornada`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/hr/attendances/employee/m1/history"] = env.json(
+            listOf(env.attendance(id = "old", clockIn = "2026-10-20T13:00:00Z", clockOut = "2026-10-20T22:00:00Z"))
+        )
+        env.responses["GET /api/v1/hr/attendances/employee/m1/status-today"] = env.error(500, "INTERNAL_ERROR", "Error interno")
+
+        val error = repository.refresh().exceptionOrNull()
+
+        assertEquals(500, (error as ApiException).httpStatus)
+        assertEquals(listOf("old"), repository.observeHistory().first().map { it.id.value })
     }
 
     @Test
