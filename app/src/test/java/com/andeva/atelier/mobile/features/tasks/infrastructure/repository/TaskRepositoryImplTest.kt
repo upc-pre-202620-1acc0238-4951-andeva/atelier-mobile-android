@@ -207,6 +207,23 @@ class TaskRepositoryImplTest {
     }
 
     @Test
+    fun `cambiar la cantidad ignora la respuesta del PUT y devuelve la tarea recargada`() = runTest {
+        env.signIn()
+        // H9: el PUT responde una línea armada a mano (id aleatorio, precios en 0)
+        env.responses["PUT /api/v1/tasks/t1/products/p1"] = env.json(
+            mapOf("id" to "random", "taskId" to "t1", "productId" to "p1", "quantity" to 5, "unitPrice" to 0, "totalAmount" to 0, "currency" to "PEN")
+        )
+        env.responses["GET /api/v1/tasks/t1"] = env.json(env.detail(products = listOf(env.product())))
+
+        val detail = repository.updatePartQuantity(id, "p1", BigDecimal(5)).getOrThrow()
+
+        val line = detail.products.single()
+        assertEquals("tp1", line.id)
+        assertEquals(BigDecimal("12.0"), line.unitPrice!!.amount)
+        assertEquals("""{"quantity":5}""", env.requested("PUT", "/api/v1/tasks/t1/products/p1").single().body.readUtf8())
+    }
+
+    @Test
     fun `retirar un repuesto acepta 204 sin cuerpo`() = runTest {
         env.signIn()
         env.responses["DELETE /api/v1/tasks/t1/products/p1"] = env.noContent()

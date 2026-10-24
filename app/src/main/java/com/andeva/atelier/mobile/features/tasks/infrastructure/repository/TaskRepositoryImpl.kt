@@ -142,8 +142,10 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun addPart(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct> =
         apiCall(gson, { taskService.addProduct(id.value, AddTaskProductRequestDto(productId, quantity)) }) { it.toDomain() }
 
-    override suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct> =
-        apiCall(gson, { taskService.updateProduct(id.value, productId, UpdateTaskProductRequestDto(quantity)) }) { it.toDomain() }
+    /** El `PUT` responde 200 con una línea armada a mano (H9 de docs/03): se ignora su cuerpo y se recarga la tarea. */
+    override suspend fun updatePartQuantity(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskDetail> =
+        apiCallUnit(gson) { taskService.updateProduct(id.value, productId, UpdateTaskProductRequestDto(quantity)) }
+            .fold(onSuccess = { getDetail(id) }, onFailure = { Result.failure(it) })
 
     override suspend fun removePart(id: TaskId, productId: String): Result<Unit> =
         apiCallUnit(gson) { taskService.removeProduct(id.value, productId) }
