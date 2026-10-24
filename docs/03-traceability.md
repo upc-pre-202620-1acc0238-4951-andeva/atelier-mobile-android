@@ -17,12 +17,12 @@ Las notificaciones push (FCM) llevan `data.type`; sus tipos están en [04-mobile
 | Historia · Escenario | Cómo se cumple | Permiso | Estado |
 | --- | --- | --- | --- |
 | US01 E1 Registro de colaborador invitado | `GET /invitations/validate?token=` → `POST /invitations/accept` (devuelve sesión completa) | público | ✅ |
-| US01 E2 Membresía activa en otro taller | `POST /invitations/accept` → **409** | público | ✅ |
-| US01 E3 Invitación vencida (48 h) o revocada | `GET /invitations/validate` / `POST /invitations/accept` → **400** | público | ✅ |
+| US01 E2 Membresía activa en otro taller | `POST /invitations/accept` → **409** (también "ya aceptada") | público | ✅ |
+| US01 E3 Invitación vencida (48 h) o revocada | `GET /invitations/validate` / `POST /invitations/accept` → **410** vencida, **404** inexistente o revocada, **400** token vacío ([api/iam.md](api/iam.md)) | público | ✅ |
 | US02 E1 Validación OTP y activación | `POST /auth/verify-email { email, token }` (OTP de 6 dígitos, 15 min) | público | ✅ |
 | US02 E2 OTP incorrecto o caducado | `POST /auth/verify-email` → 400; `POST /auth/resend-verification` | público | ✅ |
-| US03 E1 Login y contexto de sede | `POST /auth/sign-in` (permisos, taller, `membershipId`) → `GET /hr/employees/membership/{membershipId}` (sede y turno) → `GET /branches` | público · `hr:attendance:read_own` · `iam:branches:read` | ✅ |
-| US03 E2 Credenciales inválidas | `POST /auth/sign-in` → **401**; correo sin verificar → **403 `EMAIL_NOT_VERIFIED`** | público | ✅ |
+| US03 E1 Login y contexto de sede | `POST /auth/sign-in` (permisos, taller, `membershipId`) → `GET /hr/employees/membership/{membershipId}` (sede y turno; 404 si el usuario no tiene perfil laboral → entra sin sede) → `GET /branches` (lo carga `attendance`, Paso 4, con la caché `branches`) | público · `hr:attendance:read_own` · `iam:branches:read` | ✅ |
+| US03 E2 Credenciales inválidas | `POST /auth/sign-in` → **401**; correo sin verificar → **403 `EMAIL_NOT_VERIFIED`** (iam.md también lo lista bajo 401: la app decide por el `code`) | público | ✅ |
 | US04 E1 Cierre de sesión | `PUT /users/me/device-token { fcmToken: null }` → `POST /auth/sign-out { refreshToken }` → borrar DataStore | autenticado | ✅ |
 | US04 E2 Expiración del token | 401 → `POST /auth/refresh` (rotación); si falla → Login | público | ✅ |
 | US05 E1 Solicitud de recuperación | `POST /auth/forgot-password { email }` (correo con token, 2 h) | público | ✅ |
@@ -176,3 +176,9 @@ Los diez huecos detectados en la primera revisión (G1–G10) ya están implemen
 | G10 | US06, US08 (sin red) | `clockInTime` opcional para marcaciones encoladas sin red (máx. 12 h) |
 
 Solo quedan fuera del backend los escenarios marcados 📱 (los resuelve la app) y ⛔ (fuera de alcance).
+
+## Huecos abiertos
+
+| Id | Historia | Hueco | Cómo lo resuelve la app hoy |
+| --- | --- | --- | --- |
+| H1 | US01, US05 | Los correos de invitación y de restablecer contraseña traen un token, pero no hay deep link / App Link definido hacia la app | El colaborador pega el token en un campo; `ValidateInvitationUseCase`, `AcceptInvitationUseCase` y `ResetPasswordUseCase` lo reciben como texto |

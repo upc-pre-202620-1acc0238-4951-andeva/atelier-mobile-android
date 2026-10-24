@@ -22,8 +22,8 @@ Reglas para todas las sesiones:
 | # | Paso | Estado | Rama |
 | --- | --- | --- | --- |
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
-| 1 | Núcleo `core/` | ✅ Hecho (sin merge a `develop`) | `feature/core` |
-| 2 | `auth` — sesión y acceso | ⬜ Pendiente | `feature/auth` |
+| 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
+| 2 | `auth` — sesión y acceso | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ⬜ Pendiente | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ⬜ Pendiente | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ⬜ Pendiente | `feature/tasks` |
@@ -63,15 +63,27 @@ Pendiente de este paso: probarlo en un emulador (la app debe abrir sin cerrarse)
 
 ---
 
-## Paso 2 — `auth` ⬜
+## Paso 2 — `auth` ✅
 
 - **Historias:** US01–US05 ([01](01-requirements/user-stories.md), EP01) · **API:** [api/iam.md](api/iam.md) · **Trazabilidad:** [03](03-traceability.md) EP01
-- **Incluye:** login con correo y contraseña, Google Sign-In (`POST /auth/google-sign-in`), verificación OTP y reenvío, aceptar invitación (`validate` → `accept`), olvidé/restablecer contraseña, cierre de sesión.
-- **Tras el login:** `SessionManager.save(dto)` → `GET /hr/employees/membership/{membershipId}` → `updateAssignment(branchId, shiftId)` → `DeviceTokenRegistrar.registerCurrentToken()` → pedir `POST_NOTIFICATIONS` (API 33+).
-- **Cierre de sesión:** avisar si hay operaciones pendientes ([06](06-offline-sync.md) §3, "Cambio de usuario") → `DeviceTokenRegistrar.clear()` → `POST /auth/sign-out` → `CacheMaintenanceDao.clearCaches()` → `SessionManager.clear()`.
-- **Errores clave:** 401 credenciales · 403 `EMAIL_NOT_VERIFIED` → pantalla OTP · 409 invitación con membresía activa · 400 invitación vencida.
+- **Incluye:** login con correo y contraseña, Google Sign-In (`POST /auth/google-sign-in`), verificación OTP y reenvío, aceptar invitación (`validate` → `accept`), olvidé/restablecer contraseña, cierre de sesión. El alta de taller (`POST /auth/sign-up`) queda fuera: la hace el dueño en la web.
+- **Tras el login:** `GET /hr/employees/membership/{membershipId}` con el token recibido → `SessionManager.save(dto)` + `updateAssignment(branchId, shiftId)` → `DeviceTokenRegistrar.registerCurrentToken()` → pedir `POST_NOTIFICATIONS` (API 33+). La sede se pide **antes** de guardar porque al guardar `AppNavHost` cambia de grafo; sin perfil laboral (404) se entra sin sede.
+- **Cierre de sesión:** avisar si hay operaciones pendientes ([06](06-offline-sync.md) §3, "Cambio de usuario"; la cola se conserva) → `DeviceTokenRegistrar.clear()` → `POST /auth/sign-out` → `CacheMaintenanceDao.clearCaches()` → `SessionManager.clear()`.
+- **Errores clave:** 401 credenciales · `code = EMAIL_NOT_VERIFIED` (403) → pantalla OTP · invitación: 404 inexistente/revocada, 409 ya aceptada o membresía activa, 410 vencida.
 - **Sin red:** todo es en línea.
-- **Reemplaza** `AuthStartRoute` en `AppNavHost` por el grafo real de `auth`.
+- **Token de invitación y de restablecimiento:** se pega a mano (hueco H1 en [03](03-traceability.md#huecos-abiertos)).
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (pantallas, ViewModels, `UiState`, `AuthNavGraph`, textos de UI y el pedido de `POST_NOTIFICATIONS`) la hace la otra parte del equipo; `AuthStartRoute` sigue vacío en `AppNavHost`.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| Un caso de uso por acción (`SignInUseCase`, `GoogleSignInUseCase`, `VerifyEmailUseCase`, `ResendVerificationUseCase`, `ValidateInvitationUseCase`, `AcceptInvitationUseCase`, `ForgotPasswordUseCase`, `ResetPasswordUseCase`, `GetPendingOperationCountUseCase`, `SignOutUseCase`) | `features/auth/application` | Lo que llama cada ViewModel. Fallan con `ApiException` (mostrar `message`; `code = EMAIL_NOT_VERIFIED` → pantalla OTP) o `IOException` (sin red) |
+| `AuthValidation` | `features/auth/domain` | Reglas de los campos (contraseña 8–64, teléfono, OTP de 6 dígitos) |
+| `GoogleIdTokenProvider` | `features/auth/infrastructure/google` | Obtiene el `idToken` con Credential Manager (necesita contexto de Activity) para `GoogleSignInUseCase` |
+
+Con éxito, sign-in, Google y aceptar invitación ya dejan la sesión guardada: `AppNavHost` cambia de grafo solo.
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
 
 ## Paso 3 — `main` ⬜
 
