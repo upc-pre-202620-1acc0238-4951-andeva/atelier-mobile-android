@@ -123,10 +123,12 @@ class AttendanceRepositoryImpl @Inject constructor(
         if (!current.has(Permission.ATTENDANCE_READ_OWN)) return Result.success(Unit)
         val today = today()
         val history = cache.refreshRange(membershipId, today.minusDays(HISTORY_DAYS), today)
-        // La jornada activa puede haber empezado ayer (fuera del rango de hoy). Sin jornada: 404 o vacío, se ignora.
-        apiCall(gson, { attendanceService.statusToday(membershipId) }) { it }
+        // La jornada activa puede haber empezado ayer (fuera del rango de hoy). Sin jornada el backend responde 404 (H2):
+        // solo eso se ignora; otro error (401, 403, 5xx, sin red) es una lectura fallida.
+        val status = apiCall(gson, { attendanceService.statusToday(membershipId) }) { it }
             .onSuccess { cache.save(it, membershipId) }
-        return history.map { }
+        val statusError = status.exceptionOrNull()?.takeUnless { it is ApiException && it.httpStatus == 404 }
+        return history.mapCatching { if (statusError != null) throw statusError }
     }
 
     override suspend fun findBranch(branchId: String): Branch? = branchDao.findById(branchId)?.toDomain()

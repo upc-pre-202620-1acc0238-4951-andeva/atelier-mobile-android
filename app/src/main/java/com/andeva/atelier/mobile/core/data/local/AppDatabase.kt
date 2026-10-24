@@ -23,12 +23,15 @@ import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.Telem
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.VehicleFaultEntity
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchEntity
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.PartEntity
+import com.andeva.atelier.mobile.features.reception.infrastructure.local.AppointmentDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.AppointmentEntity
+import com.andeva.atelier.mobile.features.reception.infrastructure.local.CustomerDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.CustomerEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleEntity
 import com.andeva.atelier.mobile.features.tasks.infrastructure.local.TaskDao
 import com.andeva.atelier.mobile.features.tasks.infrastructure.local.TaskEntity
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderEntity
 
 /** Única base Room de la app (docs/06-offline-sync.md §5). Cada feature agrega aquí su DAO. */
@@ -54,7 +57,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun branchDao(): BranchDao
     abstract fun taskDao(): TaskDao
     abstract fun vehicleDao(): VehicleDao
+    abstract fun customerDao(): CustomerDao
+    abstract fun appointmentDao(): AppointmentDao
     abstract fun bayDao(): BayDao
+    abstract fun workOrderDao(): WorkOrderDao
 
     companion object {
         const val NAME = "atelier.db"

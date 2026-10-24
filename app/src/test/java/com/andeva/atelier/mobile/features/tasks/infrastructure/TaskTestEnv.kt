@@ -12,10 +12,11 @@ import com.andeva.atelier.mobile.core.data.remote.session.TenantSummaryDto
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationQueue
 import com.andeva.atelier.mobile.core.data.sync.SyncScheduler
 import com.andeva.atelier.mobile.core.domain.Permission
+import com.andeva.atelier.mobile.core.media.PhotoCapture
 import com.andeva.atelier.mobile.core.media.SupabaseUploader
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartSearchService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.VehicleLookupService
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskEvidenceCapture
 import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskRepositoryImpl
@@ -96,12 +97,14 @@ class TaskTestEnv {
 
     fun queue() = PendingOperationQueue(db.pendingOperationDao(), sessionManager, syncScheduler, gson)
 
-    fun capture() = TaskEvidenceCapture(uploader, db.pendingUploadDao(), queue(), sessionManager, context, clock)
+    fun photoCapture() = PhotoCapture(uploader, db.pendingUploadDao(), queue(), sessionManager, context, clock)
+
+    fun capture() = TaskEvidenceCapture(photoCapture())
 
     fun repository() = TaskRepositoryImpl(
         taskService = taskService,
         partSearchService = retrofit().create(PartSearchService::class.java),
-        vehicleService = retrofit().create(VehicleLookupService::class.java),
+        vehicleService = retrofit().create(VehicleService::class.java),
         bayService = retrofit().create(WorkBayLookupService::class.java),
         taskDao = db.taskDao(),
         vehicleDao = db.vehicleDao(),

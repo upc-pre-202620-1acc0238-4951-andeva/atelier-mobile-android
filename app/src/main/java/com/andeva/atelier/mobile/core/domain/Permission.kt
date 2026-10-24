@@ -9,6 +9,7 @@ value class Permission(val value: String) {
     companion object {
         // IAM
         val BRANCHES_READ = Permission("iam:branches:read")
+        val MEMBERS_READ = Permission("iam:members:read")
 
         // HR
         val ATTENDANCE_CLOCK_IN = Permission("hr:attendance:clock_in")
@@ -48,6 +49,7 @@ value class Permission(val value: String) {
         val BAYS_READ = Permission("operations:bays:read")
         val BAYS_REASSIGN = Permission("operations:bays:reassign")
         val VEHICLE_HANDOVER_EXECUTE = Permission("operations:vehicle_handover:execute")
+        val SERVICES_READ = Permission("operations:services:read")
 
         // Inventory
         val PARTS_READ = Permission("inventory:parts:read")

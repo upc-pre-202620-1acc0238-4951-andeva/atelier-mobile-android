@@ -5,7 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
 
-/** Perfil laboral del colaborador. Lo usan `auth` (tras el login) y `attendance` (al refrescar). */
+/** Perfil laboral del colaborador. Lo usan `auth` (tras el login), `attendance` (al refrescar) y `workorders` (mecánicos). */
 interface EmployeeService {
     /**
      * Sede (`branchId`) y turno (`assignedShiftId`) del colaborador. Tras el login se llama con el
@@ -18,4 +18,8 @@ interface EmployeeService {
         @Header("Authorization") authorization: String?,
         @Path("membershipId") membershipId: String
     ): Response<EmployeeProfileDto>
+
+    /** Colaboradores de una sede, para asignar tareas (US12 E2). Exige `iam:members:read` (H11). */
+    @GET("api/v1/hr/employees/branch/{branchId}")
+    suspend fun getByBranch(@Path("branchId") branchId: String): Response<List<EmployeeProfileDto>>
 }

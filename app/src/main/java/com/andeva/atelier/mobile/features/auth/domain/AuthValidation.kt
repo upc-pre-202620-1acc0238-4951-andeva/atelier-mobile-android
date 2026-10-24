@@ -1,5 +1,7 @@
 package com.andeva.atelier.mobile.features.auth.domain
 
+import java.net.URLDecoder
+
 /**
  * Restricciones de los modelos de request de docs/api/iam.md. Solo evitan una llamada inútil;
  * el backend vuelve a validar todo.
@@ -22,4 +24,15 @@ object AuthValidation {
     fun isPhone(value: String) = phonePattern.matches(value)
 
     fun isOtp(value: String) = otpPattern.matches(value)
+
+    /**
+     * Token de invitación o de restablecimiento. Sin deep link (H1 de docs/03-traceability.md), el colaborador pega el
+     * token o el enlace completo del correo (`…/auth/accept-invitation?token=…`): de una URL se toma `token`.
+     */
+    fun tokenFrom(input: String): String {
+        val text = input.trim()
+        val query = text.substringAfter('?', "").substringBefore('#')
+        val raw = query.split('&').firstOrNull { it.startsWith("token=") }?.substringAfter('=') ?: return text
+        return URLDecoder.decode(raw, Charsets.UTF_8.name())
+    }
 }

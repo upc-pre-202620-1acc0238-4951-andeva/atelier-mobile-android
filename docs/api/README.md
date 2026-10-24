@@ -46,7 +46,7 @@ POST /api/v1/auth/sign-out { refreshToken } → revoca el refresh del dispositiv
 | Access token | JWT HS256, vigencia por defecto **24 h** (`JWT_EXPIRATION_MS`) |
 | Claims del JWT | `sub` = userId, `email`, `tenantId`, `permissions` (array), `iat`, `exp` |
 | Refresh token | Opaco, vigencia **30 días**, **se rota en cada refresh** (el anterior queda inválido; reusarlo devuelve 401) |
-| Guardado en el dispositivo | Ambos tokens en DataStore cifrado (ver guía de arquitectura) |
+| Guardado en el dispositivo | Ambos tokens en DataStore (`SessionManager`), **hoy sin cifrar**. Cifrarlos con Tink / Android Keystore está pendiente de decidir antes de producción ([07](../07-roadmap.md)) |
 | Push | Tras iniciar sesión: `PUT /api/v1/users/me/device-token { fcmToken }`. Al cerrar sesión: el mismo endpoint con `fcmToken: null` y luego `sign-out` |
 
 Respuesta de sesión (`AuthenticatedUserResource`):
@@ -168,7 +168,7 @@ PDFs (`application/pdf`, con `Content-Disposition`): proforma `GET /work-orders/
 | iam | SalaryType | FIXED, HOURLY |
 | inventory | ItemCategory | LUBRICANTS, BRAKES, SUSPENSION, ENGINE, ELECTRICAL, TIRES, FILTERS, BODYWORK, ACCESSORIES |
 | inventory | PurchaseOrderStatus | DRAFT, ISSUED, RECEIVED, CANCELED |
-| invoicing | VoucherType | FACTURA, BOLETA, NOTA_CREDITO |
+| invoicing | VoucherType | FACTURA, BOLETA, NOTA_CREDITO. En la API viaja como código SUNAT: `"01"`, `"03"`, `"07"`. Emitir (`POST /invoicing/vouchers`) solo acepta `01\|03`; las respuestas siempre traen el código; el filtro `?voucherType=` y las series aceptan código o nombre |
 | invoicing | VoucherStatus | DRAFT, ISSUED, ACCEPTED_SUNAT, REJECTED_SUNAT, VOIDED |
 | invoicing | PaymentMethod | CASH, CREDIT_CARD, DEBIT_CARD, BANK_TRANSFER, DIGITAL_WALLET_YAPE, DIGITAL_WALLET_PLIN |
 | invoicing | DocumentType | DNI, CE, RUC, PASAPORTE |
@@ -185,7 +185,7 @@ PDFs (`application/pdf`, con `Content-Disposition`): proforma `GET /work-orders/
 | operations | WorkOrderTaskStatus | PENDING, ASSIGNED, IN_PROGRESS, ON_HOLD, COMPLETED, CANCELLED |
 | operations | HoldReason | BREAK, END_OF_SHIFT (pausas del mecánico), DEFECTIVE_PART (suspensión aprobada), WAITING_PARTS / WAITING_FOR_PARTS (heredados) |
 | operations | ProposalStatus | PENDING_REVIEW, APPROVED, REJECTED |
-| operations | ProposalSeverity | LOW, MEDIUM, HIGH, CRITICAL |
+| operations | ProposalSeverity | LOW, MEDIUM, CRITICAL al enviar (`SubmitTaskProposalResource` rechaza `HIGH` con 400). El enum del backend también tiene HIGH: tratarlo al leer |
 | operations | BayStatus | AVAILABLE, OCCUPIED, MAINTENANCE |
 | operations | BayType | LIFT, PAINT_BOOTH, WASHING, ALIGNMENT |
 | operations | EvidenceType | INITIAL_INSPECTION, DEFECT, IN_PROGRESS, COMPLETED |

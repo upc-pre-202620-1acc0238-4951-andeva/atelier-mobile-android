@@ -68,7 +68,7 @@ El informe define 26 tablas locales. Contrastadas con el código actual:
 
 | Acción | Sin red | Cómo |
 | --- | --- | --- |
-| Ver mis tareas, detalle de orden, bahías, catálogo de repuestos, turno, sede, citas del día, clientes y vehículos ya vistos | ✅ Lectura | Cachés Room (§4) |
+| Ver mis tareas, detalle de orden, bahías, catálogo de repuestos, turno, sede, citas del día, clientes y vehículos ya vistos | ✅ Lectura | Cachés Room (§4). Del detalle de orden, sin red solo la cabecera (`work_orders`) y las fotos y propuestas en cola: tareas, propuestas e imágenes ya enviadas no tienen tabla y requieren red |
 | Marcar ingreso / salida (US06–US08) | ✅ Captura y envío diferido | `CLOCK_IN` / `CLOCK_OUT` en la cola, con hora y GPS del dispositivo |
 | Leer DTC y telemetría OBD-II (US16–US19) | ✅ Captura y envío diferido | `telemetry_readings` + `REGISTER_FAULT` |
 | Fotos de recepción, desmontaje/montaje y propuestas (US13, US14, US28) | ✅ Captura y envío diferido | `pending_uploads` + `ATTACH_*` |
@@ -594,12 +594,12 @@ Las lecturas confirmadas se borran a los 7 días (la app no es el histórico; el
 | --- | --- | --- | --- |
 | R1 | `clockInTime` en el ingreso | Marcación de ingreso sin red (US06) | ✅ 1.0.3 |
 | R2 | Ignorar lecturas de telemetría repetidas | Reintentos de lotes | ✅ Ya existía |
-| R3 | `POST /iot/faults`: si el vehículo ya tiene una falla **activa** con el mismo DTC, devolver esa en vez de crear otra | Reintentar `REGISTER_FAULT` o volver a escanear sin duplicar fallas | ✅ Rama `feature/offline-sync-idempotency` |
-| R4 | `intake-images`, `evidence-images` y `proposals`: si ya existe un registro con la misma `imageUrl` en esa orden o tarea, devolverlo | Reintentar `ATTACH_*` sin fotos ni propuestas duplicadas | ✅ Rama `feature/offline-sync-idempotency` |
+| R3 | `POST /iot/faults`: si el vehículo ya tiene una falla **activa** con el mismo DTC, devolver esa en vez de crear otra | Reintentar `REGISTER_FAULT` o volver a escanear sin duplicar fallas | ✅ 1.1.0 |
+| R4 | `intake-images`, `evidence-images` y `proposals`: si ya existe un registro con la misma `imageUrl` en esa orden o tarea, devolverlo | Reintentar `ATTACH_*` sin fotos ni propuestas duplicadas | ✅ 1.1.0 |
 
 Con R3 y R4, todas las operaciones de la cola se pueden reintentar sin duplicar registros. La ruta de cada foto debe llevar un UUID generado al capturarla (§3): dos fotos distintas nunca comparten URL, y el reintento de la misma siempre la repite.
 
-> R3 y R4 están en la rama `feature/offline-sync-idempotency` de `atelier-platform` (sin publicar). Estarán en producción cuando esa rama se libere.
+> R3 y R4 se publicaron en `atelier-platform` 1.1.0 (commit `cdcdc6f`) y siguen en 1.2.0. El reintento devuelve el registro ya guardado y no emite un segundo evento ni push.
 
 ---
 
