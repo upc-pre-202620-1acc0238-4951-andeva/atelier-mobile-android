@@ -26,7 +26,7 @@ Reglas para todas las sesiones:
 | 2 | `auth` — sesión y acceso | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
-| 5 | `tasks` — tareas del mecánico | ⬜ Pendiente | `feature/tasks` |
+| 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ⬜ Pendiente | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ⬜ Pendiente | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ⬜ Pendiente | `feature/diagnostics` |
@@ -132,16 +132,39 @@ Núcleo extendido: `BusinessTime` (día de Lima), `ClockModule` (`Clock` inyecta
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial qué responde `status-today` sin jornada (hueco H2 en [03](03-traceability.md#huecos-abiertos)).
 
-## Paso 5 — `tasks` ⬜
+## Paso 5 — `tasks` ✅
 
-- **Historias:** US26–US30, US23 E1, US33, US35 · **API:** [api/operations.md](api/operations.md)
+- **Historias:** US26–US30, US23 E1–E3, US33 E1, US35 E1/E3 · **API:** [api/operations.md](api/operations.md), [api/crm.md](api/crm.md) (placa), [api/inventory.md](api/inventory.md) (buscar repuesto)
 - **En línea:** iniciar, pausar, suspender, reanudar, cerrar e imputar repuestos.
 - **Offline:** fotos de desmontaje y montaje (`UPLOAD_FILE` + `ATTACH_TASK_EVIDENCE`).
-- **Caché:** `tasks`. **Push:** `TASK_ASSIGNED`, `TASK_PAUSED`, `TASK_RESUMED`, `TASK_SUSPENSION_REQUESTED`, `TASK_PART_CHARGED`.
+- **Caché:** `tasks` (+ `vehicles` y `bays` para placa y bahía). **Push:** `TASK_ASSIGNED`, `TASK_PAUSED`, `TASK_RESUMED`, `TASK_SUSPENSION_REQUESTED`, `TASK_PART_CHARGED` (ya ruteados por `PushRouter`).
+- **Fuera de este paso:** auditoría de reintegros `part-movements` (US33 E2) y rentabilidad `profitability` (US35 E2) son de la orden: pasan al paso 6.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (Mis tareas, detalle, cronómetro, cámara, buscador de repuestos, rutas, textos y el pedido de `CAMERA`) la hace la otra parte del equipo.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `ObserveMyTasksUseCase` → `Flow<List<Task>>` | `features/tasks/application` | US26 E1: en curso → en pausa → asignadas, con `plate`, `bayName`, `estimatedHours` y `serviceName` (este solo tras abrir el detalle) |
+| `RefreshMyTasksUseCase` → `Result<Unit>` | `features/tasks/application` | Al abrir Mis tareas y al tocar `TASK_ASSIGNED`. Recarga `GET /tasks/my` y luego bahías por sede y vehículos que faltan (7 días), solo con `operations:bays:read` / `crm:vehicles:read`. Falla solo si no se pudo leer la lista: seguir con la caché |
+| `ObserveTaskUseCase(id)` / `GetTaskDetailUseCase(id)` | `features/tasks/application` | Detalle sin red desde Room / detalle en línea con productos y evidencias. El segundo sirve también al supervisor que llega por push (no la guarda en Mis tareas) |
+| `StartTaskUseCase`, `PauseTaskUseCase(id, PauseReason)` | `features/tasks/application` | US27. `Task.isPausedByMechanic` → botón *Reanudar* (`/start`). La pausa anticipada por fin de turno vuelve como `ApiException` con el `message` |
+| `RequestSuspensionUseCase(id, missingItem, inventoryItemId?)` | `features/tasks/application` | US29 E1 (`operations:tasks:hold_request`). `Task.hasPendingSuspension` mientras espera al supervisor |
+| `ApproveSuspensionUseCase`, `RejectSuspensionUseCase`, `ResumeSuspendedTaskUseCase` | `features/tasks/application` | US29 E1–E3 (`operations:tasks:hold_validate`). `Task.isSuspended` → solo un supervisor la levanta |
+| `SuggestLaborHoursUseCase(task)` + `CompleteTaskUseCase(id, horas, notas?)` | `features/tasks/application` | US30. Precargar las horas sugeridas y que el mecánico las confirme; al cerrar la tarea sale de Mis tareas |
+| `AttachTaskEvidenceUseCase(id, workOrderId, foto, EvidenceKind, nota?)` | `features/tasks/application` | US28. Comprime y encola siempre (con o sin red); `EvidenceKind` va al inicio de la `description` |
+| `ObservePendingEvidenceUseCase(id)` → `Flow<List<PendingEvidence>>` | `features/tasks/application` | Fotos en cola con ícono de "pendiente": `localFilePath` hasta que sube, luego `imageUrl`; `FAILED` se maneja en "Pendientes de sincronizar" |
+| `SearchPartsUseCase(texto)` → `PartOption` | `features/tasks/application` | US23 E1, US31 E2: en línea, `isAvailable = false` con saldo 0 |
+| `AddPartToTaskUseCase`, `UpdateTaskPartQuantityUseCase`, `RemovePartFromTaskUseCase` | `features/tasks/application` | US23 E1–E3, US33 E1, US35 E1. Imputar con `charge_parts` (mecánico, tarea propia) o `work_orders:update`; cambiar o retirar solo con `work_orders:update`. 409 de stock con `message` |
+| Excepciones | `features/tasks/domain` | `InvalidTaskInputException(field)` (dato inválido antes de llamar). El resto es `ApiException` (mostrar `message`) o `IOException` (sin red: deshabilitar con `ConnectivityObserver`) |
+
+Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` viven en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 pueden moverlos a su feature.
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial los huecos H3, H4, H7 y H8 de [03](03-traceability.md#huecos-abiertos).
 
 ## Paso 6 — `reception` + `workorders` ⬜
 
-- **Historias:** US11, US44, US12–US15, US22, US24, US25, US36 · **API:** [api/crm.md](api/crm.md), [api/operations.md](api/operations.md)
+- **Historias:** US11, US44, US12–US15, US22, US24, US25, US36, US33 E2, US35 E2 · **API:** [api/crm.md](api/crm.md), [api/operations.md](api/operations.md)
+- **Reutiliza** `VehicleDao` y `BayDao` del paso 5 (ampliarlos, no crear otros).
 - **Offline:** fotos de recepción (`ATTACH_INTAKE_IMAGE`) y propuestas (`SUBMIT_PROPOSAL`). El resto es en línea.
 - **Cachés:** `customers`, `vehicles`, `appointments`, `work_orders`. **PDF:** proforma ([04](04-mobile-integration.md) §8).
 

@@ -440,8 +440,8 @@ features/tasks/
 | `attendance` | US06–US10 | [api/hr.md](api/hr.md) |
 | `team` | US10 (supervisión de descargos), asistencia diaria de la sede | [api/hr.md](api/hr.md) |
 | `reception` | US11, US44 | [api/crm.md](api/crm.md) |
-| `workorders` | US12–US15, US22, US24, US25, US36 | [api/operations.md](api/operations.md) |
-| `tasks` | US23, US26–US30, US33, US35 | [api/operations.md](api/operations.md) |
+| `workorders` | US12–US15, US22, US24, US25, US36, US33 E2, US35 E2 | [api/operations.md](api/operations.md) |
+| `tasks` | US23, US26–US30, US33 E1, US35 E1/E3 | [api/operations.md](api/operations.md) |
 | `bays` | US40 | [api/operations.md](api/operations.md) |
 | `inventory` | US31, US32, US34 | [api/inventory.md](api/inventory.md) |
 | `diagnostics` | US16–US21, US43 | [api/iot.md](api/iot.md) |
