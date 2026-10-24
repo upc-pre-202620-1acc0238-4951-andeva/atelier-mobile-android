@@ -1,6 +1,5 @@
 package com.andeva.atelier.mobile.features.tasks.infrastructure.di
 
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartSearchService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
 import dagger.Module
@@ -16,10 +15,6 @@ object TaskApiModule {
     @Provides
     @Singleton
     fun provideTaskService(retrofit: Retrofit): TaskService = retrofit.create(TaskService::class.java)
-
-    @Provides
-    @Singleton
-    fun providePartSearchService(retrofit: Retrofit): PartSearchService = retrofit.create(PartSearchService::class.java)
 
     @Provides
     @Singleton

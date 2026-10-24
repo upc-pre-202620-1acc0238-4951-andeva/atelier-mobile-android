@@ -11,7 +11,7 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.AssignedTaskDto
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.PartDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskProductDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto

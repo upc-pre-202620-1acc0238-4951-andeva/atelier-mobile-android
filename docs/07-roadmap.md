@@ -28,7 +28,7 @@ Reglas para todas las sesiones:
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
-| 7 | `inventory` — catálogo, lotes y alertas | ⬜ Pendiente | `feature/inventory` |
+| 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ⬜ Pendiente | `feature/diagnostics` |
 | 9 | `bays`, `cashier`, `reports`, `team` | ⬜ Pendiente | una rama por feature |
 
@@ -157,7 +157,7 @@ Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarl
 | `AddPartToTaskUseCase`, `UpdateTaskPartQuantityUseCase`, `RemovePartFromTaskUseCase` | `features/tasks/application` | US23 E1–E3, US33 E1, US35 E1. Imputar con `charge_parts` (mecánico, tarea propia) o `work_orders:update`; cambiar o retirar solo con `work_orders:update`. 409 de stock con `message` |
 | Excepciones | `features/tasks/domain` | `InvalidTaskInputException(field)` (dato inválido antes de llamar). El resto es `ApiException` (mostrar `message`) o `IOException` (sin red: deshabilitar con `ConnectivityObserver`) |
 
-Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` viven en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 pueden moverlos a su feature.
+Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` viven en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 pueden moverlos a su feature (los dos primeros ya se movieron: `VehicleService` en `reception`, `InventoryService` en `inventory`).
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador. Los huecos H3, H4, H7 y H8 ya están confirmados contra el código del backend ([03](03-traceability.md#huecos-cerrados)). Queda H9: tras cambiar la cantidad de un repuesto, recargar la tarea en vez de usar la respuesta del `PUT` ([03](03-traceability.md#huecos-abiertos)).
 
@@ -201,10 +201,35 @@ También en este paso: `attendance` trata solo el 404 de `status-today` como "si
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial H10 (cuánto tarda en aparecer la orden de una cita) y H11.
 
-## Paso 7 — `inventory` ⬜
+## Paso 7 — `inventory` ✅
 
 - **Historias:** US31, US32, US34 · **API:** [api/inventory.md](api/inventory.md)
 - **Cachés:** `parts`, `batches` (solo con `inventory:batches:read`). **Push:** `LOW_STOCK`.
+- **Backend:** el catálogo se pagina en memoria, los lotes llegan del más nuevo al más viejo y con agotados, las alertas se calculan al consultar y `receive` responde 400 a todo (H12–H15 de [03](03-traceability.md#huecos-abiertos)).
+- **Fuera de este paso:** crear o editar repuestos, proveedores y órdenes de compra; despacho FIFO directo, ingreso directo de lotes, `restore` y `resolve`/`evaluate` de alertas. El descargo y el reintegro de US32/US33 ocurren al imputar o retirar en `tasks`.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` la hace la otra parte del equipo:
+- Pantallas: catálogo, búsqueda, lector de código de barras, detalle con lotes, bandeja de alertas, órdenes de compra y recepción.
+- Rutas y textos.
+- El pedido de `CAMERA` y abrir la cámara o el Photo Picker para el comprobante.
+
+Recibir se deshabilita sin red con `ConnectivityObserver`. El push `LOW_STOCK` puede repetirse (H14): lleva a la bandeja, no muestra una alerta por push.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `RefreshPartsCatalogUseCase(force?)` / `ObservePartsCatalogUseCase(categoría?)` | `features/inventory/application` | US31: catálogo completo en Room (1 h, página por página). `Part.isOutOfStock` resalta los agotados y `isSelectable` bloquea su selección (E2) |
+| `SearchPartsCatalogUseCase(texto, categoría?)` | `features/inventory/application` | US31 E1: por nombre o SKU. Sin red busca en la caché |
+| `FindPartBySkuUseCase(sku)` → `Part?` | `features/inventory/application` | US31 E1 desde el lector de código. null = no existe; formato inválido → `InvalidInventoryInputException("sku")` sin llamar |
+| `ObservePartUseCase(id)` / `GetPartDetailUseCase(id)` | `features/inventory/application` | Ficha y detalle con lotes en orden FIFO (US32, solo con `inventory:batches:read`). Destino del push `LOW_STOCK` (`itemId`) |
+| `RefreshPartBatchesUseCase(id)` / `ObservePartBatchesUseCase(id)` | `features/inventory/application` | US32: lotes del más antiguo al más nuevo; `Batch.isActive` separa los agotados. Desde la caché, `initialQty`, proveedor y comprobante van en null |
+| `GetStockAlertsUseCase` / `ObserveStockAlertsUseCase` | `features/inventory/application` | US34 E1: bandeja en línea y `Flow` desde la caché, que se vacía sola al recibir la compra (E2) |
+| `GetInventoryValuationUseCase` | `features/inventory/application` | Valorización en PEN (`inventory:batches:read`) |
+| `GetPurchaseOrdersUseCase(estado = ISSUED)` / `GetPurchaseOrderUseCase(id)` | `features/inventory/application` | US34 E2: órdenes emitidas y sus líneas (`inventory:purchase_orders:read`) |
+| `ReceivePurchaseOrderUseCase(id, número, foto?, receivedAt?)` | `features/inventory/application` | US34 E2 (`inventory:batches:receive`). Sin foto → `InvalidInventoryInputException("photo")`. Sube el comprobante, recibe y recarga catálogo y lotes. Si la orden ya estaba recibida responde éxito sin subir la foto (H15) |
+
+Núcleo extendido: `StoragePaths.purchaseReceipt`, permisos `BATCHES_RECEIVE` y `PURCHASE_ORDERS_READ`, y en `AppDatabase` los DAOs `PartDao` y `BatchDao`. `PartSearchService` de `tasks` pasa a ser `InventoryService` en `inventory` (`tasks` sigue buscando en línea para imputar). Sin cambios en el esquema Room.
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial la recepción con comprobante (H15).
 
 ## Paso 8 — `diagnostics` ⬜
 
