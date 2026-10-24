@@ -15,6 +15,7 @@ import com.andeva.atelier.mobile.features.attendance.infrastructure.local.Branch
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.BranchEntity
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftDao
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftEntity
+import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEntity
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertEntity
@@ -24,7 +25,9 @@ import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchEn
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.PartEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.AppointmentEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.CustomerEntity
+import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleEntity
+import com.andeva.atelier.mobile.features.tasks.infrastructure.local.TaskDao
 import com.andeva.atelier.mobile.features.tasks.infrastructure.local.TaskEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderEntity
 
@@ -49,6 +52,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun attendanceDao(): AttendanceDao
     abstract fun shiftDao(): ShiftDao
     abstract fun branchDao(): BranchDao
+    abstract fun taskDao(): TaskDao
+    abstract fun vehicleDao(): VehicleDao
+    abstract fun bayDao(): BayDao
 
     companion object {
         const val NAME = "atelier.db"
