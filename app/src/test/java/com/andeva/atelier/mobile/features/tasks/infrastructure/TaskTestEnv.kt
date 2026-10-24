@@ -14,7 +14,7 @@ import com.andeva.atelier.mobile.core.data.sync.SyncScheduler
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.media.PhotoCapture
 import com.andeva.atelier.mobile.core.media.SupabaseUploader
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartSearchService
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.InventoryService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
@@ -103,7 +103,7 @@ class TaskTestEnv {
 
     fun repository() = TaskRepositoryImpl(
         taskService = taskService,
-        partSearchService = retrofit().create(PartSearchService::class.java),
+        inventoryService = retrofit().create(InventoryService::class.java),
         vehicleService = retrofit().create(VehicleService::class.java),
         bayService = retrofit().create(WorkBayLookupService::class.java),
         taskDao = db.taskDao(),

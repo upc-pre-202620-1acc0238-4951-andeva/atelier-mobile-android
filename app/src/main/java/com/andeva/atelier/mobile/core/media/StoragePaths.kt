@@ -16,5 +16,9 @@ object StoragePaths {
     fun proposal(tenantId: String, workOrderId: String, photoId: String = newId()) =
         "$tenantId/work-orders/$workOrderId/proposals/$photoId.jpg"
 
+    /** Comprobante de una compra recibida (US34 E2): se sube en línea, no por la cola. */
+    fun purchaseReceipt(tenantId: String, purchaseOrderId: String, photoId: String = newId()) =
+        "$tenantId/purchase-orders/$purchaseOrderId/receipt/$photoId.jpg"
+
     fun newId(): String = UUID.randomUUID().toString()
 }

@@ -55,6 +55,8 @@ value class Permission(val value: String) {
         val PARTS_READ = Permission("inventory:parts:read")
         val BATCHES_READ = Permission("inventory:batches:read")
         val BATCHES_RESTORE = Permission("inventory:batches:restore")
+        val BATCHES_RECEIVE = Permission("inventory:batches:receive")
+        val PURCHASE_ORDERS_READ = Permission("inventory:purchase_orders:read")
         val ALERTS_READ = Permission("inventory:alerts:read")
         val ALERTS_RESOLVE = Permission("inventory:alerts:resolve")
 

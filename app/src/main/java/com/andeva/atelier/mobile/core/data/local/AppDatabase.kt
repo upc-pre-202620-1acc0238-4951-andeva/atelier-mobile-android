@@ -21,7 +21,9 @@ import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEn
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertEntity
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.TelemetryReadingEntity
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.VehicleFaultEntity
+import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchDao
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchEntity
+import com.andeva.atelier.mobile.features.inventory.infrastructure.local.PartDao
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.PartEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.AppointmentDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.AppointmentEntity
@@ -61,6 +63,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun appointmentDao(): AppointmentDao
     abstract fun bayDao(): BayDao
     abstract fun workOrderDao(): WorkOrderDao
+    abstract fun partDao(): PartDao
+    abstract fun batchDao(): BatchDao
 
     companion object {
         const val NAME = "atelier.db"
