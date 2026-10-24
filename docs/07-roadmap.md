@@ -24,7 +24,7 @@ Reglas para todas las sesiones:
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
 | 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
 | 2 | `auth` — sesión y acceso | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/auth` |
-| 3 | `main` — contenedor con pestañas por permiso | ⬜ Pendiente | `feature/main` |
+| 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ⬜ Pendiente | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ⬜ Pendiente | `feature/tasks` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ⬜ Pendiente | `feature/reception-workorders` |
@@ -85,11 +85,26 @@ Con éxito, sign-in, Google y aceptar invitación ya dejan la sesión guardada: 
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
 
-## Paso 3 — `main` ⬜
+## Paso 3 — `main` ✅
 
 - **Incluye:** `MainScreen` con `NavigationBar` armada con `NavigationItem.tabsFor(session)` ([05](05-android-architecture.md) §5.5), pestaña "Más", aviso si `plan.accessGranted == false`, ícono con el contador de pendientes (`PendingOperationDao.countPending`) y pantalla "Pendientes de sincronizar" con *Reintentar* / *Descartar* ([06](06-offline-sync.md) §3, "Reglas de producto").
 - **Consume** `PushInbox` para navegar al destino del push cuando la feature correspondiente exista.
 - **Reemplaza** `MainStartRoute` en `AppNavHost`.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (`MainScreen`, `NavigationBar`, `NavigationItem.tabsFor`, pestaña "Más", rutas, pantalla de pendientes, textos) la hace la otra parte del equipo, incluida la regla de pestañas por permiso. `MainStartRoute` sigue vacío en `AppNavHost`. No hay endpoints: todo es local.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `ObserveSessionUseCase` → `Flow<Session?>` | `features/main/application` | Pestañas por permiso (`session.has(Permission.X)`) y aviso de plan (`session.hasSubscriptionAccess()`, false solo si `accessGranted == false`) |
+| `ObservePendingOperationCountUseCase` → `Flow<Int>` | `features/main/application` | Ícono con contador; solo cuenta la cola del usuario de la sesión |
+| `ObservePendingOperationsUseCase` → `Flow<List<PendingOperation>>` | `features/main/application` | Pantalla de pendientes: `type`, `status` (`PENDING`/`SYNCING`/`FAILED`), `lastErrorMessage` (el `message` del backend), `createdAt` |
+| `RetryPendingOperationUseCase(id)` → `Boolean` | `features/main/application` | *Reintentar*: solo si está `FAILED`; reactiva también su cadena `FAILED` y dispara el sync |
+| `DiscardPendingOperationUseCase(id)` → `Boolean` | `features/main/application` | *Descartar*: se lleva sus dependientes; un `ATTACH_*` se lleva su `UPLOAD_FILE` y la foto local; no actúa si algo de la cadena está `SYNCING` |
+| `ObservePushDestinationUseCase` / `ConsumePushDestinationUseCase` | `features/main/application` | Ver el push tocado y consumirlo una sola vez para navegar |
+
+Núcleo extendido: `PendingOperationDao.resetFailed`, `allDependentIds` y `deleteAll`; `Session.hasSubscriptionAccess()`.
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo).
 
 ## Paso 4 — `attendance` ⬜
 

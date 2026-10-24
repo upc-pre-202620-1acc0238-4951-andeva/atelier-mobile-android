@@ -63,8 +63,18 @@ class FakePendingOperationDao : PendingOperationDao {
     override suspend fun retry(id: String, now: Long) =
         update(id) { it.copy(status = PendingOperationEntity.STATUS_PENDING, attempts = 0, nextAttemptAt = now) }
 
+    override suspend fun resetFailed(id: String, now: Long) {
+        if (rows.value[id]?.status == PendingOperationEntity.STATUS_FAILED) retry(id, now)
+    }
+
+    override suspend fun allDependentIds(parentId: String) = rows.value.values.filter { it.dependsOn == parentId }.map { it.id }
+
     override suspend fun delete(id: String) {
         rows.value = rows.value - id
+    }
+
+    override suspend fun deleteAll(ids: List<String>) {
+        rows.value = rows.value - ids.toSet()
     }
 
     override fun countPending(userId: String): Flow<Int> = rows.map { map -> map.values.count { it.userId == userId } }
