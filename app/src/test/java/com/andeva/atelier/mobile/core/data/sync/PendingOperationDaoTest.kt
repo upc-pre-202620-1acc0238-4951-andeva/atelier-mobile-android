@@ -101,6 +101,16 @@ class PendingOperationDaoTest {
     }
 
     @Test
+    fun `findByDedupeKey y observeByDedupeKey encuentran el hecho en cola`() = runTest {
+        assertNull(dao.observeByDedupeKey("CLOCK_IN:m1:2026-10-24").first())
+        dao.enqueue(op("a", dedupeKey = "CLOCK_IN:m1:2026-10-24"))
+
+        assertEquals("a", dao.findByDedupeKey("CLOCK_IN:m1:2026-10-24")!!.id)
+        assertEquals("a", dao.observeByDedupeKey("CLOCK_IN:m1:2026-10-24").first()!!.id)
+        assertNull(dao.findByDedupeKey("CLOCK_IN:m1:2026-10-25"))
+    }
+
+    @Test
     fun `deleteAll borra solo los ids indicados`() = runTest {
         dao.enqueue(op("a"))
         dao.enqueue(op("b"))

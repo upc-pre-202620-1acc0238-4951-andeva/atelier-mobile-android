@@ -26,6 +26,11 @@ class FakePendingOperationDao : PendingOperationDao {
 
     override suspend fun findById(id: String) = rows.value[id]
 
+    override suspend fun findByDedupeKey(dedupeKey: String) = rows.value.values.firstOrNull { it.dedupeKey == dedupeKey }
+
+    override fun observeByDedupeKey(dedupeKey: String): Flow<PendingOperationEntity?> =
+        rows.map { map -> map.values.firstOrNull { it.dedupeKey == dedupeKey } }
+
     override suspend fun nextAttemptAt(userId: String) = rows.value.values
         .filter { it.userId == userId && it.status == PendingOperationEntity.STATUS_PENDING }
         .minOfOrNull { it.nextAttemptAt }

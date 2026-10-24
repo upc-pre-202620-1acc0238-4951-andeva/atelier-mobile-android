@@ -182,3 +182,4 @@ Solo quedan fuera del backend los escenarios marcados 📱 (los resuelve la app)
 | Id | Historia | Hueco | Cómo lo resuelve la app hoy |
 | --- | --- | --- | --- |
 | H1 | US01, US05 | Los correos de invitación y de restablecer contraseña traen un token, pero no hay deep link / App Link definido hacia la app | El colaborador pega el token en un campo; `ValidateInvitationUseCase`, `AcceptInvitationUseCase` y `ResetPasswordUseCase` lo reciben como texto |
+| H2 | US06, US08 | [api/hr.md](api/hr.md) no documenta qué responde `GET /hr/attendances/employee/{membershipId}/status-today` cuando no hay jornada activa | El repositorio de `attendance` trata cualquier error o cuerpo vacío como "sin jornada" y usa `history` del día para lo demás (incluida la verificación de `CLOCK_OUT`). Confirmar contra el backend |

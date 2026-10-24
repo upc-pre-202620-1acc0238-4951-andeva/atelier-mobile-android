@@ -22,6 +22,14 @@ interface PendingOperationDao {
     @Query("SELECT * FROM pending_operations WHERE id = :id")
     suspend fun findById(id: String): PendingOperationEntity?
 
+    /** El mismo hecho ya en cola (p. ej. el `CLOCK_IN` de hoy, del que depende el `CLOCK_OUT`). */
+    @Query("SELECT * FROM pending_operations WHERE dedupe_key = :dedupeKey")
+    suspend fun findByDedupeKey(dedupeKey: String): PendingOperationEntity?
+
+    /** Para que la UI sepa que un hecho está en cola sin enviar ("marcación guardada"). */
+    @Query("SELECT * FROM pending_operations WHERE dedupe_key = :dedupeKey")
+    fun observeByDedupeKey(dedupeKey: String): Flow<PendingOperationEntity?>
+
     /** Próximo `next_attempt_at` de lo que sigue PENDING, para reprogramar el worker tras el backoff. */
     @Query("SELECT MIN(next_attempt_at) FROM pending_operations WHERE user_id = :userId AND status = 'PENDING'")
     suspend fun nextAttemptAt(userId: String): Long?

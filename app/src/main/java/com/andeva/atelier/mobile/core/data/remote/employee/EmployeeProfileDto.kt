@@ -1,8 +1,8 @@
-package com.andeva.atelier.mobile.features.auth.infrastructure.remote
+package com.andeva.atelier.mobile.core.data.remote.employee
 
 import com.google.gson.annotations.SerializedName
 
-/** `EmployeeProfileResource` de docs/api/hr.md; tras el login solo se usan la sede y el turno. */
+/** `EmployeeProfileResource` de docs/api/hr.md; la app solo usa la sede y el turno. */
 data class EmployeeProfileDto(
     @SerializedName("id") val id: String,
     @SerializedName("branchId") val branchId: String?,
