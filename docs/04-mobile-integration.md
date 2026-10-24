@@ -63,7 +63,7 @@ El backend envía mensajes con `notification` (título y cuerpo en español) y `
 | `TASK_PART_CHARGED` | Quienes tienen `inventory:batches:restore` | `workOrderId`, `taskId` | Productos de la tarea (revisar imputación) |
 | `TASK_RESUMED` | Supervisores (`operations:tasks:hold_validate`) tras una pausa; el mecánico cuando se levanta su suspensión | `workOrderId`, `taskId` | Detalle de la tarea |
 | `WORK_ORDER_COMPLETED` | Quienes tienen `operations:vehicle_handover:execute` (asesor) | `workOrderId` | Detalle de la orden (control de calidad y cobro) |
-| `LOW_STOCK` | Quienes tienen `inventory:alerts:read` | `itemId`, `currentStock`, `minimumStock` | Alertas de stock |
+| `LOW_STOCK` | Quienes tienen `inventory:alerts:read` | `itemId`, `currentStock`, `minimumStock` | Alertas de stock (se repite en cada descargo bajo el mínimo, H14 de [03](03-traceability.md#huecos-abiertos)) |
 | `OVERTIME_RECORDED` | Quienes tienen `hr:payroll:manage` | `attendanceId`, `membershipId`, `overtimeMinutes` | Asistencia del colaborador |
 | `JUSTIFICATION_REVIEWED` | El colaborador que envió el descargo | `attendanceId`, `verdict` (`APPROVED`/`REJECTED`) | Mi asistencia |
 | `SHIFT_REMINDER` | Colaboradores con turno que empieza en 15 min | `shiftId`, `startTime` | Marcar ingreso |
@@ -93,6 +93,7 @@ CameraX / Photo Picker → comprimir (JPEG, lado mayor 1600 px, calidad 80)
 | Recepción (US13) | `{tenantId}/work-orders/{workOrderId}/intake/{uuid}.jpg` |
 | Desmontaje / montaje (US28) | `{tenantId}/work-orders/{workOrderId}/tasks/{taskId}/{uuid}.jpg` |
 | Propuesta adicional (US14) | `{tenantId}/work-orders/{workOrderId}/proposals/{uuid}.jpg` |
+| Comprobante de compra recibida (US34 E2) | `{tenantId}/purchase-orders/{purchaseOrderId}/receipt/{uuid}.jpg`. Se sube **en línea** justo antes de `PUT /inventory/purchase-orders/{id}/receive`, no por la cola |
 
 - El backend valida que la URL sea `https`, del host de Supabase configurado y que contenga `/storage/v1/object/` y `/atelier/`. Cualquier otra URL → 400.
 - El bucket debe permitir `INSERT` con la anon key (política de Storage) y lectura pública.

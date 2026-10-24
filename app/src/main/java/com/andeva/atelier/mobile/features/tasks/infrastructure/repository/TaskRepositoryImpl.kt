@@ -31,7 +31,7 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.AddTaskPro
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.AttachTaskEvidencePayload
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.CompleteTaskRequestDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.HoldTaskRequestDto
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartSearchService
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.InventoryService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PauseTaskRequestDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.UpdateTaskProductRequestDto
@@ -57,7 +57,7 @@ import javax.inject.Inject
  */
 class TaskRepositoryImpl @Inject constructor(
     private val taskService: TaskService,
-    private val partSearchService: PartSearchService,
+    private val inventoryService: InventoryService,
     private val vehicleService: VehicleService,
     private val bayService: WorkBayLookupService,
     private val taskDao: TaskDao,
@@ -139,7 +139,7 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun searchParts(query: String): Result<List<PartOption>> =
-        apiCall(gson, { partSearchService.search(query.trim().ifEmpty { null }) }) { dtos -> dtos.map { it.toDomain() } }
+        apiCall(gson, { inventoryService.getItems(search = query.trim().ifEmpty { null }) }) { dtos -> dtos.map { it.toDomain() } }
 
     override suspend fun addPart(id: TaskId, productId: String, quantity: BigDecimal): Result<TaskProduct> =
         apiCall(gson, { taskService.addProduct(id.value, AddTaskProductRequestDto(productId, quantity)) }) { it.toDomain() }
