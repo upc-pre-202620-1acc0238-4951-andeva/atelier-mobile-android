@@ -31,6 +31,9 @@ class FakePendingOperationDao : PendingOperationDao {
     override fun observeByDedupeKey(dedupeKey: String): Flow<PendingOperationEntity?> =
         rows.map { map -> map.values.firstOrNull { it.dedupeKey == dedupeKey } }
 
+    override fun observeByTypeAndDedupePrefix(type: String, prefix: String): Flow<List<PendingOperationEntity>> =
+        rows.map { map -> map.values.filter { it.type == type && it.dedupeKey.startsWith(prefix) }.sortedBy { it.createdAt } }
+
     override suspend fun nextAttemptAt(userId: String) = rows.value.values
         .filter { it.userId == userId && it.status == PendingOperationEntity.STATUS_PENDING }
         .minOfOrNull { it.nextAttemptAt }

@@ -30,6 +30,10 @@ interface PendingOperationDao {
     @Query("SELECT * FROM pending_operations WHERE dedupe_key = :dedupeKey")
     fun observeByDedupeKey(dedupeKey: String): Flow<PendingOperationEntity?>
 
+    /** Operaciones de un tipo cuya `dedupe_key` empieza con [prefix] (p. ej. las fotos en cola de una tarea). */
+    @Query("SELECT * FROM pending_operations WHERE type = :type AND dedupe_key LIKE :prefix || '%' ORDER BY created_at")
+    fun observeByTypeAndDedupePrefix(type: String, prefix: String): Flow<List<PendingOperationEntity>>
+
     /** Próximo `next_attempt_at` de lo que sigue PENDING, para reprogramar el worker tras el backoff. */
     @Query("SELECT MIN(next_attempt_at) FROM pending_operations WHERE user_id = :userId AND status = 'PENDING'")
     suspend fun nextAttemptAt(userId: String): Long?

@@ -14,7 +14,9 @@ import com.andeva.atelier.mobile.features.main.domain.PendingOperationStatus
 import com.google.gson.Gson
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -198,6 +200,9 @@ class PendingOperationRepositoryImplTest {
         }
 
         override suspend fun findById(id: String) = rows[id]
+
+        override fun observeByTarget(target: String): Flow<List<PendingUploadEntity>> =
+            flowOf(rows.values.filter { it.target == target })
 
         override suspend fun setPublicUrl(id: String, publicUrl: String) {
             rows[id]?.let { rows[id] = it.copy(publicUrl = publicUrl) }
