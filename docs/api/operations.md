@@ -697,7 +697,7 @@ Add authorized technical task to work order
 | Campo | Tipo | Requerido | Restricciones |
 | --- | --- | --- | --- |
 | `description` | string | no | max 1000 |
-| `mechanicId` | string(uuid) | no |  |
+| `mechanicId` | string(uuid) | no | membershipId del mecánico |
 | `price` | number | no | ≥ 0 |
 
 ### CompleteTaskResource (request)
@@ -735,7 +735,7 @@ Add authorized technical task to work order
 
 | Campo | Tipo | Requerido | Restricciones |
 | --- | --- | --- | --- |
-| `mechanicId` | string(uuid) | sí |  |
+| `mechanicId` | string(uuid) | sí | membershipId del mecánico |
 
 ### PauseTaskResource (request)
 
@@ -844,6 +844,8 @@ Add authorized technical task to work order
 | `currency` | string |
 
 ### WorkOrderDetailResource
+
+> Nombres de referencia sin valor real: `tasks[].serviceName` = "Standard Service", `proposals[].serviceName` = "Suggested Service", `mechanicName` = `null`, `products[].productName` = "Product {uuid}". Resolver el servicio con `GET /services` (hueco H11 de [03](../03-traceability.md#huecos-abiertos)). Una tarea con `pendingSuspensionRequestedAt` no nulo tiene una solicitud de suspensión pendiente (H5).
 
 | Campo | Tipo |
 | --- | --- |
@@ -959,7 +961,7 @@ Add authorized technical task to work order
 | --- | --- | --- | --- |
 | `description` | string | sí | max 2000 |
 | `imageUrl` | string | sí | min 1 |
-| `mechanicId` | string(uuid) | sí |  |
+| `mechanicId` | string(uuid) | sí | membershipId del mecánico (en la app: el de la sesión) |
 | `severity` | string | sí | min 1, patrón `LOW\|MEDIUM\|CRITICAL` |
 | `suggestedServiceId` | string(uuid) | no |  |
 
@@ -970,7 +972,7 @@ Add authorized technical task to work order
 | `finalPrice` | number | sí | ≥ 0 |
 | `laborHours` | number | sí | ≥ 0 |
 | `serviceId` | string(uuid) | sí |  |
-| `mechanicId` | string(uuid) | no |  |
+| `mechanicId` | string(uuid) | no | membershipId del mecánico |
 | `notes` | string | no | max 1000 |
 
 ### RejectTaskProposalResource (request)
@@ -986,7 +988,7 @@ Add authorized technical task to work order
 | `description` | string | sí | max 1000 |
 | `serviceId` | string(uuid) | sí |  |
 | `currency` | string | no | patrón `PEN\|USD` |
-| `mechanicId` | string(uuid) | no |  |
+| `mechanicId` | string(uuid) | no | membershipId del mecánico |
 | `price` | number | no | ≥ 0 |
 
 ### PartProfitabilityResource
