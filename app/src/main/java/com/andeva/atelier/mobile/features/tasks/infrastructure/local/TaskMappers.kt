@@ -2,7 +2,6 @@ package com.andeva.atelier.mobile.features.tasks.infrastructure.local
 
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
-import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleEntity
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.Task
@@ -14,7 +13,6 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.AssignedTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PartDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskProductDto
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.VehicleDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskImageDto
@@ -109,19 +107,6 @@ fun PartDto.toDomain() = PartOption(
     basePrice = basePrice,
     totalStock = totalStock ?: BigDecimal.ZERO,
     unitOfMeasure = unitOfMeasure
-)
-
-fun VehicleDto.toEntity(syncedAt: Long) = VehicleEntity(
-    id = id,
-    plate = plate,
-    vin = vin,
-    brand = brand.orEmpty(),
-    model = model.orEmpty(),
-    year = year,
-    engineType = engineType,
-    currentOwnerId = currentOwnerId,
-    currentMileage = currentMileage,
-    syncedAt = syncedAt
 )
 
 /** Sin `branchId` en la respuesta se usa la sede consultada, para que caiga en su alcance `bays:{branchId}`. */
