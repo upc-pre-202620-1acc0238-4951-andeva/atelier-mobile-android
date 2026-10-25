@@ -5,6 +5,7 @@ import com.andeva.atelier.mobile.core.data.remote.PdfDownloader
 import com.andeva.atelier.mobile.core.data.remote.apiCall
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.MissingBranchException
+import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.cashier.domain.CashierRepository
 import com.andeva.atelier.mobile.features.cashier.domain.DailyCashSummary
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
@@ -147,7 +148,9 @@ class CashierRepositoryImpl @Inject constructor(
         val voucher = getVoucher(voucherId).getOrElse { return Result.failure(it) }
         if (amount > voucher.pendingBalance.amount) return Result.failure(InvalidCashierInputException("amount"))
 
-        val request = paymentRequest(voucher, branchId, amount, method, reference)
+        val currency = voucher.currency?.takeIf { it == Money.PEN || it == Money.USD }
+            ?: return Result.failure(InvalidCashierInputException("currency"))
+        val request = paymentRequest(voucher, currency, branchId, amount, method, reference)
         val payment = guarded { cashierService.registerPayment(request) }
         val failure = payment.exceptionOrNull()
         if (failure != null) {

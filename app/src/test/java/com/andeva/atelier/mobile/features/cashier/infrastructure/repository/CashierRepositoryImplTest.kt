@@ -479,4 +479,39 @@ class CashierRepositoryImplTest {
         assertEquals("Falta el pago", error?.message)
         assertEquals("COMPLETED", env.db.workOrderDao().findById("wo1")!!.status)
     }
+
+    // --- Montos y moneda nunca inventados ---
+
+    @Test
+    fun `un saldo pendiente ausente hace fallar la lectura en vez de verse pagado`() = runTest {
+        env.signIn()
+        env.responses["GET $voucherPath"] = env.json(env.voucher() - "pendingBalance")
+
+        assertTrue(repository.getVoucher("v1").isFailure)
+        assertTrue(repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).isFailure)
+        assertTrue(env.requested("POST", paymentsPath).isEmpty())
+    }
+
+    @Test
+    fun `una moneda desconocida en el comprobante no envia un cobro con PEN inventado`() = runTest {
+        env.signIn()
+        env.responses["GET $voucherPath"] = env.json(env.voucher() + ("currency" to "EUR"))
+
+        val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+        assertEquals("currency", (error as InvalidCashierInputException).field)
+        assertTrue(env.requested("POST", paymentsPath).isEmpty())
+    }
+
+    @Test
+    fun `cobro registrado pero relectura fallida falla con PaymentOutcomeUnknownException`() = runTest {
+        env.signIn()
+        env.enqueue("GET $voucherPath", env.json(env.voucher()), env.error(500, "ERROR", "Falla"))
+        env.responses["POST $paymentsPath"] = env.json(env.payment(amount = 10.0), code = 201)
+
+        val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+        assertTrue(error is PaymentOutcomeUnknownException)
+        assertEquals(1, env.requested("POST", paymentsPath).size)
+    }
 }

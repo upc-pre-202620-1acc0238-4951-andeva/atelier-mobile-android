@@ -87,7 +87,8 @@ fun ElectronicVoucherDto.toDomain(): Voucher {
         sunatDescription = sunatResponse?.description,
         lines = lines.orEmpty().map { it.toDomain() },
         payments = payments.orEmpty().map { it.toDomain(currency) },
-        issuedAt = issuedAt.toInstant()
+        issuedAt = issuedAt.toInstant(),
+        currency = this.currency
     )
 }
 
@@ -155,12 +156,12 @@ fun VoucherDraft.toRequest(branchId: String, serie: String) = IssueVoucherReques
 )
 
 /**
- * Solo la moneda cae a PEN si no se conoce; el monto nunca se inventa: un monto inválido (negativo) hace fallar el
+ * Solo la moneda cae a PEN si no se conoce; el monto nunca se inventa: un monto ausente o inválido (negativo) hace fallar el
  * mapeo, porque un saldo en 0 de más haría ver pagada una orden que no lo está.
  */
 private fun money(amount: BigDecimal?, currency: String): Money {
     val known = if (currency == Money.PEN || currency == Money.USD) currency else Money.PEN
-    return Money(amount ?: BigDecimal.ZERO, known)
+    return Money(requireNotNull(amount) { "Missing amount" }, known)
 }
 
 /** Si el comprobante cuenta como venta vigente, sin construir el modelo completo. */
@@ -187,6 +188,7 @@ fun DailyReconciliationDto.toDomain(requestedDate: LocalDate): DailyCashSummary 
 /** La moneda y el comprobante salen del comprobante leído; la sede, de la sesión. */
 fun paymentRequest(
     voucher: Voucher,
+    currency: String,
     branchId: String,
     amount: BigDecimal,
     method: PaymentMethod,
@@ -194,7 +196,7 @@ fun paymentRequest(
 ) = RegisterPaymentRequestDto(
     amount = amount,
     branchId = branchId,
-    currency = voucher.pendingBalance.currency,
+    currency = currency,
     paymentMethod = method.name,
     voucherId = voucher.id,
     transactionReference = transactionReference

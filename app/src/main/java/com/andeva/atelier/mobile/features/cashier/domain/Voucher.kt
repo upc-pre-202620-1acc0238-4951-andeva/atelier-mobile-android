@@ -36,7 +36,9 @@ data class Voucher(
     val sunatDescription: String?,
     val lines: List<VoucherLine>,
     val payments: List<Payment>,
-    val issuedAt: Instant?
+    val issuedAt: Instant?,
+    /** Moneda tal como la envió el backend; null si falta. Los montos usan PEN si no es PEN ni USD. */
+    val currency: String? = null
 ) {
     val isActiveSale: Boolean get() = isActiveSale(type, status)
 }
