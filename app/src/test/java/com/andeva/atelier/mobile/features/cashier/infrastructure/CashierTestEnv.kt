@@ -7,6 +7,7 @@ import com.andeva.atelier.mobile.core.data.local.AppDatabase
 import com.andeva.atelier.mobile.core.data.local.InMemoryPreferencesDataStore
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.AuthInterceptor
+import com.andeva.atelier.mobile.core.data.remote.PdfDownloader
 import com.andeva.atelier.mobile.core.data.remote.session.AuthenticatedUserDto
 import com.andeva.atelier.mobile.core.data.remote.session.TenantSummaryDto
 import com.andeva.atelier.mobile.core.domain.Permission
@@ -17,6 +18,7 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherItemType
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherLineDraft
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CashierService
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.HandoverService
 import com.andeva.atelier.mobile.features.cashier.infrastructure.repository.CashierRepositoryImpl
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
@@ -90,6 +92,9 @@ class CashierTestEnv {
 
     fun repository() = CashierRepositoryImpl(
         cashierService = retrofit.create(CashierService::class.java),
+        handoverService = retrofit.create(HandoverService::class.java),
+        workOrderDao = db.workOrderDao(),
+        pdfDownloader = PdfDownloader(context, gson),
         voucherDao = db.voucherDao(),
         sessionManager = sessionManager,
         gson = gson,
@@ -144,6 +149,17 @@ class CashierTestEnv {
         ),
         "payments" to emptyList<Any>(), "issuedAt" to "2026-10-24T13:30:00Z",
         "paidAmount" to paid, "pendingBalance" to total - paid, "paymentStatus" to if (paid > 0) "PARTIAL" else "PENDING"
+    )
+
+    fun workOrder(id: String = "wo1", status: String = "COMPLETED"): Map<String, Any?> = mapOf(
+        "id" to id, "tenantId" to "t1", "internalNumber" to 15, "vehicleId" to "v1", "customerId" to "c1",
+        "branchId" to "b1", "currentBayId" to null, "bayName" to null, "status" to status,
+        "totalAmount" to 118.0, "currency" to "PEN", "createdAt" to "2026-10-24T13:00:00Z"
+    )
+
+    fun payment(id: String = "p1", amount: Double = 50.0, method: String = "CASH"): Map<String, Any?> = mapOf(
+        "id" to id, "voucherId" to "v1", "amount" to amount, "currency" to "PEN", "paymentMethod" to method,
+        "transactionReference" to null, "status" to "COMPLETED", "paidAt" to "2026-10-24T13:45:00Z"
     )
 
     fun draft(type: VoucherType = VoucherType.BOLETA) = VoucherDraft(

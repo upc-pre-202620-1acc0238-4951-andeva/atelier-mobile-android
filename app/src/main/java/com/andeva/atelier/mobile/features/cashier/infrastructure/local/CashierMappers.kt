@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.cashier.infrastructure.local
 
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.cashier.domain.CustomerFiscalInfo
+import com.andeva.atelier.mobile.features.cashier.domain.DailyCashSummary
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalDocumentType
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
 import com.andeva.atelier.mobile.features.cashier.domain.Payment
@@ -16,14 +17,17 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.domain.isActiveSale
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CustomerFiscalInfoDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.DailyReconciliationDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ElectronicVoucherDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.IssueVoucherRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.RegisterPaymentRequestDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.SeriesConfigurationDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherLineDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherLineRequestDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherPaymentDto
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * Room guarda los montos como texto decimal (docs/06-offline-sync.md §5). Un tipo, estado o forma de pago que la app no
@@ -165,3 +169,33 @@ fun ElectronicVoucherDto.isActiveSale() = isActiveSale(VoucherType.from(voucherT
 private fun String?.toInstant(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
 
 private inline fun <reified T : Enum<T>> String?.toEnum(): T? = enumValues<T>().firstOrNull { it.name == this }
+
+/** Una forma de pago que la app no conoce se omite del desglose; el total y los cobros llegan completos. */
+fun DailyReconciliationDto.toDomain(requestedDate: LocalDate): DailyCashSummary {
+    val currency = currency ?: Money.PEN
+    return DailyCashSummary(
+        date = date?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: requestedDate,
+        totalCollected = money(totalCollected, currency),
+        paymentCount = paymentCount ?: payments.orEmpty().size,
+        byMethod = breakdownByMethod.orEmpty().mapNotNull { (key, amount) ->
+            key.toEnum<PaymentMethod>()?.let { it to money(amount, currency) }
+        }.toMap(),
+        payments = payments.orEmpty().map { it.toDomain(currency) }
+    )
+}
+
+/** La moneda y el comprobante salen del comprobante leído; la sede, de la sesión. */
+fun paymentRequest(
+    voucher: Voucher,
+    branchId: String,
+    amount: BigDecimal,
+    method: PaymentMethod,
+    transactionReference: String?
+) = RegisterPaymentRequestDto(
+    amount = amount,
+    branchId = branchId,
+    currency = voucher.pendingBalance.currency,
+    paymentMethod = method.name,
+    voucherId = voucher.id,
+    transactionReference = transactionReference
+)

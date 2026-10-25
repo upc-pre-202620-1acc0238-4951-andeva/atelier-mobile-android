@@ -30,6 +30,7 @@ import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderRepository
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderTaskChanges
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.saveHeaderOrDeleteClosed
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toDetail
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toDomain
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
@@ -272,16 +273,7 @@ class WorkOrderRepositoryImpl @Inject constructor(
     private suspend fun header(call: suspend () -> Response<WorkOrderDto>): Result<WorkOrder> =
         apiCall(gson, call) { it }.map { saveHeader(it) }
 
-    private suspend fun saveHeader(dto: WorkOrderDto): WorkOrder {
-        val row = dto.toEntity(clock.millis())
-        val closed = WorkOrderStatus.entries.any { it.name == dto.status && it.isClosed }
-        if (closed) {
-            workOrderDao.delete(dto.id)
-            return row.toDomain()
-        }
-        workOrderDao.saveHeader(row)
-        return workOrderDao.findById(dto.id)?.toDomain() ?: row.toDomain()
-    }
+    private suspend fun saveHeader(dto: WorkOrderDto): WorkOrder = workOrderDao.saveHeaderOrDeleteClosed(dto, clock.millis())
 
     /** Operaciones en cola de un tipo para la orden, con el archivo local mientras no se suba. */
     private fun <T> pending(

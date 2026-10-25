@@ -7,4 +7,4 @@ class InvalidCashierInputException(val field: String) : Exception("Invalid cashi
 class MissingFiscalSeriesException : Exception("No active fiscal series for the voucher type")
 
 /** Un cobro terminó sin respuesta: no se sabe si el backend lo registró; hay que revisar el historial antes de reintentar. */
-class PaymentOutcomeUnknownException : Exception("Payment outcome unknown")
+class PaymentOutcomeUnknownException(cause: Throwable? = null) : Exception("Payment outcome unknown", cause)
