@@ -48,8 +48,9 @@ interface CashierRepository {
 
     /**
      * Emite el comprobante con la sede de la sesión. Nunca duplica: si la orden ya tiene una factura o boleta vigente
-     * la devuelve como [IssueOutcome.AlreadyIssued] sin emitir, y tras un corte de red relee la orden antes de
-     * rendirse (el backend no documenta un reintento seguro).
+     * la devuelve como [IssueOutcome.AlreadyIssued] sin emitir, y tras un corte de red o un 2xx sin cuerpo legible
+     * relee la orden antes de rendirse (el backend no documenta un reintento seguro). Dos emisiones de la misma orden en
+     * el proceso van una tras otra.
      */
     suspend fun issue(draft: VoucherDraft, serie: String): Result<IssueOutcome>
 
@@ -58,8 +59,10 @@ interface CashierRepository {
      * la orden) y no llama al backend si [amount] es menor a 0.01, tiene más de 2 decimales o supera el saldo
      * (`InvalidCashierInputException("amount")`), o si [transactionReference] pasa de 100 caracteres
      * (`InvalidCashierInputException("transactionReference")`). La moneda es la del comprobante y la sede, la de la
-     * sesión. Devuelve el comprobante releído. Si el envío termina sin respuesta no se reintenta: se relee el
-     * comprobante y falla con [PaymentOutcomeUnknownException], para revisar el historial antes de volver a cobrar.
+     * sesión. Devuelve el comprobante releído. Si el envío termina sin respuesta, con un 5xx o con un 2xx sin cuerpo
+     * legible no se reintenta: se relee el comprobante y falla con [PaymentOutcomeUnknownException], para revisar el
+     * historial antes de volver a cobrar. Un 4xx falla con el `message` del backend. Dos cobros del mismo comprobante en
+     * el proceso van uno tras otro.
      */
     suspend fun registerPayment(
         voucherId: String,

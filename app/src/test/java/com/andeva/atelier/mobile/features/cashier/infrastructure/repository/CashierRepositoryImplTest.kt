@@ -645,6 +645,130 @@ class CashierRepositoryImplTest {
         assertEquals(listOf("good"), repository.observeWorkOrderVouchers("wo1").first().map { it.id })
     }
 
+    // --- Respuestas ambiguas: 2xx sin cuerpo, cuerpo ilegible, 5xx al cobrar ---
+
+    private fun unreadable() = MockResponse().setResponseCode(201).setBody("<html>oops</html>")
+
+    @Test
+    fun `una emision 204 sin cuerpo relee la orden y devuelve el comprobante creado`() = runTest {
+        env.signIn()
+        env.enqueue("GET $listPath", env.json(emptyList<Any>()), env.json(listOf(env.voucher(id = "created"))))
+        env.responses["POST $issuePath"] = MockResponse().setResponseCode(204)
+
+        val outcome = repository.issue(env.draft(), "B001").getOrThrow()
+
+        assertTrue(outcome is IssueOutcome.Issued)
+        assertEquals("created", outcome.voucherId)
+        assertEquals(1, env.requested("POST", issuePath).size)
+    }
+
+    @Test
+    fun `una emision con cuerpo null sin comprobante en la relectura devuelve el error original`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(emptyList<Any>())
+        env.responses["POST $issuePath"] = MockResponse().setResponseCode(201).setBody("null")
+
+        val error = repository.issue(env.draft(), "B001").exceptionOrNull()
+
+        assertEquals("EMPTY_BODY", (error as ApiException).code)
+        assertEquals(201, error.httpStatus)
+        assertEquals(2, env.requested("GET", listPath).size)
+        assertEquals(1, env.requested("POST", issuePath).size)
+    }
+
+    @Test
+    fun `una emision con cuerpo ilegible relee la orden y devuelve el comprobante creado`() = runTest {
+        env.signIn()
+        env.enqueue("GET $listPath", env.json(emptyList<Any>()), env.json(listOf(env.voucher(id = "created"))))
+        env.responses["POST $issuePath"] = unreadable()
+
+        val outcome = repository.issue(env.draft(), "B001").getOrThrow()
+
+        assertTrue(outcome is IssueOutcome.Issued)
+        assertEquals("created", outcome.voucherId)
+    }
+
+    @Test
+    fun `una emision con cuerpo ilegible sin comprobante en la relectura devuelve el error original`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(emptyList<Any>())
+        env.responses["POST $issuePath"] = unreadable()
+
+        val error = repository.issue(env.draft(), "B001").exceptionOrNull()
+
+        assertTrue(error != null && error !is ApiException)
+        assertEquals(2, env.requested("GET", listPath).size)
+        assertEquals(1, env.requested("POST", issuePath).size)
+    }
+
+    @Test
+    fun `si la relectura tras un timeout tambien corta devuelve la IOException del envio`() = runTest {
+        env.signIn()
+        env.enqueue(
+            "GET $listPath",
+            env.json(emptyList<Any>()),
+            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+        )
+        env.responses["POST $issuePath"] = MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+
+        val error = repository.issue(env.draft(), "B001").exceptionOrNull()
+
+        assertTrue(error is IOException)
+        assertEquals(1, env.requested("POST", issuePath).size)
+        assertEquals(2, env.requested("GET", listPath).size)
+    }
+
+    @Test
+    fun `si la relectura tras un timeout es ilegible devuelve la IOException del envio`() = runTest {
+        env.signIn()
+        env.enqueue("GET $listPath", env.json(emptyList<Any>()), MockResponse().setBody("<html>oops</html>"))
+        env.responses["POST $issuePath"] = MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+
+        val error = repository.issue(env.draft(), "B001").exceptionOrNull()
+
+        assertTrue(error is java.net.SocketTimeoutException)
+    }
+
+    @Test
+    fun `un 5xx al cobrar es un resultado desconocido y relee el comprobante`() = runTest {
+        env.signIn()
+        env.responses["GET $voucherPath"] = env.json(env.voucher())
+        env.responses["POST $paymentsPath"] = env.error(500, "ERROR", "Falla interna")
+
+        val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+        assertTrue(error is PaymentOutcomeUnknownException)
+        assertEquals(500, (error?.cause as ApiException).httpStatus)
+        assertEquals(1, env.requested("POST", paymentsPath).size)
+        assertEquals(2, env.requested("GET", voucherPath).size)
+    }
+
+    @Test
+    fun `un cobro 2xx sin cuerpo es un resultado desconocido y relee el comprobante`() = runTest {
+        env.signIn()
+        env.responses["GET $voucherPath"] = env.json(env.voucher())
+        env.responses["POST $paymentsPath"] = MockResponse().setResponseCode(201).setBody("null")
+
+        val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+        assertTrue(error is PaymentOutcomeUnknownException)
+        assertEquals("EMPTY_BODY", (error?.cause as ApiException).code)
+        assertEquals(2, env.requested("GET", voucherPath).size)
+    }
+
+    @Test
+    fun `un cobro con cuerpo ilegible es un resultado desconocido y relee el comprobante`() = runTest {
+        env.signIn()
+        env.responses["GET $voucherPath"] = env.json(env.voucher())
+        env.responses["POST $paymentsPath"] = unreadable()
+
+        val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+        assertTrue(error is PaymentOutcomeUnknownException)
+        assertEquals(1, env.requested("POST", paymentsPath).size)
+        assertEquals(2, env.requested("GET", voucherPath).size)
+    }
+
     // --- Doble toque concurrente ---
 
     private fun key(request: RecordedRequest) = "${request.method} ${request.path!!.substringBefore('?')}"

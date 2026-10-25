@@ -111,9 +111,9 @@ class CashierRepositoryImpl @Inject constructor(
     /**
      * Antes de emitir se lee la orden: si ya tiene una factura o boleta vigente se devuelve esa y no se envía nada
      * (doble toque, otro cajero). Si no se puede verificar, no se emite. Si el envío termina sin respuesta
-     * ([IOException] o respuesta ilegible) no se sabe si el backend lo creó: se relee la orden y, si hay un comprobante
-     * vigente, es el creado; si no, se devuelve el error original. Un error HTTP (p. ej. 502 de SUNAT) se devuelve tal
-     * cual y no guarda nada. El envío no se reintenta solo. Guardar la cabecera en la caché es de mejor esfuerzo: nunca
+     * ([IOException], respuesta ilegible o 2xx sin cuerpo) no se sabe si el backend lo creó: se relee la orden y, si hay
+     * un comprobante vigente, es el creado; si no (o si la relectura también falla), se devuelve el error original. Un
+     * error HTTP 4xx o 5xx (p. ej. 502 de SUNAT) se devuelve tal cual y no guarda nada. El envío no se reintenta solo. Guardar la cabecera en la caché es de mejor esfuerzo: nunca
      * cambia el resultado que ya dio el backend. Dos emisiones de la misma orden en este proceso van una tras otra: la
      * segunda ya ve el comprobante de la primera.
      */
@@ -132,12 +132,15 @@ class CashierRepositoryImpl @Inject constructor(
 
         val issued = guarded { cashierService.issueVoucher(draft.toRequest(branchId, serie)) }
         val failure = issued.exceptionOrNull()
-        if (failure != null && failure !is ApiException) {
+        if (failure is ApiException && !failure.isSuccessStatus) {
+            return Result.failure(failure) // error HTTP, también 5xx: el backend rechazó la emisión
+        }
+        if (failure != null) {
+            // Sin respuesta, cuerpo ilegible o 2xx sin cuerpo: no se sabe si lo creó. Se relee la orden.
             val created = fetchWorkOrderVouchers(draft.workOrderId).getOrNull()?.firstOrNull { it.isActiveSale() }
                 ?: return Result.failure(failure)
             return Result.success(issuedOutcome(created, draft.workOrderId))
         }
-        if (failure != null) return Result.failure(failure) // error HTTP: el backend rechazó la emisión
         // El backend ya lo emitió: desde aquí nunca se devuelve un error.
         return Result.success(issuedOutcome(issued.getOrThrow(), draft.workOrderId))
     }
@@ -149,18 +152,20 @@ class CashierRepositoryImpl @Inject constructor(
     private suspend fun issuedOutcome(dto: ElectronicVoucherDto, workOrderId: String): IssueOutcome {
         cacheHeader(dto, workOrderId)
         runCatching { dto.toDomain() }.getOrNull()?.let { return IssueOutcome.Issued(it) }
-        val reread = try {
-            getVoucher(dto.id).getOrNull()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
-        return reread?.let { IssueOutcome.Issued(it) } ?: IssueOutcome.IssuedPendingDetails(dto.id)
+        return readVoucher(dto.id).getOrNull()?.let { IssueOutcome.Issued(it) } ?: IssueOutcome.IssuedPendingDetails(dto.id)
     }
 
     private suspend fun fetchWorkOrderVouchers(workOrderId: String) =
-        apiCall(gson, { cashierService.getWorkOrderVouchers(workOrderId) }) { it }
+        guarded { cashierService.getWorkOrderVouchers(workOrderId) }
+
+    /** [getVoucher] que nunca lanza: una respuesta ilegible también llega como fallo. */
+    private suspend fun readVoucher(id: String): Result<Voucher> = try {
+        getVoucher(id)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     /** Mejor esfuerzo: la cabecera en caché es de cortesía y su fallo nunca desmiente lo que dijo el backend. */
     private suspend fun cacheHeader(dto: ElectronicVoucherDto, fallbackWorkOrderId: String?) {
@@ -203,7 +208,7 @@ class CashierRepositoryImpl @Inject constructor(
         branchId: String
     ): Result<Voucher> {
         // El saldo sale siempre del comprobante, leído ahora (riesgo 3), nunca de la orden.
-        val voucher = getVoucher(voucherId).getOrElse { return Result.failure(it) }
+        val voucher = readVoucher(voucherId).getOrElse { return Result.failure(it) }
         if (amount > voucher.pendingBalance.amount) return Result.failure(InvalidCashierInputException("amount"))
 
         val currency = voucher.currency?.takeIf { it == Money.PEN || it == Money.USD }
@@ -212,13 +217,17 @@ class CashierRepositoryImpl @Inject constructor(
         val payment = guarded { cashierService.registerPayment(request) }
         val failure = payment.exceptionOrNull()
         if (failure != null) {
-            if (failure is ApiException) return Result.failure(failure)
-            // Sin respuesta: no se sabe si el backend lo registró. Nunca se reintenta; se relee y se avisa.
-            getVoucher(voucherId)
+            // Un 4xx es un rechazo: se muestra su message.
+            if (failure is ApiException && !failure.isSuccessStatus && failure.httpStatus < SERVER_ERROR) {
+                return Result.failure(failure)
+            }
+            // Sin respuesta, cuerpo ilegible, 2xx sin cuerpo o 5xx: no se sabe si el backend lo registró. Nunca se
+            // reintenta; se relee (para la caché) y se avisa.
+            readVoucher(voucherId)
             return Result.failure(PaymentOutcomeUnknownException(failure))
         }
         // Cobrado en el backend: si la relectura falla no se informa un error de cobro, sino que se revise el historial.
-        return getVoucher(voucherId).recoverCatching { throw PaymentOutcomeUnknownException(it) }
+        return readVoucher(voucherId).recoverCatching { throw PaymentOutcomeUnknownException(it) }
     }
 
     override suspend fun getPayments(voucherId: String): Result<List<Payment>> =
@@ -255,6 +264,10 @@ class CashierRepositoryImpl @Inject constructor(
         val MIN_PAYMENT = BigDecimal("0.01")
         const val MONEY_SCALE = 2
         const val MAX_REFERENCE_LENGTH = 100
+        const val SERVER_ERROR = 500
+
+        /** Un 2xx que llega como error: `apiCall` lo da así si no hay cuerpo (`EMPTY_BODY`). */
+        val ApiException.isSuccessStatus: Boolean get() = httpStatus in 200..299
     }
 }
 
