@@ -54,7 +54,20 @@ fun ElectronicVoucherDto.toEntity(fallbackWorkOrderId: String?, syncedAt: Long):
     )
 }
 
-/** null si algún monto guardado no se puede leer: nunca se muestra un 0 inventado. */ fun VoucherEntity.toDomain(): VoucherSummary? = VoucherSummary( id = id, workOrderId = workOrderId, type = VoucherType.from(voucherType), serie = serie, number = number, totalAmount = totalAmount.toBigDecimalOrNull() ?: return null, paidAmount = paidAmount.toBigDecimalOrNull() ?: return null, pendingBalance = pendingBalance.toBigDecimalOrNull() ?: return null, paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(), status = status.toEnum<VoucherStatus>(), pdfUrl = pdfUrl )
+/** null si algún monto guardado no se puede leer: nunca se muestra un 0 inventado. */
+fun VoucherEntity.toDomain(): VoucherSummary? = VoucherSummary(
+    id = id,
+    workOrderId = workOrderId,
+    type = VoucherType.from(voucherType),
+    serie = serie,
+    number = number,
+    totalAmount = totalAmount.toBigDecimalOrNull() ?: return null,
+    paidAmount = paidAmount.toBigDecimalOrNull() ?: return null,
+    pendingBalance = pendingBalance.toBigDecimalOrNull() ?: return null,
+    paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(),
+    status = status.toEnum<VoucherStatus>(),
+    pdfUrl = pdfUrl
+)
 
 fun ElectronicVoucherDto.toDomain(): Voucher {
     val currency = currency ?: Money.PEN

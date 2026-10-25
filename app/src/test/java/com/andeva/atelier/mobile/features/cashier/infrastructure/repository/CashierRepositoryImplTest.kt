@@ -259,6 +259,81 @@ class CashierRepositoryImplTest {
         assertTrue(env.requests.isEmpty())
     }
 
+    // --- Series SUNAT (B5) ---
+
+    private val seriesPath = "/api/v1/invoicing/series-configurations"
+
+    private fun seriesJson(id: String = "s1", type: String = "03", serie: String = "B001", active: Boolean = true) =
+        mapOf("id" to id, "branchId" to "b1", "voucherType" to type, "serie" to serie, "currentCorrelative" to 0, "active" to active)
+
+    @Test
+    fun `configurar envia el codigo SUNAT`() = runTest {
+        env.signIn()
+        env.responses["POST $seriesPath"] = env.json(seriesJson(), code = 201)
+
+        val series = repository.configureSeries(VoucherType.BOLETA, "B001", 5).getOrThrow()
+
+        assertEquals("s1", series.id)
+        assertEquals(VoucherType.BOLETA, series.type)
+        val body = JsonParser.parseString(env.requested("POST", seriesPath).single().body.readUtf8()).asJsonObject
+        assertEquals("03", body["voucherType"].asString)
+        assertEquals("B001", body["serie"].asString)
+        assertEquals("b1", body["branchId"].asString)
+        assertEquals(5, body["initialCorrelative"].asInt)
+    }
+
+    @Test
+    fun `serie con prefijo invalido no llega al backend`() = runTest {
+        env.signIn()
+
+        val error = repository.configureSeries(VoucherType.BOLETA, "F001", null).exceptionOrNull()
+
+        assertTrue(error is InvalidCashierInputException)
+        assertEquals("serie", (error as InvalidCashierInputException).field)
+        assertTrue(env.requests.isEmpty())
+    }
+
+    @Test
+    fun `un correlativo inicial negativo no llega al backend`() = runTest {
+        env.signIn()
+
+        val error = repository.configureSeries(VoucherType.FACTURA, "F001", -1).exceptionOrNull()
+
+        assertEquals("initialCorrelative", (error as InvalidCashierInputException).field)
+        assertTrue(env.requests.isEmpty())
+    }
+
+    @Test
+    fun `sin sede configurar falla con MissingBranchException sin llamar al backend`() = runTest {
+        env.signIn(branchId = null)
+
+        assertTrue(repository.configureSeries(VoucherType.BOLETA, "B001", null).exceptionOrNull() is MissingBranchException)
+        assertTrue(env.requests.isEmpty())
+    }
+
+    @Test
+    fun `serie duplicada devuelve el message del 409`() = runTest {
+        env.signIn()
+        env.responses["POST $seriesPath"] = env.error(409, "SERIES_EXISTS", "La serie ya está registrada")
+
+        val error = repository.configureSeries(VoucherType.BOLETA, "B001", null).exceptionOrNull()
+
+        assertTrue(error is ApiException)
+        assertEquals(409, (error as ApiException).httpStatus)
+        assertEquals("La serie ya está registrada", error.message)
+    }
+
+    @Test
+    fun `activar o desactivar una serie envia active`() = runTest {
+        env.signIn()
+        env.responses["PUT $seriesPath/s1/status"] = MockResponse().setResponseCode(200).setBody("{}")
+
+        repository.setSeriesActive("s1", false).getOrThrow()
+
+        val body = JsonParser.parseString(env.requested("PUT", "$seriesPath/s1/status").single().body.readUtf8()).asJsonObject
+        assertEquals(false, body["active"].asBoolean)
+    }
+
     // --- Cobros (B4) ---
 
     private val voucherPath = "/api/v1/invoicing/vouchers/v1"

@@ -3,10 +3,12 @@ package com.andeva.atelier.mobile.features.cashier.infrastructure.repository
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.PdfDownloader
 import com.andeva.atelier.mobile.core.data.remote.apiCall
+import com.andeva.atelier.mobile.core.data.remote.apiCallUnit
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.cashier.domain.CashierRepository
+import com.andeva.atelier.mobile.features.cashier.domain.CashierValidation
 import com.andeva.atelier.mobile.features.cashier.domain.DailyCashSummary
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
 import com.andeva.atelier.mobile.features.cashier.domain.InvalidCashierInputException
@@ -17,6 +19,7 @@ import com.andeva.atelier.mobile.features.cashier.domain.PaymentOutcomeUnknownEx
 import com.andeva.atelier.mobile.features.cashier.domain.Voucher
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherDraft
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherDao
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.isActiveSale
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.toDomain
@@ -24,6 +27,8 @@ import com.andeva.atelier.mobile.features.cashier.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.paymentRequest
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.toRequest
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CashierService
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ConfigureSeriesRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.UpdateSeriesStatusRequestDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ElectronicVoucherDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.HandoverService
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
@@ -77,6 +82,23 @@ class CashierRepositoryImpl @Inject constructor(
         val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
         return apiCall(gson, { cashierService.getBranchSeries(branchId) }) { dtos -> dtos.map { it.toDomain() } }
     }
+
+    override suspend fun configureSeries(
+        type: VoucherType,
+        serie: String,
+        initialCorrelative: Int?
+    ): Result<FiscalSeries> {
+        if (!CashierValidation.isSeriesFor(type, serie)) return Result.failure(InvalidCashierInputException("serie"))
+        if (initialCorrelative != null && initialCorrelative < 0) {
+            return Result.failure(InvalidCashierInputException("initialCorrelative"))
+        }
+        val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
+        val request = ConfigureSeriesRequestDto(branchId, serie, type.code, initialCorrelative)
+        return apiCall(gson, { cashierService.configureSeries(request) }) { it.toDomain() }
+    }
+
+    override suspend fun setSeriesActive(id: String, active: Boolean): Result<Unit> =
+        apiCallUnit(gson) { cashierService.updateSeriesStatus(id, UpdateSeriesStatusRequestDto(active)) }
 
     /**
      * Antes de emitir se lee la orden: si ya tiene una factura o boleta vigente se devuelve esa y no se envía nada

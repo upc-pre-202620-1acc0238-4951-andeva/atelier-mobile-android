@@ -37,6 +37,16 @@ interface CashierRepository {
     suspend fun getBranchSeries(): Result<List<FiscalSeries>>
 
     /**
+     * Registra una serie en la sede de la sesión (`voucherType` viaja como código SUNAT). No llama al backend si la
+     * serie no corresponde al tipo (`InvalidCashierInputException("serie")`) o si [initialCorrelative] es negativo
+     * (`InvalidCashierInputException("initialCorrelative")`). Una serie repetida da el `message` del 409.
+     */
+    suspend fun configureSeries(type: VoucherType, serie: String, initialCorrelative: Int?): Result<FiscalSeries>
+
+    /** Activa o desactiva una serie. */
+    suspend fun setSeriesActive(id: String, active: Boolean): Result<Unit>
+
+    /**
      * Emite el comprobante con la sede de la sesión. Nunca duplica: si la orden ya tiene una factura o boleta vigente
      * la devuelve como [IssueOutcome.AlreadyIssued] sin emitir, y tras un corte de red relee la orden antes de
      * rendirse (el backend no documenta un reintento seguro).
