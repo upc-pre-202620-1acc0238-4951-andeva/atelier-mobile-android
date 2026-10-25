@@ -7,8 +7,8 @@ import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Caché `bays` por sede (docs/06-offline-sync.md §4). Por ahora la llena `tasks` para mostrar el nombre
- * de la bahía (US26); el paso 9 (`bays`) la usa para el tablero.
+ * Caché `bays` por sede (docs/06-offline-sync.md §4). La llenan `tasks`, para mostrar el nombre de la
+ * bahía (US26), y `bays`, para el tablero; ambas marcan el mismo alcance `bays:{branchId}`.
  */
 @Dao
 abstract class BayDao {
