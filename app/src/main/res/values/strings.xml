@@ -13,4 +13,59 @@
     <string name="sync_failed_max_attempts">No se pudo sincronizar</string>
     <string name="error_storage_not_configured">Falta configurar el almacenamiento de fotos</string>
     <string name="error_pending_photo_missing">La foto ya no está en el teléfono</string>
+
+    <!-- Común -->
+    <string name="common_back">Volver</string>
+
+    <!-- Auth: campos -->
+    <string name="auth_email_label">Correo institucional</string>
+    <string name="auth_password_label">Contraseña</string>
+    <string name="auth_confirm_password">Confirmar contraseña</string>
+    <string name="auth_show_password">Mostrar contraseña</string>
+    <string name="auth_hide_password">Ocultar contraseña</string>
+    <string name="auth_first_name">Nombres</string>
+    <string name="auth_last_name">Apellidos</string>
+
+    <!-- Auth: A5 Iniciar sesión -->
+    <string name="auth_login_title">Inicia sesión</string>
+    <string name="auth_login_subtitle">Con el correo institucional de tu taller.</string>
+    <string name="auth_login_action">Iniciar sesión</string>
+    <string name="auth_forgot_password">¿Olvidaste tu contraseña?</string>
+    <string name="auth_or">o</string>
+    <string name="auth_have_invitation">Tengo un enlace de invitación</string>
+    <string name="auth_email_verified">Correo verificado. Ya puedes iniciar sesión.</string>
+
+    <!-- Auth: A3 Registro por invitación -->
+    <string name="auth_register_title">Crear tu cuenta</string>
+    <string name="auth_link_title">Pega tu enlace</string>
+    <string name="auth_link_body">Usa el enlace del correo con el que te invitó el administrador de tu taller.</string>
+    <string name="auth_link_label">Enlace de invitación</string>
+    <string name="auth_link_placeholder">Pega el enlace o el código</string>
+    <string name="auth_continue">Continuar</string>
+    <string name="auth_invited_to">Te invitaron a</string>
+    <string name="auth_invited_role">Rol: %1$s</string>
+    <string name="auth_rule_length">Al menos 8 caracteres</string>
+    <string name="auth_rule_uppercase">Una letra mayúscula</string>
+    <string name="auth_rule_match">Coincide con la confirmación</string>
+    <string name="auth_rule_met">Cumplido</string>
+    <string name="auth_rule_pending">Pendiente</string>
+    <string name="auth_complete_registration">Completar registro</string>
+    <string name="auth_invitation_expired_title">Esta invitación venció.</string>
+    <string name="auth_invitation_expired_body">Pide una nueva al administrador de tu taller.</string>
+    <string name="auth_invitation_gone_title">Esta invitación ya no es válida.</string>
+    <string name="auth_invitation_gone_body">Fue revocada o el enlace está incompleto. Pide una nueva al administrador de tu taller.</string>
+    <string name="auth_back_to_login">Volver a iniciar sesión</string>
+
+    <!-- Auth: A4 Verificar correo -->
+    <string name="auth_verify_title">Verifica tu correo</string>
+    <string name="auth_otp_title">Ingresa el código</string>
+    <string name="auth_otp_sent_to">Lo enviamos a %1$s</string>
+    <string name="auth_otp_label">Código de verificación de %1$d dígitos</string>
+    <string name="auth_otp_progress">%1$d de %2$d dígitos</string>
+    <string name="auth_otp_expires_in">Vence en %1$s</string>
+    <string name="auth_otp_expired">El código venció. Pide uno nuevo.</string>
+    <string name="auth_otp_resent">Te enviamos un código nuevo.</string>
+    <string name="auth_resend">Reenviar código</string>
+    <string name="auth_resend_in">Reenviar en %1$s</string>
+    <string name="auth_verify_action">Verificar código</string>
 </resources>
