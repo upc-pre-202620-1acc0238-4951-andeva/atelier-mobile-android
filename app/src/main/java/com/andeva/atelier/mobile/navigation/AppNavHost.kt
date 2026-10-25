@@ -12,14 +12,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
 import kotlinx.serialization.Serializable
 
-/** Grafo sin sesión. La feature `auth` reemplaza [AuthStartRoute] por sus pantallas. */
+/** Grafo sin sesión. Sus pantallas las define la feature `auth` (`authNavGraph`). */
 @Serializable
 data object AuthNavGraphRoute
-
-@Serializable
-data object AuthStartRoute
 
 /** Grafo con sesión. La feature `main` reemplaza [MainStartRoute] por el Scaffold con pestañas. */
 @Serializable
@@ -40,9 +38,7 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
         navController = navController,
         startDestination = if (signedIn) MainNavGraphRoute else AuthNavGraphRoute
     ) {
-        navigation<AuthNavGraphRoute>(startDestination = AuthStartRoute) {
-            composable<AuthStartRoute> { }
-        }
+        authNavGraph(navController)
         navigation<MainNavGraphRoute>(startDestination = MainStartRoute) {
             composable<MainStartRoute> { }
         }
