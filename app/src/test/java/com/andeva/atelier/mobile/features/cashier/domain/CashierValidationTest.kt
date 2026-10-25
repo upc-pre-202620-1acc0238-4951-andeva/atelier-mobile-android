@@ -58,6 +58,13 @@ class CashierValidationTest {
         assertTrue(summary(VoucherType.FACTURA, VoucherStatus.ISSUED).isActiveSale)
     }
 
+    @Test
+    fun `isActiveSale excluye rechazados por SUNAT pero cuenta borradores`() {
+        assertFalse(summary(VoucherType.BOLETA, VoucherStatus.REJECTED_SUNAT).isActiveSale)
+        assertTrue(summary(VoucherType.BOLETA, VoucherStatus.DRAFT).isActiveSale)
+        assertTrue(summary(VoucherType.BOLETA, VoucherStatus.ACCEPTED_SUNAT).isActiveSale)
+    }
+
     private fun summary(type: VoucherType, status: VoucherStatus) = VoucherSummary(
         id = "v1", workOrderId = "w1", type = type, serie = "F001", number = 1,
         totalAmount = BigDecimal("118.00"), paidAmount = BigDecimal.ZERO,

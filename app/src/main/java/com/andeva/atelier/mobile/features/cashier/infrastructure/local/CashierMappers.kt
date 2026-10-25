@@ -14,6 +14,7 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherPaymentStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
+import com.andeva.atelier.mobile.features.cashier.domain.isActiveSale
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CustomerFiscalInfoDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ElectronicVoucherDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.IssueVoucherRequestDto
@@ -149,8 +150,17 @@ fun VoucherDraft.toRequest(branchId: String, serie: String) = IssueVoucherReques
     workOrderId = workOrderId
 )
 
-private fun money(amount: BigDecimal?, currency: String): Money =
-    runCatching { Money(amount ?: BigDecimal.ZERO, currency) }.getOrElse { Money(BigDecimal.ZERO, Money.PEN) }
+/**
+ * Solo la moneda cae a PEN si no se conoce; el monto nunca se inventa: un monto inválido (negativo) hace fallar el
+ * mapeo, porque un saldo en 0 de más haría ver pagada una orden que no lo está.
+ */
+private fun money(amount: BigDecimal?, currency: String): Money {
+    val known = if (currency == Money.PEN || currency == Money.USD) currency else Money.PEN
+    return Money(amount ?: BigDecimal.ZERO, known)
+}
+
+/** Si el comprobante cuenta como venta vigente, sin construir el modelo completo. */
+fun ElectronicVoucherDto.isActiveSale() = isActiveSale(VoucherType.from(voucherType), status.toEnum<VoucherStatus>())
 
 private fun String?.toInstant(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
 

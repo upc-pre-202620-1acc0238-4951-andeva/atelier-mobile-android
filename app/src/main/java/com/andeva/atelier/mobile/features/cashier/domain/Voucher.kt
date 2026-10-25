@@ -4,9 +4,13 @@ import com.andeva.atelier.mobile.core.domain.Money
 import java.math.BigDecimal
 import java.time.Instant
 
-/** Una venta vigente es una factura o boleta que no está anulada; las notas de crédito no cuentan. */
+/**
+ * Una venta vigente es una factura o boleta con validez fiscal: ni anulada ni rechazada por SUNAT (esa se puede volver
+ * a emitir). Un borrador sí cuenta. Las notas de crédito no cuentan.
+ */
 internal fun isActiveSale(type: VoucherType?, status: VoucherStatus?): Boolean =
-    (type == VoucherType.FACTURA || type == VoucherType.BOLETA) && status != VoucherStatus.VOIDED
+    (type == VoucherType.FACTURA || type == VoucherType.BOLETA) &&
+        status != VoucherStatus.VOIDED && status != VoucherStatus.REJECTED_SUNAT
 
 /** `ElectronicVoucherResource` (docs/api/invoicing.md). */
 data class Voucher(

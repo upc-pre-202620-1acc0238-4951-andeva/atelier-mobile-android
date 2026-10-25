@@ -20,6 +20,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
+import java.math.BigDecimal
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -100,6 +101,38 @@ class CashierRepositoryImplTest {
         assertEquals(1, env.requested("POST", issuePath).size)
     }
 
+
+    @Test
+    fun `un comprobante rechazado por SUNAT no bloquea una nueva emision`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(listOf(env.voucher(id = "rej", status = "REJECTED_SUNAT")))
+        env.responses["POST $issuePath"] = env.json(env.voucher(id = "new"), code = 201)
+
+        val outcome = repository.issue(env.draft(), "B001").getOrThrow()
+
+        assertTrue(outcome is IssueOutcome.Issued)
+        assertEquals("new", outcome.voucher.id)
+        assertEquals(1, env.requested("POST", issuePath).size)
+    }
+
+    @Test
+    fun `una moneda desconocida conserva el saldo pendiente`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/invoicing/vouchers/v1"] = env.json(env.voucher(paid = 18.0) + ("currency" to "EUR"))
+
+        val voucher = repository.getVoucher("v1").getOrThrow()
+
+        assertEquals(0, BigDecimal("100.0").compareTo(voucher.pendingBalance.amount))
+        assertEquals("PEN", voucher.pendingBalance.currency)
+    }
+
+    @Test
+    fun `un monto invalido hace fallar el mapeo en vez de inventar un saldo en cero`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/invoicing/vouchers/v1"] = env.json(env.voucher() + ("pendingBalance" to -5.0))
+
+        assertTrue(repository.getVoucher("v1").isFailure)
+    }
     @Test
     fun `tras un timeout al emitir relee y devuelve el comprobante creado`() = runTest {
         env.signIn()
