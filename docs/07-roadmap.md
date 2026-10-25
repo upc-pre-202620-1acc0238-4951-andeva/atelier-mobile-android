@@ -287,9 +287,9 @@ Solo `domain`, `application` e `infrastructure`; la pantalla del tablero, las ru
 
 | Pieza lista para la UI | Dónde | Para qué |
 | --- | --- | --- |
-| `RefreshBayBoardUseCase` / `ObserveBayBoardUseCase` → `Flow<List<BayBoardItem>>` | `features/bays/application` | US40 E3: tablero desde Room. Emite enseguida sin mecánicos ni tiempo y los completa cuando llegan los detalles de las órdenes. `laborElapsed` es null si ninguna tarea está `IN_PROGRESS`. `MissingBranchException` sin sede |
+| `RefreshBayBoardUseCase` → `Result<Unit>`; `ObserveBayBoardUseCase` → `Flow<List<BayBoardItem>>` | `features/bays/application` | US40 E3: tablero desde Room. Emite enseguida sin mecánicos ni tiempo y los completa cuando llegan los detalles de las órdenes. `laborElapsed` es null si ninguna tarea está `IN_PROGRESS`. El tiempo transcurrido solo avanza con cada refresco (30 s); la UI puede contarlo localmente. Sin sede, Refresh falla con `MissingBranchException` y Observe emite una lista vacía |
 | `PollBayBoardUseCase` → `Flow<Result<Unit>>` | `features/bays/application` | US40 E3: refresca ya y cada 30 s mientras se recoge; recogerlo solo con la pantalla visible. Sin `operations:bays:read` termina sin emitir ni llamar |
-| `ReassignBayUseCase(workOrderId, targetBay)` | `features/bays/application` | US40 E1/E2 (`operations:bays:reassign`). Si `WorkBay.canReceive` es falso lanza `BayUnavailableException` sin llamar (deshabilitar esas bahías); si otro la ocupó antes, 409 con el `message`. `bayType` solo se muestra (H25) |
+| `ReassignBayUseCase(workOrderId, targetBay)` | `features/bays/application` | US40 E1/E2 (`operations:bays:reassign`). Si `WorkBay.canReceive` es falso falla con `BayUnavailableException` sin llamar (deshabilitar esas bahías); si otro la ocupó antes, 409 con el `message`. `bayType` solo se muestra (H25) |
 | `ReassignTaskMechanicUseCase(taskId, mechanicId)` | `features/bays/application` | US40 E1. `mechanicId` = membershipId (H11); la lista sale de `GetBranchMechanicsUseCase`. Tras reasignar, el tablero muestra un momento los ocupantes sin mecánico hasta que se recargan los detalles |
 | Excepciones | `features/bays/domain` | `BayUnavailableException`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
 
