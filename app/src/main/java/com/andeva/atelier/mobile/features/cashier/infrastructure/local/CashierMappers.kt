@@ -31,36 +31,30 @@ import java.time.LocalDate
 
 /**
  * Room guarda los montos como texto decimal (docs/06-offline-sync.md §5). Un tipo, estado o forma de pago que la app no
- * conoce queda en null; las columnas obligatorias de la caché guardan entonces texto vacío.
+ * conoce queda en null; las columnas obligatorias de la caché guardan entonces texto vacío. Sin monto no hay fila (null):
+ * nunca se guarda un 0 inventado.
  */
-fun ElectronicVoucherDto.toEntity(fallbackWorkOrderId: String?, syncedAt: Long) = VoucherEntity(
-    id = id,
-    workOrderId = workOrderId ?: fallbackWorkOrderId,
-    voucherType = voucherType.orEmpty(),
-    serie = serie.orEmpty(),
-    number = number ?: 0,
-    totalAmount = (totalAmount ?: BigDecimal.ZERO).toPlainString(),
-    paidAmount = (paidAmount ?: BigDecimal.ZERO).toPlainString(),
-    pendingBalance = (pendingBalance ?: BigDecimal.ZERO).toPlainString(),
-    paymentStatus = paymentStatus.orEmpty(),
-    status = status.orEmpty(),
-    pdfUrl = digitalReceipts?.pdfUrl,
-    syncedAt = syncedAt
-)
+fun ElectronicVoucherDto.toEntity(fallbackWorkOrderId: String?, syncedAt: Long): VoucherEntity? {
+    val total = totalAmount ?: return null
+    val paid = paidAmount ?: return null
+    val pending = pendingBalance ?: return null
+    return VoucherEntity(
+        id = id,
+        workOrderId = workOrderId ?: fallbackWorkOrderId,
+        voucherType = voucherType.orEmpty(),
+        serie = serie.orEmpty(),
+        number = number ?: 0,
+        totalAmount = total.toPlainString(),
+        paidAmount = paid.toPlainString(),
+        pendingBalance = pending.toPlainString(),
+        paymentStatus = paymentStatus.orEmpty(),
+        status = status.orEmpty(),
+        pdfUrl = digitalReceipts?.pdfUrl,
+        syncedAt = syncedAt
+    )
+}
 
-fun VoucherEntity.toDomain() = VoucherSummary(
-    id = id,
-    workOrderId = workOrderId,
-    type = VoucherType.from(voucherType),
-    serie = serie,
-    number = number,
-    totalAmount = totalAmount.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-    paidAmount = paidAmount.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-    pendingBalance = pendingBalance.toBigDecimalOrNull() ?: BigDecimal.ZERO,
-    paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(),
-    status = status.toEnum<VoucherStatus>(),
-    pdfUrl = pdfUrl
-)
+/** null si algún monto guardado no se puede leer: nunca se muestra un 0 inventado. */ fun VoucherEntity.toDomain(): VoucherSummary? = VoucherSummary( id = id, workOrderId = workOrderId, type = VoucherType.from(voucherType), serie = serie, number = number, totalAmount = totalAmount.toBigDecimalOrNull() ?: return null, paidAmount = paidAmount.toBigDecimalOrNull() ?: return null, pendingBalance = pendingBalance.toBigDecimalOrNull() ?: return null, paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(), status = status.toEnum<VoucherStatus>(), pdfUrl = pdfUrl )
 
 fun ElectronicVoucherDto.toDomain(): Voucher {
     val currency = currency ?: Money.PEN

@@ -8,11 +8,18 @@ import java.time.LocalDate
 
 /** Resultado de emitir: el comprobante nuevo, o el que la orden ya tenía vigente (no se emite otro). */
 sealed interface IssueOutcome {
-    val voucher: Voucher
+    val voucherId: String
 
-    data class Issued(override val voucher: Voucher) : IssueOutcome
+    data class Issued(val voucher: Voucher) : IssueOutcome {
+        override val voucherId: String get() = voucher.id
+    }
 
-    data class AlreadyIssued(override val voucher: Voucher) : IssueOutcome
+    data class AlreadyIssued(val voucher: Voucher) : IssueOutcome {
+        override val voucherId: String get() = voucher.id
+    }
+
+    /** El comprobante ya existe en el backend, pero su respuesta no se pudo leer completa: la UI debe recargarlo. */
+    data class IssuedPendingDetails(override val voucherId: String) : IssueOutcome
 }
 
 /** Contrato de caja: comprobantes, cobros, caja del día, pase de salida y entrega. */

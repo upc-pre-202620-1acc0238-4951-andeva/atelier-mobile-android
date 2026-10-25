@@ -55,10 +55,10 @@ class VoucherDaoTest {
         dao.upsert(row("b", "wo1", number = 2, status = "ALGO_NUEVO", type = "99"))
 
         assertEquals("VOIDED", dao.findById("a")!!.status)
-        val summary = dao.findById("b")!!.toDomain()
+        val summary = dao.findById("b")!!.toDomain()!!
         assertNull(summary.status)
         assertNull(summary.type)
-        assertEquals(VoucherType.BOLETA, dao.findById("a")!!.toDomain().type)
-        assertEquals(VoucherStatus.VOIDED, dao.findById("a")!!.toDomain().status)
+        assertEquals(VoucherType.BOLETA, dao.findById("a")!!.toDomain()!!.type)
+        assertEquals(VoucherStatus.VOIDED, dao.findById("a")!!.toDomain()!!.status)
     }
 }

@@ -8,6 +8,7 @@ import com.andeva.atelier.mobile.features.cashier.domain.IssueOutcome
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentOutcomeUnknownException
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherPaymentStatus
+import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEntity
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.infrastructure.CashierTestEnv
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
@@ -60,7 +61,7 @@ class CashierRepositoryImplTest {
         val outcome = repository.issue(env.draft(VoucherType.FACTURA), "F001").getOrThrow()
 
         assertTrue(outcome is IssueOutcome.Issued)
-        assertEquals("v1", outcome.voucher.id)
+        assertEquals("v1", outcome.voucherId)
         val body = JsonParser.parseString(env.requested("POST", issuePath).single().body.readUtf8()).asJsonObject
         assertEquals("01", body["voucherType"].asString)
         assertEquals("b1", body["branchId"].asString)
@@ -82,7 +83,7 @@ class CashierRepositoryImplTest {
         val outcome = repository.issue(env.draft(), "B001").getOrThrow()
 
         assertTrue(outcome is IssueOutcome.AlreadyIssued)
-        assertEquals("v9", outcome.voucher.id)
+        assertEquals("v9", outcome.voucherId)
         assertTrue(env.requested("POST", issuePath).isEmpty())
     }
 
@@ -94,7 +95,7 @@ class CashierRepositoryImplTest {
 
         val outcome = repository.issue(env.draft(), "B001").getOrThrow()
 
-        assertEquals("new", outcome.voucher.id)
+        assertEquals("new", outcome.voucherId)
         assertEquals(1, env.requested("POST", issuePath).size)
     }
 
@@ -107,7 +108,7 @@ class CashierRepositoryImplTest {
         val outcome = repository.issue(env.draft(), "B001").getOrThrow()
 
         assertTrue(outcome is IssueOutcome.Issued)
-        assertEquals("new", outcome.voucher.id)
+        assertEquals("new", outcome.voucherId)
         assertEquals(1, env.requested("POST", issuePath).size)
     }
 
@@ -121,7 +122,7 @@ class CashierRepositoryImplTest {
         val outcome = repository.issue(env.draft(), "B001").getOrThrow()
 
         assertTrue(outcome is IssueOutcome.Issued)
-        assertEquals("new", outcome.voucher.id)
+        assertEquals("new", outcome.voucherId)
         assertEquals(1, env.requested("POST", issuePath).size)
     }
 
@@ -152,7 +153,7 @@ class CashierRepositoryImplTest {
         val outcome = repository.issue(env.draft(), "B001").getOrThrow()
 
         assertTrue(outcome is IssueOutcome.Issued)
-        assertEquals("created", outcome.voucher.id)
+        assertEquals("created", outcome.voucherId)
         assertEquals(1, env.requested("POST", issuePath).size)
         assertEquals(2, env.requested("GET", listPath).size)
     }
@@ -513,5 +514,54 @@ class CashierRepositoryImplTest {
 
         assertTrue(error is PaymentOutcomeUnknownException)
         assertEquals(1, env.requested("POST", paymentsPath).size)
+    }
+
+    // --- Emision con respuesta incompleta y cache sin montos inventados ---
+
+    @Test
+    fun `una respuesta de emision sin saldo se relee por id y sigue siendo Issued`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(emptyList<Any>())
+        env.responses["POST $issuePath"] = env.json(env.voucher(id = "new") - "pendingBalance", code = 201)
+        env.responses["GET /api/v1/invoicing/vouchers/new"] = env.json(env.voucher(id = "new"))
+
+        val outcome = repository.issue(env.draft(), "B001").getOrThrow()
+
+        assertTrue(outcome is IssueOutcome.Issued)
+        assertEquals("new", outcome.voucherId)
+        assertEquals(1, env.requested("POST", issuePath).size)
+    }
+
+    @Test
+    fun `si ni la respuesta ni la relectura se pueden mapear devuelve IssuedPendingDetails`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(emptyList<Any>())
+        env.responses["POST $issuePath"] = env.json(env.voucher(id = "new") - "pendingBalance", code = 201)
+        env.responses["GET /api/v1/invoicing/vouchers/new"] = env.error(500, "ERROR", "Falla")
+
+        val outcome = repository.issue(env.draft(), "B001").getOrThrow()
+
+        assertEquals(IssueOutcome.IssuedPendingDetails("new"), outcome)
+        assertEquals(1, env.requested("POST", issuePath).size)
+        assertNull(env.db.voucherDao().findById("new"))
+    }
+
+    @Test
+    fun `refrescar no guarda comprobantes sin montos`() = runTest {
+        env.signIn()
+        env.responses["GET $listPath"] = env.json(listOf(env.voucher(id = "ok"), env.voucher(id = "bad") - "totalAmount"))
+
+        repository.refreshWorkOrderVouchers("wo1")
+
+        assertEquals(listOf("ok"), repository.observeWorkOrderVouchers("wo1").first().map { it.id })
+    }
+
+    @Test
+    fun `una fila de cache con monto ilegible no se muestra como pagada`() = runTest {
+        val dao = env.db.voucherDao()
+        dao.upsert(VoucherEntity("good", "wo1", "03", "B001", 1, "118", "0", "118", "PENDING", "ISSUED", null, 0))
+        dao.upsert(VoucherEntity("bad", "wo1", "03", "B001", 2, "118", "0", "", "PENDING", "ISSUED", null, 0))
+
+        assertEquals(listOf("good"), repository.observeWorkOrderVouchers("wo1").first().map { it.id })
     }
 }

@@ -58,12 +58,12 @@ class CashierRepositoryImpl @Inject constructor(
 ) : CashierRepository {
 
     override fun observeWorkOrderVouchers(workOrderId: String): Flow<List<VoucherSummary>> =
-        voucherDao.observeByWorkOrder(workOrderId).map { rows -> rows.map { it.toDomain() } }
+        voucherDao.observeByWorkOrder(workOrderId).map { rows -> rows.mapNotNull { it.toDomain() } }
 
     override suspend fun refreshWorkOrderVouchers(workOrderId: String): Result<List<Voucher>> =
         fetchWorkOrderVouchers(workOrderId).mapCatching { dtos ->
             val now = clock.millis()
-            voucherDao.replaceWorkOrder(workOrderId, dtos.map { it.toEntity(workOrderId, now) })
+            voucherDao.replaceWorkOrder(workOrderId, dtos.mapNotNull { it.toEntity(workOrderId, now) })
             dtos.map { it.toDomain() }
         }
 
@@ -101,14 +101,28 @@ class CashierRepositoryImpl @Inject constructor(
         if (failure != null && failure !is ApiException) {
             val created = fetchWorkOrderVouchers(draft.workOrderId).getOrNull()?.firstOrNull { it.isActiveSale() }
                 ?: return Result.failure(failure)
-            cacheHeader(created, draft.workOrderId)
-            return runCatching { IssueOutcome.Issued(created.toDomain()) }
+            return Result.success(issuedOutcome(created, draft.workOrderId))
         }
-        // El backend ya lo emitió: un fallo al guardar la caché no puede convertir el resultado en error.
-        return issued.mapCatching { dto ->
-            cacheHeader(dto, draft.workOrderId)
-            IssueOutcome.Issued(dto.toDomain())
+        if (failure != null) return Result.failure(failure) // error HTTP: el backend rechazó la emisión
+        // El backend ya lo emitió: desde aquí nunca se devuelve un error.
+        return Result.success(issuedOutcome(issued.getOrThrow(), draft.workOrderId))
+    }
+
+    /**
+     * Resultado de un comprobante que el backend ya emitió. Si su respuesta no se puede mapear (falta un monto) se
+     * relee por id; si tampoco, el comprobante existe pero sin detalle ([IssueOutcome.IssuedPendingDetails]).
+     */
+    private suspend fun issuedOutcome(dto: ElectronicVoucherDto, workOrderId: String): IssueOutcome {
+        cacheHeader(dto, workOrderId)
+        runCatching { dto.toDomain() }.getOrNull()?.let { return IssueOutcome.Issued(it) }
+        val reread = try {
+            getVoucher(dto.id).getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
         }
+        return reread?.let { IssueOutcome.Issued(it) } ?: IssueOutcome.IssuedPendingDetails(dto.id)
     }
 
     private suspend fun fetchWorkOrderVouchers(workOrderId: String) =
@@ -117,7 +131,7 @@ class CashierRepositoryImpl @Inject constructor(
     /** Mejor esfuerzo: la cabecera en caché es de cortesía y su fallo nunca desmiente lo que dijo el backend. */
     private suspend fun cacheHeader(dto: ElectronicVoucherDto, fallbackWorkOrderId: String?) {
         try {
-            voucherDao.upsert(dto.toEntity(fallbackWorkOrderId, clock.millis()))
+            dto.toEntity(fallbackWorkOrderId, clock.millis())?.let { voucherDao.upsert(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
