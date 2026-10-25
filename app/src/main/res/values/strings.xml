@@ -5,6 +5,10 @@
     <string name="notification_channel_tasks">Tareas</string>
     <string name="notification_channel_attendance">Asistencia</string>
     <string name="notification_channel_inventory">Inventario</string>
+    <string name="notification_channel_diagnostics">Diagnóstico</string>
+
+    <!-- Diagnóstico OBD-II: notificación del foreground service (Android la exige) -->
+    <string name="diagnostics_session_notification_title">Diagnóstico OBD-II en curso</string>
 
     <!-- Núcleo: red y sincronización -->
     <string name="error_requires_connection">Requiere conexión</string>
