@@ -18,8 +18,11 @@ import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftE
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEntity
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertDao
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertEntity
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.TelemetryReadingDao
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.TelemetryReadingEntity
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.VehicleFaultDao
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.VehicleFaultEntity
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchDao
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchEntity
@@ -65,6 +68,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderDao(): WorkOrderDao
     abstract fun partDao(): PartDao
     abstract fun batchDao(): BatchDao
+    abstract fun telemetryReadingDao(): TelemetryReadingDao
+    abstract fun vehicleFaultDao(): VehicleFaultDao
+    abstract fun predictiveAlertDao(): PredictiveAlertDao
 
     companion object {
         const val NAME = "atelier.db"

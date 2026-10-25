@@ -29,7 +29,7 @@ Reglas para todas las sesiones:
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
-| 8 | `diagnostics` — OBD-II, DTC e informe IA | ⬜ Pendiente | `feature/diagnostics` |
+| 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
 | 9 | `bays`, `cashier`, `reports`, `team` | ⬜ Pendiente | una rama por feature |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
@@ -240,11 +240,39 @@ Núcleo extendido: `StoragePaths.purchaseReceipt`, permisos `BATCHES_RECEIVE` y 
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial la recepción con comprobante (H15).
 
-## Paso 8 — `diagnostics` ⬜
+## Paso 8 — `diagnostics` ✅
 
-- **Historias:** US16–US21, US43 · **API:** [api/iot.md](api/iot.md) · [04](04-mobile-integration.md) §4 (ELM327)
+- **Historias:** US16–US21, US43 E1 · **API:** [api/iot.md](api/iot.md) · [04](04-mobile-integration.md) §4 (ELM327)
 - **Offline:** `telemetry_readings` → `TELEMETRY_BATCH`, `REGISTER_FAULT`, `RESOLVE_FAULT` ([06](06-offline-sync.md) §6).
-- **Visible solo si** `session.canUseTelemetry()` / `canUseAiDiagnostics()`. Foreground service `connectedDevice` en sesiones largas.
+- **En línea:** instalar o retirar el escáner, informe IA, alertas predictivas.
+- **Visible solo si** `session.canUseTelemetry()` / `canUseAiDiagnostics()`. Foreground service `connectedDevice` mientras dura la lectura en vivo.
+- **Fuera de este paso:** PDF de flota (US43 E2, paso 9), `generate-async`, registrar dispositivos, telemetría histórica, alertas del taller y convertir alertas en citas.
+
+**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` la hace la otra parte del equipo:
+- Pantallas: elegir adaptador y escáner, conexión, lectura en vivo con avisos, códigos de falla, borrado, informe IA y alertas.
+- Rutas y textos.
+- El pedido de `BLUETOOTH_CONNECT` (API 31+) y abrir o compartir el PDF con FileProvider.
+
+El `vehicleId` sale de `Task.vehicleId` (paso 5) o de `FindVehicleByPlateUseCase` (paso 6). Instalar y el informe IA se deshabilitan sin red con `ConnectivityObserver`; conectar, leer, escanear y borrar funcionan sin red.
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `GetPairedObdAdaptersUseCase` → `ObdAdapter` | `features/diagnostics/application` | US16: adaptadores emparejados en Android (sin escaneo). `BluetoothPermissionDeniedException` → pedir permiso; `BluetoothDisabledException` → activar Bluetooth |
+| `GetObdDevicesUseCase` / `GetActiveInstallationUseCase(vehicleId)` / `InstallObdDeviceUseCase` / `UninstallObdDeviceUseCase` | `features/diagnostics/application` | US16 en línea. Sin instalación activa el lote de telemetría responde 404 (H16): conviene instalar antes de capturar. `ObdDevice.matches(address)` solo sugiere el escáner (H17) |
+| `ConnectObdUseCase(address)` → `ObdConnectionInfo` / `DisconnectObdUseCase` | `features/diagnostics/application` | US16 E1: protocolo y VIN. E2: `ObdNoResponseException` (contacto apagado o sin alimentación) u `ObdAdapterUnreachableException` |
+| `StartLiveTelemetryUseCase(vehicleId)` / `StopLiveTelemetryUseCase` / `ObserveLiveTelemetryUseCase` → `StateFlow<LiveTelemetry>` | `features/diagnostics/application` | US18 E1, US19: muestra cada 2 s, `warnings` por umbral, estado `STREAMING` / `RECONNECTING` / `LOST`. Lotes de 200 por la cola |
+| `FreezeTelemetryUseCase` → `TelemetrySnapshot` | `features/diagnostics/application` | US18 E2: congela la última muestra (ya viaja en el lote; no se puede adjuntar a la orden, H19) |
+| `ScanFaultsUseCase(vehicleId)` → `FaultScanResult` | `features/diagnostics/application` | US17: modo 03 + cuadro congelado (modo 02). `isClean` = sin códigos (E2). Los nuevos quedan `isPending` hasta sincronizar |
+| `ClearFaultsUseCase(vehicleId)` → `ClearFaultsResult` | `features/diagnostics/application` | US20 (`iot:faults:resolve`): `cleared` (E1) y `persistent` (E2, revisar el circuito) |
+| `RefreshVehicleFaultsUseCase` / `ObserveVehicleFaultsUseCase` / `ObserveDiagnosticsSyncStateUseCase` | `features/diagnostics/application` | Fallas activas desde Room y lecturas o fallas que esperan señal (US19 E1) |
+| `GenerateHealthReportUseCase(vehicleId, días 7–90)` → `HealthReport` | `features/diagnostics/application` | US21 E1. `InsufficientTelemetryException` (E3); 403 cuota/plan y 502 IA como `ApiException` con `message` |
+| `GetLatestHealthReportUseCase` / `GetHealthReportDetailUseCase(reportId)` / `DownloadHealthReportPdfUseCase` | `features/diagnostics/application` | US21 E1/E2, US43 E1: detalle (subsistemas, riesgos, servicios sugeridos, correlaciones DTC) y PDF en `cacheDir/pdfs` |
+| `RefreshPredictiveAlertsUseCase` / `ObservePredictiveAlertsUseCase` / `AcknowledgePredictiveAlertUseCase` | `features/diagnostics/application` | Alertas predictivas del vehículo (`iot:alerts:read` / `acknowledge`) |
+| Excepciones | `features/diagnostics/domain` | `ObdNotConnectedException`, `ObdConnectionLostException`, `InvalidDiagnosticsInputException(field)`. El resto es `ApiException` (mostrar `message`) o `IOException` |
+
+Núcleo extendido: en `AppDatabase` los DAOs `TelemetryReadingDao`, `VehicleFaultDao` y `PredictiveAlertDao` (sin cambios en el esquema Room). La ubicación del lote reutiliza `LocationProvider` de `attendance` (opcional). `ObdSessionService` crea su propio canal "Diagnóstico"; `core/notifications` no cambia.
+
+Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo con un ELM327 real y contra el backend, en especial H16 (lote sin instalación) y H17 (qué es `deviceIdentifier`).
 
 ## Paso 9 — `bays`, `cashier`, `reports`, `team` ⬜
 
