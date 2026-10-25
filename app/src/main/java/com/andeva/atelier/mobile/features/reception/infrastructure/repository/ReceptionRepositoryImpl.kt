@@ -83,6 +83,9 @@ class ReceptionRepositoryImpl @Inject constructor(
 
     override fun observeCustomer(id: String): Flow<Customer?> = customerDao.observeById(id).map { it?.toDomain() }
 
+    override suspend fun getCustomer(id: String): Result<Customer> =
+        apiCall(gson, { customerService.getCustomer(id) }) { it }.map { saveCustomer(it) }
+
     override suspend fun searchCustomers(query: String): Result<List<Customer>> {
         val text = query.trim()
         val result = apiCall(gson, { customerService.search(text.ifEmpty { null }) }) { it }
