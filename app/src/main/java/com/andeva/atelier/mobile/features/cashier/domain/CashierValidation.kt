@@ -11,6 +11,17 @@ object CashierValidation {
     private const val DNI_LENGTH = 8
     private const val SERIES_LENGTH = 4
 
+    /** Nombres genéricos de `GET /work-orders/{id}` (H11): "Standard Service" y "Product {uuid}". */
+    private const val SERVICE_PLACEHOLDER = "Standard Service"
+    private val PRODUCT_PLACEHOLDER =
+        Regex("Product [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+    /** Una descripción vacía o con un nombre genérico del detalle de la orden no sirve para un comprobante. */
+    fun isPlaceholderDescription(description: String): Boolean {
+        val text = description.trim()
+        return text.isEmpty() || text == SERVICE_PLACEHOLDER || PRODUCT_PLACEHOLDER.matches(text)
+    }
+
     /** Pasa un precio sin IGV a uno con IGV: × 1.18, 2 decimales, HALF_UP. */
     fun withIgv(net: BigDecimal): BigDecimal =
         net.multiply(BigDecimal.ONE.add(IGV_RATE)).setScale(2, RoundingMode.HALF_UP)

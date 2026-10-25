@@ -88,4 +88,10 @@ data class VoucherLineDraft(
     val description: String,
     val quantity: BigDecimal,
     val unitPriceWithIgv: BigDecimal
-)
+) {
+    /**
+     * La descripción está vacía o es un nombre genérico del detalle de la orden (H11): la UI debe pedir editarla antes
+     * de emitir. Pasa con los repuestos del Cajero, que no tiene `inventory:parts:read`.
+     */
+    val needsDescription: Boolean get() = CashierValidation.isPlaceholderDescription(description)
+}

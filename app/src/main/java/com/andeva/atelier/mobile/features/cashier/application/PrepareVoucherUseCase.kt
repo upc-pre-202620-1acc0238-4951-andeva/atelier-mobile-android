@@ -13,7 +13,9 @@ import javax.inject.Inject
 /**
  * Arma el comprobante de una orden `COMPLETED` (US39, H26). Los nombres de servicio salen del catálogo y los de
  * repuesto de la caché de inventario; si no se pueden leer (el catálogo pide un permiso que algunos roles no tienen)
- * la línea queda con la descripción de la tarea o el nombre del repuesto, sin fallar el borrador.
+ * la línea queda con la descripción de la tarea o el nombre del repuesto, sin fallar el borrador; si ese nombre es el
+ * genérico del detalle (H11) la línea queda marcada con `needsDescription` y la UI debe pedir editarla antes de emitir.
+ * Sin líneas que cobrar falla con `lines`; con precios en varias monedas, con `currency`.
  */
 class PrepareVoucherUseCase @Inject constructor(
     private val workOrderRepository: WorkOrderRepository,
@@ -34,9 +36,9 @@ class PrepareVoucherUseCase @Inject constructor(
             return Result.failure(e)
         }
 
-        val currencies = (detail.tasks.mapNotNull { it.price?.currency } +
-            detail.tasks.flatMap { it.products }.mapNotNull { it.unitPrice?.currency }).distinct()
-        val currency = currencies.singleOrNull() ?: return Result.failure(InvalidCashierInputException("currency"))
+        // Solo cuentan los precios que dan línea: una tarea cancelada o un repuesto en 0 no fijan la moneda.
+        val currency = VoucherDrafts.currenciesOf(detail).singleOrNull()
+            ?: return Result.failure(InvalidCashierInputException("currency"))
 
         val customer = receptionRepository.getCustomer(detail.workOrder.customerId).getOrElse { return Result.failure(it) }
         val (type, info) = VoucherDrafts.suggestFiscalInfo(customer)

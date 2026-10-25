@@ -198,6 +198,41 @@ class CashierUseCasesTest {
     }
 
     @Test
+    fun `una descripcion vacia o generica no se emite`() = runTest {
+        val base = draft(VoucherType.BOLETA, "45678912")
+        listOf("", "   ", "Standard Service", "Product 3f2b8c1e-9d4a-4b7e-8a61-2c5d9e0f1a7b").forEach { description ->
+            val d = base.copy(lines = base.lines + base.lines.first().copy(itemType = VoucherItemType.PRODUCT, description = description))
+
+            assertEquals("lines", field(IssueVoucherUseCase(cashier)(d)))
+        }
+        assertEquals("lines", field(IssueVoucherUseCase(cashier)(base.copy(lines = emptyList()))))
+        coVerify(exactly = 0) { cashier.getBranchSeries() }
+        coVerify(exactly = 0) { cashier.issue(any(), any()) }
+    }
+
+    @Test
+    fun `una tarea cancelada en otra moneda no bloquea el borrador`() = runTest {
+        val cancelledUsd = task(Money(BigDecimal("50.00"), Money.USD)).copy(status = TaskStatus.CANCELLED)
+        val freeUsdPart = product(Money(BigDecimal.ZERO, Money.USD))
+        stubPrepare(
+            detail(WorkOrderStatus.COMPLETED, task(pen("100.00"), listOf(freeUsdPart)), cancelledUsd),
+            Result.success(emptyList())
+        )
+
+        val draft = prepare()("wo1").getOrThrow()
+
+        assertEquals("PEN", draft.currency)
+        assertEquals(1, draft.lines.size)
+    }
+
+    @Test
+    fun `una orden sin nada que cobrar falla con lines y no con currency`() = runTest {
+        stubPrepare(detail(WorkOrderStatus.COMPLETED), Result.success(emptyList()))
+
+        assertEquals("lines", field(prepare()("wo1")))
+    }
+
+    @Test
     fun `pago que salda recarga la orden`() = runTest {
         val getDetail = GetWorkOrderDetailUseCase(workOrders)
         coEvery { cashier.registerPayment("v1", BigDecimal("118.00"), PaymentMethod.CASH, null) } returns

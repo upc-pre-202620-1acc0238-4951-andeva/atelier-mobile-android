@@ -11,7 +11,9 @@ import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderDetail
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -106,11 +108,34 @@ class VoucherDraftTest {
     }
 
     @Test
-    fun `precio nulo falla con el campo lines`() {
+    fun `una tarea en 0 no da linea pero sus repuestos si`() {
+        val lines = VoucherDrafts.fromWorkOrder(
+            detail(task("0.00", products = listOf(product("Filtro", "1", "10.00")))),
+            serviceNames = emptyMap(), partNames = emptyMap()
+        )
+
+        assertEquals(listOf(VoucherItemType.PRODUCT), lines.map { it.itemType })
+        assertEquals(BigDecimal("11.80"), lines.single().unitPriceWithIgv)
+    }
+
+    @Test
+    fun `un repuesto en 0 no da linea`() {
+        val lines = VoucherDrafts.fromWorkOrder(
+            detail(task("100.00", products = listOf(product("Arandela", "4", "0")))),
+            serviceNames = emptyMap(), partNames = emptyMap()
+        )
+
+        assertEquals(listOf(VoucherItemType.SERVICE), lines.map { it.itemType })
+    }
+
+    @Test
+    fun `precio nulo o sin lineas que cobrar falla con el campo lines`() {
         listOf(
             detail(task(null)),
-            detail(task("0.00")),
-            detail(task("100.00", products = listOf(product("Filtro", "1", null))))
+            detail(task("100.00", products = listOf(product("Filtro", "1", null)))),
+            detail(task("0.00", products = listOf(product("Filtro", "1", "0.00")))),
+            detail(task("100.00", status = TaskStatus.CANCELLED)),
+            detail()
         ).forEach { d ->
             try {
                 VoucherDrafts.fromWorkOrder(d, emptyMap(), emptyMap())
@@ -119,6 +144,30 @@ class VoucherDraftTest {
                 assertEquals("lines", e.field)
             }
         }
+    }
+
+    @Test
+    fun `las monedas salen solo de lo que da lineas`() {
+        val usd = Money(BigDecimal("10.00"), Money.USD)
+        val cancelled = task("50.00", status = TaskStatus.CANCELLED).copy(price = usd)
+        val freePart = product("Arandela", "1", null).copy(unitPrice = Money(BigDecimal.ZERO, Money.USD))
+
+        assertEquals(
+            setOf(Money.PEN),
+            VoucherDrafts.currenciesOf(detail(task("100.00", products = listOf(freePart)), cancelled))
+        )
+    }
+
+    @Test
+    fun `una linea sin descripcion o con el nombre generico del detalle pide editarla`() {
+        fun line(type: VoucherItemType, description: String) =
+            VoucherLineDraft(type, "id", description, BigDecimal.ONE, BigDecimal("1.18"))
+
+        assertTrue(line(VoucherItemType.SERVICE, "  ").needsDescription)
+        assertTrue(line(VoucherItemType.SERVICE, "Standard Service").needsDescription)
+        assertTrue(line(VoucherItemType.PRODUCT, "Product 3f2b8c1e-9d4a-4b7e-8a61-2c5d9e0f1a7b").needsDescription)
+        assertFalse(line(VoucherItemType.SERVICE, "Cambio de aceite").needsDescription)
+        assertFalse(line(VoucherItemType.PRODUCT, "Product Filtro K&N").needsDescription)
     }
 
     @Test
