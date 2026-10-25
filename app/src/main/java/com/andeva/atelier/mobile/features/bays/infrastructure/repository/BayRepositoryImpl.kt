@@ -127,9 +127,18 @@ class BayRepositoryImpl @Inject constructor(
             }
         }
 
-    /** null si falla: esa bahía sale sin mecánicos hasta que la colección se reinicie. */
+    /**
+     * Guarda también la cabecera de la orden (`work_orders`) para que el tablero tenga el `internalNumber` aunque la
+     * lista de órdenes nunca se haya refrescado. La placa sigue saliendo de la caché de vehículos (la llena `tasks` o
+     * `reception`); no hay endpoint propio para ella. null si falla: esa bahía sale sin mecánicos hasta que la
+     * colección se reinicie.
+     */
     private suspend fun loadTasks(workOrderId: String): List<TaskDetail>? =
-        apiCall(gson, { workOrderService.getWorkOrder(workOrderId) }) { dto -> dto.tasks.orEmpty().map { it.toDomain() } }
+        apiCall(gson, { workOrderService.getWorkOrder(workOrderId) }) { it }
+            .mapCatching { dto ->
+                workOrderDao.saveHeader(dto.toEntity(clock.millis()))
+                dto.tasks.orEmpty().map { it.toDomain() }
+            }
             .getOrNull()
 
 

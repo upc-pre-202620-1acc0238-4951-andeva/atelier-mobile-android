@@ -218,6 +218,21 @@ class BayRepositoryImplTest {
         assertEquals(2, env.requested("GET", "/api/v1/work-orders/wo1").size)
     }
 
+    @Test
+    fun `el tablero guarda la cabecera del detalle y muestra el numero interno sin lista previa`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = env.json(env.workOrderDetail(tasks = listOf(env.task())))
+        repository.refreshBranchBays().getOrThrow()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+
+        var occupant = emissions.next().single().occupant!!
+        while (occupant.internalNumber == null) occupant = emissions.next().single().occupant!!
+
+        assertEquals(15, occupant.internalNumber)
+    }
+
     private fun summaryEntity() = env.gson
         .fromJson(env.gson.toJson(env.workOrderSummary()), WorkOrderDto::class.java)
         .toEntity(env.clock.millis())
