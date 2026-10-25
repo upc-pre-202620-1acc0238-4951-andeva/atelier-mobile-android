@@ -17,7 +17,6 @@ import com.andeva.atelier.mobile.features.bays.infrastructure.remote.AssignWorkB
 import com.andeva.atelier.mobile.features.bays.infrastructure.remote.WorkBayService
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.infrastructure.local.toDomain
-import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskRepositoryImpl
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderService
@@ -65,7 +64,7 @@ class BayRepositoryImpl @Inject constructor(
         return apiCall(gson, { workBayService.getBays(branchId) }) { it }.mapCatching { dtos ->
             val rows = dtos.map { it.toEntity(branchId, now) }
             bayDao.replaceBranch(branchId, rows)
-            cacheMetadataDao.upsert(CacheMetadataEntity(TaskRepositoryImpl.bayScope(branchId), now, rows.size))
+            cacheMetadataDao.upsert(CacheMetadataEntity(BayCacheScope.of(branchId), now, rows.size))
         }
     }
 

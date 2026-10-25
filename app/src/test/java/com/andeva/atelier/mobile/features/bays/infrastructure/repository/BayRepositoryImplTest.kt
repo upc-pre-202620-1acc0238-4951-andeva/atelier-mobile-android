@@ -4,7 +4,6 @@ import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.features.bays.domain.BayStatus
 import com.andeva.atelier.mobile.features.bays.infrastructure.BayTestEnv
-import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskRepositoryImpl
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -54,7 +53,7 @@ class BayRepositoryImplTest {
         assertEquals("b1", env.requested("GET", "/api/v1/work-bays").single().requestUrl!!.queryParameter("branchId"))
         assertEquals(listOf("Elevador 1", "Foso 2"), repository.observeBoard().first().map { it.bay.name })
         val metadata = env.db.cacheMetadataDao()
-        assertEquals(2, metadata.get(TaskRepositoryImpl.bayScope("b1"))!!.recordCount)
+        assertEquals(2, metadata.get(BayCacheScope.of("b1"))!!.recordCount)
     }
 
     @Test
