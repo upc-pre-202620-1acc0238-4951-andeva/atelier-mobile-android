@@ -23,17 +23,18 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEnti
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderService
 import com.google.gson.Gson
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.time.Clock
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 /**
@@ -67,54 +68,68 @@ class BayRepositoryImpl @Inject constructor(
     }
 
     /**
-     * El detalle de la orden (mecánicos y tareas en curso) se lee una sola vez por `currentWorkOrderId` mientras
-     * dure la colección; el tiempo se recalcula con el reloj en cada emisión, sin volver a la red.
+     * Sale de Room de inmediato; el detalle de la orden (mecánicos y tareas en curso) se lee en segundo plano, una
+     * sola vez por `currentWorkOrderId` mientras dure la colección, y llega a la siguiente emisión. Un detalle que
+     * falla no se reintenta en la misma colección. El tiempo se recalcula con el reloj en cada emisión.
      */
     override fun observeBoard(): Flow<List<BayBoardItem>> = sessionManager.session
         .map { it?.branchId }
         .distinctUntilChanged()
         .flatMapLatest { branchId ->
             if (branchId == null) return@flatMapLatest flowOf(emptyList())
-            flow {
-                val details = HashMap<String, List<TaskDetail>>()
-                var version = mechanicChanges.value
-                emitAll(
-                    combine(
-                        bayDao.observeBranch(branchId),
-                        workOrderDao.observeBranch(branchId),
-                        mechanicChanges
-                    ) { bays, orders, currentVersion ->
-                        if (currentVersion != version) {
-                            details.clear()
-                            version = currentVersion
+            channelFlow {
+                val details = MutableStateFlow<Map<String, List<TaskDetail>>>(emptyMap())
+                val requested = HashSet<String>()
+                val lastVersion = AtomicInteger(mechanicChanges.value)
+                val bays = bayDao.observeBranch(branchId).map { rows -> rows.map { it.toDomain() } }
+
+                launch {
+                    combine(bays.map { b -> b.mapNotNull { it.currentWorkOrderId }.toSet() }.distinctUntilChanged(), mechanicChanges) { ids, version ->
+                        ids to version
+                    }.collect { (ids, version) ->
+                        if (requested.retainAll(ids) || details.value.keys.any { it !in ids }) {
+                            details.update { it.filterKeys { id -> id in ids } }
                         }
-                        val board = bays.map { it.toDomain() }
-                        details.keys.retainAll(board.mapNotNull { it.currentWorkOrderId }.toSet())
-                        val ordersById = orders.associateBy { it.workOrder.id }
-                        board.map { bay ->
-                            val orderId = bay.currentWorkOrderId ?: return@map BayBoardItem(bay, null)
-                            val tasks = details[orderId] ?: loadTasks(orderId)?.also { details[orderId] = it }
-                            val row = ordersById[orderId]
-                            BayBoardItem(
-                                bay,
-                                BayOccupant(
-                                    workOrderId = orderId,
-                                    internalNumber = row?.workOrder?.internalNumber,
-                                    plate = row?.plate,
-                                    mechanicIds = tasks.orEmpty().mapNotNull { it.mechanicId }.distinct(),
-                                    laborElapsed = tasks?.let { laborElapsed(it, clock.instant()) }
-                                )
-                            )
+                        if (version != lastVersion.getAndSet(version)) {
+                            requested.clear()
+                            details.value = emptyMap()
+                        }
+                        ids.filter { requested.add(it) }.forEach { orderId ->
+                            launch {
+                                loadTasks(orderId)?.let { tasks ->
+                                    if (version == mechanicChanges.value) details.update { it + (orderId to tasks) }
+                                }
+                            }
                         }
                     }
-                )
+                }
+
+                combine(bays, workOrderDao.observeBranch(branchId), details) { board, orders, loaded ->
+                    val ordersById = orders.associateBy { it.workOrder.id }
+                    board.map { bay ->
+                        val orderId = bay.currentWorkOrderId ?: return@map BayBoardItem(bay, null)
+                        val tasks = loaded[orderId]
+                        val row = ordersById[orderId]
+                        BayBoardItem(
+                            bay,
+                            BayOccupant(
+                                workOrderId = orderId,
+                                internalNumber = row?.workOrder?.internalNumber,
+                                plate = row?.plate,
+                                mechanicIds = tasks.orEmpty().mapNotNull { it.mechanicId }.distinct(),
+                                laborElapsed = tasks?.let { laborElapsed(it, clock.instant()) }
+                            )
+                        )
+                    }
+                }.collect { send(it) }
             }
         }
 
-    /** null si falla: esa bahía sale sin mecánicos y se reintenta en la próxima emisión. */
+    /** null si falla: esa bahía sale sin mecánicos hasta que la colección se reinicie. */
     private suspend fun loadTasks(workOrderId: String): List<TaskDetail>? =
         apiCall(gson, { workOrderService.getWorkOrder(workOrderId) }) { dto -> dto.tasks.orEmpty().map { it.toDomain() } }
             .getOrNull()
+
 
     /** La cabecera nueva trae la bahía; la recarga de bahías es de cortesía y no desmiente la reasignación. */
     override suspend fun reassignBay(workOrderId: String, bayId: String): Result<Unit> =

@@ -17,6 +17,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Duration
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.SocketPolicy
 import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
@@ -79,7 +81,9 @@ class BayRepositoryImplTest {
         env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
         repository.refreshBranchBays().getOrThrow()
 
-        val board = repository.observeBoard().first()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        val board = emissions.untilLoaded()
 
         val occupied = board.first { it.bay.id == "bay1" }
         assertEquals(BayStatus.OCCUPIED, occupied.bay.status)
@@ -102,7 +106,7 @@ class BayRepositoryImplTest {
         repository.refreshBranchBays().getOrThrow()
         backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
 
-        val first = emissions.next().single()
+        val first = emissions.untilLoaded().single()
         repository.refreshBranchBays().getOrThrow()
         emissions.next()
         repository.refreshBranchBays().getOrThrow()
@@ -152,9 +156,54 @@ class BayRepositoryImplTest {
         assertEquals(BayStatus.OCCUPIED, repository.observeBoard().first().first { it.bay.id == "bay2" }.bay.status)
     }
 
+    @Test
+    fun `el tablero sale de Room aunque el detalle de la orden no responda`() = runTest {
+        env.signIn()
+        env.cachePlate()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+        env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
+        repository.refreshBranchBays().getOrThrow()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+
+        val occupant = emissions.next().single().occupant!!
+
+        assertEquals("ABC123", occupant.plate)
+        assertEquals(emptyList<String>(), occupant.mechanicIds)
+        assertNull(occupant.laborElapsed)
+    }
+
+    @Test
+    fun `un detalle que falla no se reintenta en cada emision`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = env.error(403, "FORBIDDEN", "Sin permiso")
+        env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        repository.refreshBranchBays().getOrThrow()
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+
+        emissions.next()
+        repository.refreshBranchBays().getOrThrow()
+        emissions.next()
+        repository.refreshBranchBays().getOrThrow()
+        emissions.next()
+
+        assertEquals(1, env.requested("GET", "/api/v1/work-orders/wo1").size)
+    }
+
     private fun summaryEntity() = env.gson
         .fromJson(env.gson.toJson(env.workOrderSummary()), WorkOrderDto::class.java)
         .toEntity(env.clock.millis())
+
+    /** Salta la emisión de Room que sale antes de que llegue el detalle. */
+    private suspend fun Channel<List<BayBoardItem>>.untilLoaded(): List<BayBoardItem> {
+        while (true) {
+            val board = next()
+            if (board.all { it.occupant == null || it.occupant.mechanicIds.isNotEmpty() }) return board
+        }
+    }
 
     private suspend fun <T> Channel<T>.next(): T = withContext(Dispatchers.Default) { withTimeout(5_000) { receive() } }
 }
