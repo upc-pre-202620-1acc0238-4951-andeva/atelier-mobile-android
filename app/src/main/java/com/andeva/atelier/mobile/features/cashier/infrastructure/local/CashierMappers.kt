@@ -111,7 +111,7 @@ fun VoucherLineDto.toDomain() = VoucherLine(
     itemId = itemId,
     itemType = itemType.toEnum<VoucherItemType>(),
     description = description.orEmpty(),
-    quantity = quantity ?: BigDecimal.ZERO,
+    quantity = requireNotNull(quantity) { "Missing quantity" },
     unitValue = unitValue,
     unitPrice = unitPrice,
     igvAmount = igvAmount,
@@ -163,8 +163,8 @@ fun VoucherDraft.toRequest(branchId: String, serie: String) = IssueVoucherReques
 )
 
 /**
- * Solo la moneda cae a PEN si no se conoce; el monto nunca se inventa: un monto ausente o inválido (negativo) hace fallar el
- * mapeo, porque un saldo en 0 de más haría ver pagada una orden que no lo está.
+ * Solo la moneda cae a PEN si no se conoce; el monto nunca se inventa, porque un saldo en 0 de más haría ver pagada una
+ * orden que no lo está: un monto ausente falla aquí y uno negativo, en el constructor de [Money].
  */
 private fun money(amount: BigDecimal?, currency: String): Money {
     val known = if (currency == Money.PEN || currency == Money.USD) currency else Money.PEN

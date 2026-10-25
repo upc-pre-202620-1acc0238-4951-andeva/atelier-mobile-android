@@ -14,7 +14,10 @@ import com.andeva.atelier.mobile.features.cashier.infrastructure.CashierTestEnv
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.google.gson.JsonParser
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -767,6 +770,44 @@ class CashierRepositoryImplTest {
         assertTrue(error is PaymentOutcomeUnknownException)
         assertEquals(1, env.requested("POST", paymentsPath).size)
         assertEquals(2, env.requested("GET", voucherPath).size)
+    }
+
+    // --- Cobros solo en comprobantes vigentes, mapeos y caché de mejor esfuerzo ---
+
+    @Test
+    fun `no se cobra un comprobante anulado, rechazado o una nota de credito`() = runTest {
+        env.signIn()
+        listOf(env.voucher(status = "VOIDED"), env.voucher(status = "REJECTED_SUNAT"), env.voucher(type = "07")).forEach {
+            env.responses["GET $voucherPath"] = env.json(it)
+
+            val error = repository.registerPayment("v1", BigDecimal("10"), PaymentMethod.CASH, null).exceptionOrNull()
+
+            assertEquals("status", (error as InvalidCashierInputException).field)
+        }
+        assertTrue(env.requested("POST", paymentsPath).isEmpty())
+    }
+
+    @Test
+    fun `una linea sin cantidad hace fallar el mapeo en vez de inventar un 0`() = runTest {
+        env.signIn()
+        val line = mapOf("id" to "l1", "itemType" to "SERVICE", "description" to "Frenos", "unitPrice" to 118.0, "totalLine" to 118.0)
+        env.responses["GET $voucherPath"] = env.json(env.voucher() + ("lines" to listOf(line)))
+
+        assertTrue(repository.getVoucher("v1").isFailure)
+    }
+
+    @Test
+    fun `si la cache de ordenes falla marcar como pagada y entregar igual devuelven la orden del backend`() = runTest {
+        env.signIn()
+        val brokenDao = mockk<WorkOrderDao>()
+        coEvery { brokenDao.saveHeader(any()) } throws IllegalStateException("disco lleno")
+        coEvery { brokenDao.delete(any()) } throws IllegalStateException("disco lleno")
+        val repository = env.repository(workOrderDao = brokenDao)
+        env.responses["POST /api/v1/work-orders/wo1/mark-as-paid"] = env.json(env.workOrder(status = "COMPLETED"))
+        env.responses["POST /api/v1/work-orders/wo1/deliver"] = env.json(env.workOrder(status = "PAID"))
+
+        assertEquals(WorkOrderStatus.COMPLETED, repository.markWorkOrderPaid("wo1").getOrThrow().status)
+        assertEquals(WorkOrderStatus.PAID, repository.deliver("wo1").getOrThrow().status)
     }
 
     // --- Doble toque concurrente ---

@@ -34,6 +34,8 @@ import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.Handover
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.saveHeaderOrDeleteClosed
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toDomain as toWorkOrder
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity as toWorkOrderEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
 import com.google.gson.Gson
 import kotlinx.coroutines.CancellationException
@@ -209,6 +211,8 @@ class CashierRepositoryImpl @Inject constructor(
     ): Result<Voucher> {
         // El saldo sale siempre del comprobante, leído ahora (riesgo 3), nunca de la orden.
         val voucher = readVoucher(voucherId).getOrElse { return Result.failure(it) }
+        // Anulado, rechazado por SUNAT o nota de crédito: no se cobra. Un estado desconocido o nulo cuenta como vigente.
+        if (!voucher.isActiveSale) return Result.failure(InvalidCashierInputException("status"))
         if (amount > voucher.pendingBalance.amount) return Result.failure(InvalidCashierInputException("amount"))
 
         val currency = voucher.currency?.takeIf { it == Money.PEN || it == Money.USD }
@@ -249,7 +253,18 @@ class CashierRepositoryImpl @Inject constructor(
     override suspend fun deliver(workOrderId: String): Result<WorkOrder> =
         apiCall(gson, { handoverService.deliver(workOrderId) }) { it }.mapCatching { saveWorkOrderHeader(it) }
 
-    private suspend fun saveWorkOrderHeader(dto: WorkOrderDto) = workOrderDao.saveHeaderOrDeleteClosed(dto, clock.millis())
+    /** Mejor esfuerzo, como [cacheHeader]: si Room falla se devuelve igual la orden que respondió el backend. */
+    private suspend fun saveWorkOrderHeader(dto: WorkOrderDto): WorkOrder {
+        val now = clock.millis()
+        val fromBackend = dto.toWorkOrderEntity(now).toWorkOrder()
+        return try {
+            workOrderDao.saveHeaderOrDeleteClosed(dto, now)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            fromBackend
+        }
+    }
 
     /** Como [apiCall], pero una respuesta ilegible (no solo un corte de red) también llega como fallo. */
     private suspend fun <T> guarded(call: suspend () -> Response<T>): Result<T> = try {

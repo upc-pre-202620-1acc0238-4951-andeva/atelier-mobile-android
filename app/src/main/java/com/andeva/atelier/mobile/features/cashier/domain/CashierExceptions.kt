@@ -6,5 +6,8 @@ class InvalidCashierInputException(val field: String) : Exception("Invalid cashi
 /** La sede no tiene una serie activa para el tipo de comprobante. */
 class MissingFiscalSeriesException : Exception("No active fiscal series for the voucher type")
 
-/** Un cobro terminó sin respuesta: no se sabe si el backend lo registró; hay que revisar el historial antes de reintentar. */
+/**
+ * No se sabe cómo terminó un cobro: el envío quedó sin respuesta, con un 5xx o con un 2xx sin cuerpo legible, o el
+ * backend lo registró pero la relectura del comprobante falló. Hay que revisar el historial antes de volver a cobrar.
+ */
 class PaymentOutcomeUnknownException(cause: Throwable? = null) : Exception("Payment outcome unknown", cause)

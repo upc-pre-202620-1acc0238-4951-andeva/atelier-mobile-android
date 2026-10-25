@@ -58,7 +58,8 @@ interface CashierRepository {
      * Registra un cobro. Antes de enviar lee el comprobante en la red (el saldo sale de su `pendingBalance`, nunca de
      * la orden) y no llama al backend si [amount] es menor a 0.01, tiene más de 2 decimales o supera el saldo
      * (`InvalidCashierInputException("amount")`), o si [transactionReference] pasa de 100 caracteres
-     * (`InvalidCashierInputException("transactionReference")`). La moneda es la del comprobante y la sede, la de la
+     * (`InvalidCashierInputException("transactionReference")`), ni si el comprobante no es una venta vigente (anulado,
+     * rechazado por SUNAT o nota de crédito: `InvalidCashierInputException("status")`). La moneda es la del comprobante y la sede, la de la
      * sesión. Devuelve el comprobante releído. Si el envío termina sin respuesta, con un 5xx o con un 2xx sin cuerpo
      * legible no se reintenta: se relee el comprobante y falla con [PaymentOutcomeUnknownException], para revisar el
      * historial antes de volver a cobrar. Un 4xx falla con el `message` del backend. Dos cobros del mismo comprobante en
@@ -77,12 +78,15 @@ interface CashierRepository {
     /** Caja de la sede de la sesión en [date]; falla con `MissingBranchException` sin llamar si la sesión no tiene sede. */
     suspend fun getDailyCashSummary(date: LocalDate): Result<DailyCashSummary>
 
-    /** Pago formal de la orden (`mark-as-paid`). Guarda la cabecera; una orden cerrada sale de la caché de la sede. */
+    /**
+     * Pago formal de la orden (`mark-as-paid`). Guarda la cabecera (mejor esfuerzo: un fallo de Room no cambia la
+     * respuesta del backend); una orden cerrada sale de la caché de la sede.
+     */
     suspend fun markWorkOrderPaid(workOrderId: String): Result<WorkOrder>
 
     /** Descarga el pase de salida en PDF; una orden sin pagar da el `message` del 422 del backend. */
     suspend fun downloadExitPass(workOrderId: String): Result<File>
 
-    /** Entrega el vehículo. Guarda la cabecera; una orden cerrada sale de la caché de la sede. */
+    /** Entrega el vehículo. Guarda la cabecera (mejor esfuerzo); una orden cerrada sale de la caché de la sede. */
     suspend fun deliver(workOrderId: String): Result<WorkOrder>
 }

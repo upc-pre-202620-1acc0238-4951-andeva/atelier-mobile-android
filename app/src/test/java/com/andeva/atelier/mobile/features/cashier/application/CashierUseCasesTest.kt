@@ -115,6 +115,17 @@ class CashierUseCasesTest {
     }
 
     @Test
+    fun `factura con 11 digitos pero documento que no es RUC no se emite`() = runTest {
+        val d = draft(VoucherType.FACTURA, "20123456789")
+        val withDni = d.copy(customerInfo = d.customerInfo.copy(documentType = FiscalDocumentType.DNI))
+        val withoutType = d.copy(customerInfo = d.customerInfo.copy(documentType = null))
+
+        assertEquals("taxId", field(IssueVoucherUseCase(cashier)(withDni)))
+        assertEquals("taxId", field(IssueVoucherUseCase(cashier)(withoutType)))
+        coVerify(exactly = 0) { cashier.getBranchSeries() }
+    }
+
+    @Test
     fun `sin serie activa del tipo falla con MissingFiscalSeriesException`() = runTest {
         coEvery { cashier.getBranchSeries() } returns Result.success(
             listOf(series(VoucherType.FACTURA, "F001", active = false), series(VoucherType.BOLETA, "B001", active = true))
