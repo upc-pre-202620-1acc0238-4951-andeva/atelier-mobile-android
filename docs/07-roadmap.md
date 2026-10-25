@@ -30,7 +30,7 @@ Reglas para todas las sesiones:
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
-| 9 | `bays`, `cashier`, `reports`, `team` | ⬜ Pendiente | una rama por feature |
+| 9 | `bays`, `cashier`, `reports`, `team` | 🔄 En curso: `bays` hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, una rama por feature |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
 
@@ -166,7 +166,7 @@ Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarl
 | `AddPartToTaskUseCase`, `UpdateTaskPartQuantityUseCase`, `RemovePartFromTaskUseCase` | `features/tasks/application` | US23 E1–E3, US33 E1, US35 E1. Imputar con `charge_parts` (mecánico, tarea propia) o `work_orders:update`; cambiar o retirar solo con `work_orders:update`. 409 de stock con `message` |
 | Excepciones | `features/tasks/domain` | `InvalidTaskInputException(field)` (dato inválido antes de llamar). El resto es `ApiException` (mostrar `message`) o `IOException` (sin red: deshabilitar con `ConnectivityObserver`) |
 
-Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` viven en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 pueden moverlos a su feature (los dos primeros ya se movieron: `VehicleService` en `reception`, `InventoryService` en `inventory`).
+Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` vivían en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 los movieron a su feature (`VehicleService` en `reception`, `InventoryService` en `inventory`; `WorkBayLookupService` pasó a ser `WorkBayService` en `bays` y `tasks` ahora lo inyecta).
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador. Los huecos H3, H4, H7 y H8 ya están confirmados contra el código del backend ([03](03-traceability.md#huecos-cerrados)). Queda H9: tras cambiar la cantidad de un repuesto, recargar la tarea en vez de usar la respuesta del `PUT` ([03](03-traceability.md#huecos-abiertos)).
 
@@ -274,12 +274,24 @@ Núcleo extendido: en `AppDatabase` los DAOs `TelemetryReadingDao`, `VehicleFaul
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo con un ELM327 real y contra el backend, en especial H16 (lote sin instalación) y H17 (qué es `deviceIdentifier`).
 
-## Paso 9 — `bays`, `cashier`, `reports`, `team` ⬜
+## Paso 9 — `bays`, `cashier`, `reports`, `team` 🔄
 
 - **`bays`:** US40 · tablero con refresco cada 15–30 s mientras la pantalla está visible.
 - **`cashier`:** US37–US39 · todo en línea (dinero y documentos fiscales); pase de salida en PDF. `voucherType` va y vuelve como código SUNAT (`"01"` factura, `"03"` boleta, `"07"` nota de crédito), no como nombre del enum ([api/README.md](api/README.md) §8).
 - **`reports`:** US41, US43 E2 · PDFs de flujo de caja y de flota.
 - **`team`:** US10 (revisar descargos) y asistencia diaria de la sede.
+
+### Parte `bays` ✅ (sin `presentation`)
+
+Solo `domain`, `application` e `infrastructure`; la pantalla del tablero, las rutas y los textos los hace la otra parte del equipo. Caché `bays:{branchId}` compartida con `tasks`; sin cambios en el esquema Room. Huecos H24 y H25 en [03](03-traceability.md#huecos-abiertos).
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `RefreshBayBoardUseCase` / `ObserveBayBoardUseCase` → `Flow<List<BayBoardItem>>` | `features/bays/application` | US40 E3: tablero desde Room. Emite enseguida sin mecánicos ni tiempo y los completa cuando llegan los detalles de las órdenes. `laborElapsed` es null si ninguna tarea está `IN_PROGRESS`. `MissingBranchException` sin sede |
+| `PollBayBoardUseCase` → `Flow<Result<Unit>>` | `features/bays/application` | US40 E3: refresca ya y cada 30 s mientras se recoge; recogerlo solo con la pantalla visible. Sin `operations:bays:read` termina sin emitir ni llamar |
+| `ReassignBayUseCase(workOrderId, targetBay)` | `features/bays/application` | US40 E1/E2 (`operations:bays:reassign`). Si `WorkBay.canReceive` es falso lanza `BayUnavailableException` sin llamar (deshabilitar esas bahías); si otro la ocupó antes, 409 con el `message`. `bayType` solo se muestra (H25) |
+| `ReassignTaskMechanicUseCase(taskId, mechanicId)` | `features/bays/application` | US40 E1. `mechanicId` = membershipId (H11); la lista sale de `GetBranchMechanicsUseCase`. Tras reasignar, el tablero muestra un momento los ocupantes sin mecánico hasta que se recargan los detalles |
+| Excepciones | `features/bays/domain` | `BayUnavailableException`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
 
 ---
 
