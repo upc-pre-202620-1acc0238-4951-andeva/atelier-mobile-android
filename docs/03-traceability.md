@@ -199,6 +199,8 @@ Solo quedan fuera del backend los escenarios marcados 📱 (los resuelve la app)
 | H21 | US21 | `POST /iot/health-reports/generate-async` devuelve un `jobId`, pero no hay endpoint para consultar ese trabajo | La app usa `generate` (síncrono) y `latest` |
 | H22 | US16–US19 | `iot:telemetry:ingest` solo lo tiene el rol Mecánico ([02](02-roles-and-permissions.md)): el Mecánico Jefe no ve el escáner (`canUseTelemetry()`) | La app decide por permiso; si el jefe debe escanear, el dueño edita su rol |
 | H23 | US18, US21 | `engineTempCelsius` es obligatorio en cada lectura: un vehículo que no responde el PID `0105` no acumula telemetría y el informe IA responde 422 | La muestra sin temperatura solo se muestra en vivo; no se guarda ni se envía |
+| H24 | US40 E1 | No hay push al mecánico cuando su orden cambia de bahía: no hay ningún evento de notificación para `PUT /work-orders/{id}/bay` | La app no avisa. El mecánico ve la bahía nueva la próxima vez que se refresca el tablero (cada 30 s mientras la pantalla está visible) |
+| H25 | US40 E1 | "Tipo compatible" no está en la API: `WorkBayResource.bayType` no dice qué servicios admite cada bahía | `BayBoardItem` muestra `bayType` y la app no filtra las bahías destino; decide el supervisor. Solo se bloquea la que no está `AVAILABLE` (`BayUnavailableException`, sin llamar) |
 
 ## Huecos cerrados
 
