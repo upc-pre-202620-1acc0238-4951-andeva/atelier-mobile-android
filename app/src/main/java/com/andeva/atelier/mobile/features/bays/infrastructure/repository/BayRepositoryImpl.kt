@@ -36,12 +36,14 @@ import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Tablero de bahías offline-first (docs/06-offline-sync.md §4): la UI observa `bays` + `work_orders` y las acciones
  * en línea dejan la caché al día. El alcance `bays:{branchId}` es el mismo que llena `tasks`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Singleton
 class BayRepositoryImpl @Inject constructor(
     private val workBayService: WorkBayService,
     private val workOrderService: WorkOrderService,
@@ -134,7 +136,7 @@ class BayRepositoryImpl @Inject constructor(
     /** La cabecera nueva trae la bahía; la recarga de bahías es de cortesía y no desmiente la reasignación. */
     override suspend fun reassignBay(workOrderId: String, bayId: String): Result<Unit> =
         apiCall(gson, { workBayService.assignBay(workOrderId, AssignWorkBayRequestDto(bayId)) }) { it }
-            .map { dto -> workOrderDao.saveHeader(dto.toEntity(clock.millis())) }
+            .mapCatching { dto -> workOrderDao.saveHeader(dto.toEntity(clock.millis())) }
             .also { if (it.isSuccess) refreshBranchBays() }
 
     override suspend fun reassignMechanic(taskId: String, mechanicId: String): Result<Unit> =

@@ -193,6 +193,31 @@ class BayRepositoryImplTest {
         assertEquals(1, env.requested("GET", "/api/v1/work-orders/wo1").size)
     }
 
+    @Test
+    fun `el repositorio de bahias se comparte en toda la app`() {
+        assertTrue(BayRepositoryImpl::class.java.isAnnotationPresent(javax.inject.Singleton::class.java))
+    }
+
+    @Test
+    fun `reasignar el mecanico refresca el tablero observado con la misma instancia`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = env.json(env.workOrderDetail(tasks = listOf(env.task("t1", "m9"))))
+        env.responses["PUT /api/v1/tasks/t1/mechanic"] = env.json(env.task("t1", "m7"))
+        env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
+        repository.refreshBranchBays().getOrThrow()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        assertEquals(listOf("m9"), emissions.untilLoaded().single().occupant!!.mechanicIds)
+        env.responses["GET /api/v1/work-orders/wo1"] = env.json(env.workOrderDetail(tasks = listOf(env.task("t1", "m7"))))
+
+        repository.reassignMechanic("t1", "m7").getOrThrow()
+
+        while (emissions.next().single().occupant!!.mechanicIds != listOf("m7")) Unit
+        assertTrue(env.requested("PUT", "/api/v1/tasks/t1/mechanic").single().body.readUtf8().contains("\"mechanicId\":\"m7\""))
+        assertEquals(2, env.requested("GET", "/api/v1/work-orders/wo1").size)
+    }
+
     private fun summaryEntity() = env.gson
         .fromJson(env.gson.toJson(env.workOrderSummary()), WorkOrderDto::class.java)
         .toEntity(env.clock.millis())
