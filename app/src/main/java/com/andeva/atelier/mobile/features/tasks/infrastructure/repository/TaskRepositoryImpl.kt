@@ -36,7 +36,8 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PauseTaskR
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.UpdateTaskProductRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
+import com.andeva.atelier.mobile.features.bays.infrastructure.local.toEntity as toBayEntity
+import com.andeva.atelier.mobile.features.bays.infrastructure.remote.WorkBayService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.sync.AttachTaskEvidenceHandler
 import com.google.gson.Gson
@@ -59,7 +60,7 @@ class TaskRepositoryImpl @Inject constructor(
     private val taskService: TaskService,
     private val inventoryService: InventoryService,
     private val vehicleService: VehicleService,
-    private val bayService: WorkBayLookupService,
+    private val bayService: WorkBayService,
     private val taskDao: TaskDao,
     private val vehicleDao: VehicleDao,
     private val bayDao: BayDao,
@@ -193,7 +194,7 @@ class TaskRepositoryImpl @Inject constructor(
 
     private suspend fun refreshBays(branchId: String, now: Long) {
         apiCall(gson, { bayService.getBays(branchId) }) { it }.onSuccess { dtos ->
-            val bays = dtos.map { it.toEntity(branchId, now) }
+            val bays = dtos.map { it.toBayEntity(branchId, now) }
             bayDao.replaceBranch(branchId, bays)
             cacheMetadataDao.upsert(CacheMetadataEntity(bayScope(branchId), now, bays.size))
         }

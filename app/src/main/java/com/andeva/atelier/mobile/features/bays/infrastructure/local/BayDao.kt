@@ -30,4 +30,7 @@ abstract class BayDao {
 
     @Query("SELECT * FROM bays WHERE id = :id")
     abstract fun observeById(id: String): Flow<BayEntity?>
+
+    @Query("SELECT * FROM bays WHERE branch_id = :branchId ORDER BY name")
+    abstract fun observeBranch(branchId: String): Flow<List<BayEntity>>
 }
