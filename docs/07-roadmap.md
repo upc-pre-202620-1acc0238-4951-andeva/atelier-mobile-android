@@ -23,7 +23,7 @@ Reglas para todas las sesiones:
 | --- | --- | --- | --- |
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
 | 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
-| 2 | `auth` — sesión y acceso | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/auth` |
+| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` solo A5 login, A3 registro por invitación y A4 código (falta A6 recuperar, A5b sede, Google y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
@@ -73,7 +73,16 @@ Pendiente de este paso: probarlo en un emulador (la app debe abrir sin cerrarse)
 - **Sin red:** todo es en línea.
 - **Token de invitación y de restablecimiento:** se pega a mano (hueco H1 en [03](03-traceability.md#huecos-abiertos)).
 
-**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (pantallas, ViewModels, `UiState`, `AuthNavGraph`, textos de UI y el pedido de `POST_NOTIFICATIONS`) la hace la otra parte del equipo; `AuthStartRoute` sigue vacío en `AppNavHost`.
+**Alcance entregado:** `domain`, `application` e `infrastructure` completos; `presentation` con **A5 Iniciar sesión**, **A3 Registro por invitación** (pegar enlace → formulario | vencida) y **A4 Verificar correo · código**, sobre el tema Atelier de `core/designsystem` (tokens de la galería `front-chi-ivory.vercel.app`, Plus Jakarta Sans, modo oscuro y claro). Archivos en `features/auth/presentation/{login,register,verifyemail,navigation}`; `AuthStartRoute` ya no existe: `AppNavHost` llama a `authNavGraph(navController)`.
+
+Decisiones de flujo (contrato real, no el de la galería):
+
+- **Invitación → app:** `POST /invitations/accept` devuelve la sesión completa, así que A3 **no** pasa por A4; al aceptar, `AppNavHost` entra solo.
+- **A4 se abre desde el login:** cuando `sign-in` responde `EMAIL_NOT_VERIFIED`. Al verificar vuelve al login con el correo precargado y un aviso. "Vence en 15:00" solo aparece tras un reenvío hecho en la pantalla (la app no sabe cuándo se envió el código anterior); el reenvío se bloquea 60 s.
+- **A3 necesita el enlace:** no hay deep link (H1), así que A3 empieza pidiendo pegar el enlace o el token (paso añadido a la galería). `RegisterRoute(token)` queda listo para el deep link.
+- **A3 muestra el rol** de la invitación en lugar de la fecha de vencimiento: `GET /invitations/validate` no devuelve `expiresAt`.
+- **Contraseña:** además de 8–64 caracteres (backend), la UI exige una mayúscula y confirmación, como la galería.
+- **"¿Olvidaste tu contraseña?"** solo se dibuja si se pasa `onForgotPassword` (pendiente A6).
 
 | Pieza lista para la UI | Dónde | Para qué |
 | --- | --- | --- |
@@ -83,7 +92,7 @@ Pendiente de este paso: probarlo en un emulador (la app debe abrir sin cerrarse)
 
 Con éxito, sign-in, Google y aceptar invitación ya dejan la sesión guardada: `AppNavHost` cambia de grafo solo.
 
-Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
+Pendiente de este paso: pantallas A6 (recuperar contraseña), A5b (elegir sede), cierre de sesión y pedido de `POST_NOTIFICATIONS`; probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
 
 ## Paso 3 — `main` ✅
 
