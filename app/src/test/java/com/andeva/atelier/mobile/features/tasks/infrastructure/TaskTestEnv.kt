@@ -17,7 +17,7 @@ import com.andeva.atelier.mobile.core.media.SupabaseUploader
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.InventoryService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
+import com.andeva.atelier.mobile.features.bays.infrastructure.remote.WorkBayService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskEvidenceCapture
 import com.andeva.atelier.mobile.features.tasks.infrastructure.repository.TaskRepositoryImpl
 import com.google.gson.Gson
@@ -105,7 +105,7 @@ class TaskTestEnv {
         taskService = taskService,
         inventoryService = retrofit().create(InventoryService::class.java),
         vehicleService = retrofit().create(VehicleService::class.java),
-        bayService = retrofit().create(WorkBayLookupService::class.java),
+        bayService = retrofit().create(WorkBayService::class.java),
         taskDao = db.taskDao(),
         vehicleDao = db.vehicleDao(),
         bayDao = db.bayDao(),

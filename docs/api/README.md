@@ -187,7 +187,7 @@ PDFs (`application/pdf`, con `Content-Disposition`): proforma `GET /work-orders/
 | operations | ProposalStatus | PENDING_REVIEW, APPROVED, REJECTED |
 | operations | ProposalSeverity | LOW, MEDIUM, CRITICAL al enviar (`SubmitTaskProposalResource` rechaza `HIGH` con 400). El enum del backend también tiene HIGH: tratarlo al leer |
 | operations | BayStatus | AVAILABLE, OCCUPIED, MAINTENANCE |
-| operations | BayType | LIFT, PAINT_BOOTH, WASHING, ALIGNMENT |
+| operations | BayType | LIFT, PAINT_BOOTH, WASHING, ALIGNMENT, MECHANICAL_LIFT, WASH_BAY, DIAGNOSTIC_PIT, ALIGNMENT_STATION |
 | operations | EvidenceType | INITIAL_INSPECTION, DEFECT, IN_PROGRESS, COMPLETED |
 | shared | Currency | PEN, USD |
 | shared | MeasurementUnit | UNIT, LITER, GALLON, KILOGRAM, METER, HOUR |

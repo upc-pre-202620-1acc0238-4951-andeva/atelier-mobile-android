@@ -1,7 +1,6 @@
 package com.andeva.atelier.mobile.features.tasks.infrastructure.local
 
 import com.andeva.atelier.mobile.core.domain.Money
-import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.Task
@@ -13,7 +12,6 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.AssignedTaskDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.PartDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskProductDto
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskImageDto
 import java.math.BigDecimal
@@ -107,17 +105,6 @@ fun PartDto.toDomain() = PartOption(
     basePrice = basePrice,
     totalStock = totalStock ?: BigDecimal.ZERO,
     unitOfMeasure = unitOfMeasure
-)
-
-/** Sin `branchId` en la respuesta se usa la sede consultada, para que caiga en su alcance `bays:{branchId}`. */
-fun WorkBayDto.toEntity(fallbackBranchId: String, syncedAt: Long) = BayEntity(
-    id = id,
-    branchId = branchId ?: fallbackBranchId,
-    name = name.orEmpty(),
-    bayType = bayType.orEmpty(),
-    status = status.orEmpty(),
-    currentWorkOrderId = currentWorkOrderId,
-    syncedAt = syncedAt
 )
 
 private fun String?.toTaskStatus() = TaskStatus.entries.firstOrNull { it.name == this }

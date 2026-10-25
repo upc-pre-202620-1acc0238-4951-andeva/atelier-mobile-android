@@ -10,6 +10,7 @@ import com.andeva.atelier.mobile.core.data.sync.PendingUploadDao
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
+import com.andeva.atelier.mobile.features.bays.infrastructure.repository.BayCacheScope
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.VehicleDao
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.toEntity as toVehicleEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.repository.ReceptionCachePolicy
@@ -36,7 +37,8 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.PauseTaskR
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.TaskService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.UpdateTaskProductRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
-import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkBayLookupService
+import com.andeva.atelier.mobile.features.bays.infrastructure.local.toEntity as toBayEntity
+import com.andeva.atelier.mobile.features.bays.infrastructure.remote.WorkBayService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.sync.AttachTaskEvidenceHandler
 import com.google.gson.Gson
@@ -59,7 +61,7 @@ class TaskRepositoryImpl @Inject constructor(
     private val taskService: TaskService,
     private val inventoryService: InventoryService,
     private val vehicleService: VehicleService,
-    private val bayService: WorkBayLookupService,
+    private val bayService: WorkBayService,
     private val taskDao: TaskDao,
     private val vehicleDao: VehicleDao,
     private val bayDao: BayDao,
@@ -181,7 +183,7 @@ class TaskRepositoryImpl @Inject constructor(
     private suspend fun enrich(rows: List<TaskEntity>, session: Session, now: Long) {
         if (session.has(Permission.BAYS_READ)) {
             rows.mapNotNull { it.branchId }.distinct()
-                .filter { isStale(bayScope(it), BAYS_TTL_MILLIS, now) }
+                .filter { isStale(BayCacheScope.of(it), BAYS_TTL_MILLIS, now) }
                 .forEach { refreshBays(it, now) }
         }
         if (session.has(Permission.VEHICLES_READ)) {
@@ -193,9 +195,9 @@ class TaskRepositoryImpl @Inject constructor(
 
     private suspend fun refreshBays(branchId: String, now: Long) {
         apiCall(gson, { bayService.getBays(branchId) }) { it }.onSuccess { dtos ->
-            val bays = dtos.map { it.toEntity(branchId, now) }
+            val bays = dtos.map { it.toBayEntity(branchId, now) }
             bayDao.replaceBranch(branchId, bays)
-            cacheMetadataDao.upsert(CacheMetadataEntity(bayScope(branchId), now, bays.size))
+            cacheMetadataDao.upsert(CacheMetadataEntity(BayCacheScope.of(branchId), now, bays.size))
         }
     }
 
@@ -216,7 +218,5 @@ class TaskRepositoryImpl @Inject constructor(
 
         /** Vigencia de docs/06-offline-sync.md §4 (la de vehículos está en [ReceptionCachePolicy]). */
         const val BAYS_TTL_MILLIS = 30 * 1000L
-
-        fun bayScope(branchId: String) = "bays:$branchId"
     }
 }
