@@ -15,9 +15,11 @@ import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
 import com.google.gson.JsonParser
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -32,6 +34,9 @@ import java.io.File
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -638,5 +643,75 @@ class CashierRepositoryImplTest {
         dao.upsert(VoucherEntity("bad", "wo1", "03", "B001", 2, "118", "0", "", "PENDING", "ISSUED", null, 0))
 
         assertEquals(listOf("good"), repository.observeWorkOrderVouchers("wo1").first().map { it.id })
+    }
+
+    // --- Doble toque concurrente ---
+
+    private fun key(request: RecordedRequest) = "${request.method} ${request.path!!.substringBefore('?')}"
+
+    /**
+     * El primer POST espera (500 ms como tope) a que llegue otra lectura: sin exclusión, la segunda llamada lee y envía
+     * su propio POST mientras tanto. Con exclusión nadie llega y el POST responde al vencer la espera.
+     */
+    private class HeldPost {
+        val done = AtomicBoolean(false)
+        private val first = AtomicBoolean(true)
+        private val otherRead = CountDownLatch(1)
+
+        fun post(response: () -> MockResponse): MockResponse {
+            if (first.getAndSet(false)) otherRead.await(500, TimeUnit.MILLISECONDS)
+            done.set(true)
+            return response()
+        }
+
+        fun read(response: MockResponse): MockResponse {
+            if (!first.get()) otherRead.countDown()
+            return response
+        }
+    }
+
+    @Test
+    fun `dos emisiones concurrentes de la misma orden envian un solo POST`() = runTest {
+        env.signIn()
+        val held = HeldPost()
+        env.handler = { request ->
+            when (key(request)) {
+                "POST $issuePath" -> held.post { env.json(env.voucher(id = "new"), code = 201) }
+                "GET $listPath" ->
+                    held.read(env.json(if (held.done.get()) listOf(env.voucher(id = "new")) else emptyList<Any>()))
+                else -> null
+            }
+        }
+
+        val first = async { repository.issue(env.draft(), "B001") }
+        val second = async { repository.issue(env.draft(), "B001") }
+        val outcomes = listOf(first.await().getOrThrow(), second.await().getOrThrow())
+
+        assertEquals(1, env.requested("POST", issuePath).size)
+        assertEquals(1, outcomes.count { it is IssueOutcome.Issued })
+        assertEquals("new", outcomes.single { it is IssueOutcome.AlreadyIssued }.voucherId)
+    }
+
+    @Test
+    fun `dos cobros concurrentes del mismo comprobante envian un solo POST y el segundo ve el saldo nuevo`() = runTest {
+        env.signIn()
+        val held = HeldPost()
+        env.handler = { request ->
+            when (key(request)) {
+                "POST $paymentsPath" -> held.post { env.json(env.payment(amount = 118.0), code = 201) }
+                "GET $voucherPath" -> held.read(
+                    env.json(if (held.done.get()) env.voucher(paid = 118.0) + ("paymentStatus" to "PAID") else env.voucher())
+                )
+                else -> null
+            }
+        }
+
+        val first = async { repository.registerPayment("v1", BigDecimal("118"), PaymentMethod.CASH, null) }
+        val second = async { repository.registerPayment("v1", BigDecimal("118"), PaymentMethod.CASH, null) }
+        val results = listOf(first.await(), second.await())
+
+        assertEquals(1, env.requested("POST", paymentsPath).size)
+        assertEquals(VoucherPaymentStatus.PAID, results.single { it.isSuccess }.getOrThrow().paymentStatus)
+        assertEquals("amount", (results.single { it.isFailure }.exceptionOrNull() as InvalidCashierInputException).field)
     }
 }

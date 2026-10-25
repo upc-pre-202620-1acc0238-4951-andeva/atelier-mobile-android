@@ -39,6 +39,8 @@ import com.google.gson.Gson
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.Response
 import java.io.File
 import java.io.IOException
@@ -46,11 +48,14 @@ import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Comprobantes de caja (docs/api/invoicing.md). La caché `vouchers` guarda solo cabeceras; el detalle completo siempre
- * sale de la red. Emitir nunca duplica un comprobante fiscal: ver [issue].
+ * sale de la red. Emitir nunca duplica un comprobante fiscal: ver [issue]. Es `@Singleton` porque guarda los candados
+ * que serializan la emisión por orden y el cobro por comprobante dentro del proceso (doble toque).
  */
+@Singleton
 class CashierRepositoryImpl @Inject constructor(
     private val cashierService: CashierService,
     private val handoverService: HandoverService,
@@ -61,6 +66,9 @@ class CashierRepositoryImpl @Inject constructor(
     private val gson: Gson,
     private val clock: Clock
 ) : CashierRepository {
+
+    private val issueLocks = KeyedMutex()
+    private val paymentLocks = KeyedMutex()
 
     override fun observeWorkOrderVouchers(workOrderId: String): Flow<List<VoucherSummary>> =
         voucherDao.observeByWorkOrder(workOrderId).map { rows -> rows.mapNotNull { it.toDomain() } }
@@ -106,11 +114,15 @@ class CashierRepositoryImpl @Inject constructor(
      * ([IOException] o respuesta ilegible) no se sabe si el backend lo creó: se relee la orden y, si hay un comprobante
      * vigente, es el creado; si no, se devuelve el error original. Un error HTTP (p. ej. 502 de SUNAT) se devuelve tal
      * cual y no guarda nada. El envío no se reintenta solo. Guardar la cabecera en la caché es de mejor esfuerzo: nunca
-     * cambia el resultado que ya dio el backend.
+     * cambia el resultado que ya dio el backend. Dos emisiones de la misma orden en este proceso van una tras otra: la
+     * segunda ya ve el comprobante de la primera.
      */
     override suspend fun issue(draft: VoucherDraft, serie: String): Result<IssueOutcome> {
         val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
+        return issueLocks.withLock(draft.workOrderId) { issueOnce(draft, serie, branchId) }
+    }
 
+    private suspend fun issueOnce(draft: VoucherDraft, serie: String, branchId: String): Result<IssueOutcome> {
         val existing = fetchWorkOrderVouchers(draft.workOrderId).getOrElse { return Result.failure(it) }
             .firstOrNull { it.isActiveSale() }
         if (existing != null) {
@@ -179,7 +191,17 @@ class CashierRepositoryImpl @Inject constructor(
             return Result.failure(InvalidCashierInputException("transactionReference"))
         }
         val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
+        // Dos cobros del mismo comprobante en este proceso van uno tras otro: el segundo valida contra el saldo nuevo.
+        return paymentLocks.withLock(voucherId) { payOnce(voucherId, amount, method, reference, branchId) }
+    }
 
+    private suspend fun payOnce(
+        voucherId: String,
+        amount: BigDecimal,
+        method: PaymentMethod,
+        reference: String?,
+        branchId: String
+    ): Result<Voucher> {
         // El saldo sale siempre del comprobante, leído ahora (riesgo 3), nunca de la orden.
         val voucher = getVoucher(voucherId).getOrElse { return Result.failure(it) }
         if (amount > voucher.pendingBalance.amount) return Result.failure(InvalidCashierInputException("amount"))
@@ -233,5 +255,24 @@ class CashierRepositoryImpl @Inject constructor(
         val MIN_PAYMENT = BigDecimal("0.01")
         const val MONEY_SCALE = 2
         const val MAX_REFERENCE_LENGTH = 100
+    }
+}
+
+/** Un [Mutex] por clave (orden o comprobante), no uno global; la entrada se libera cuando nadie la usa. */
+private class KeyedMutex {
+    private class Entry {
+        val mutex = Mutex()
+        var users = 0
+    }
+
+    private val entries = HashMap<String, Entry>()
+
+    suspend fun <T> withLock(key: String, block: suspend () -> T): T {
+        val entry = synchronized(entries) { entries.getOrPut(key) { Entry() }.also { it.users++ } }
+        try {
+            return entry.mutex.withLock { block() }
+        } finally {
+            synchronized(entries) { if (--entry.users == 0) entries.remove(key) }
+        }
     }
 }

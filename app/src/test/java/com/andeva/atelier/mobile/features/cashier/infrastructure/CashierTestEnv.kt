@@ -20,6 +20,7 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CashierService
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.HandoverService
 import com.andeva.atelier.mobile.features.cashier.infrastructure.repository.CashierRepositoryImpl
+import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -52,6 +53,10 @@ class CashierTestEnv {
     val sequences = ConcurrentHashMap<String, ArrayDeque<MockResponse>>()
     val requests = CopyOnWriteArrayList<RecordedRequest>()
 
+    /** Si devuelve una respuesta, gana sobre [sequences] y [responses] (respuestas que dependen del orden). */
+    @Volatile
+    var handler: ((RecordedRequest) -> MockResponse?)? = null
+
     val context: Context get() = ApplicationProvider.getApplicationContext()
 
     lateinit var db: AppDatabase
@@ -67,7 +72,8 @@ class CashierTestEnv {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 requests += request
                 val key = "${request.method} ${request.path!!.substringBefore('?')}"
-                return sequences[key]?.let { synchronized(it) { it.removeFirstOrNull() } }
+                return handler?.invoke(request)
+                    ?: sequences[key]?.let { synchronized(it) { it.removeFirstOrNull() } }
                     ?: responses[key]
                     ?: error(404, "NOT_FOUND", "No encontrado")
             }
@@ -90,10 +96,10 @@ class CashierTestEnv {
         db.close()
     }
 
-    fun repository() = CashierRepositoryImpl(
+    fun repository(workOrderDao: WorkOrderDao = db.workOrderDao()) = CashierRepositoryImpl(
         cashierService = retrofit.create(CashierService::class.java),
         handoverService = retrofit.create(HandoverService::class.java),
-        workOrderDao = db.workOrderDao(),
+        workOrderDao = workOrderDao,
         pdfDownloader = PdfDownloader(context, gson),
         voucherDao = db.voucherDao(),
         sessionManager = sessionManager,
