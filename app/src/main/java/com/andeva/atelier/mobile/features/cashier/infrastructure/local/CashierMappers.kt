@@ -1,0 +1,157 @@
+package com.andeva.atelier.mobile.features.cashier.infrastructure.local
+
+import com.andeva.atelier.mobile.core.domain.Money
+import com.andeva.atelier.mobile.features.cashier.domain.CustomerFiscalInfo
+import com.andeva.atelier.mobile.features.cashier.domain.FiscalDocumentType
+import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
+import com.andeva.atelier.mobile.features.cashier.domain.Payment
+import com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod
+import com.andeva.atelier.mobile.features.cashier.domain.Voucher
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherDraft
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherItemType
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherLine
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherPaymentStatus
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.CustomerFiscalInfoDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ElectronicVoucherDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.IssueVoucherRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.SeriesConfigurationDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherLineDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherLineRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherPaymentDto
+import java.math.BigDecimal
+import java.time.Instant
+
+/**
+ * Room guarda los montos como texto decimal (docs/06-offline-sync.md §5). Un tipo, estado o forma de pago que la app no
+ * conoce queda en null; las columnas obligatorias de la caché guardan entonces texto vacío.
+ */
+fun ElectronicVoucherDto.toEntity(fallbackWorkOrderId: String?, syncedAt: Long) = VoucherEntity(
+    id = id,
+    workOrderId = workOrderId ?: fallbackWorkOrderId,
+    voucherType = voucherType.orEmpty(),
+    serie = serie.orEmpty(),
+    number = number ?: 0,
+    totalAmount = (totalAmount ?: BigDecimal.ZERO).toPlainString(),
+    paidAmount = (paidAmount ?: BigDecimal.ZERO).toPlainString(),
+    pendingBalance = (pendingBalance ?: BigDecimal.ZERO).toPlainString(),
+    paymentStatus = paymentStatus.orEmpty(),
+    status = status.orEmpty(),
+    pdfUrl = digitalReceipts?.pdfUrl,
+    syncedAt = syncedAt
+)
+
+fun VoucherEntity.toDomain() = VoucherSummary(
+    id = id,
+    workOrderId = workOrderId,
+    type = VoucherType.from(voucherType),
+    serie = serie,
+    number = number,
+    totalAmount = totalAmount.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+    paidAmount = paidAmount.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+    pendingBalance = pendingBalance.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+    paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(),
+    status = status.toEnum<VoucherStatus>(),
+    pdfUrl = pdfUrl
+)
+
+fun ElectronicVoucherDto.toDomain(): Voucher {
+    val currency = currency ?: Money.PEN
+    return Voucher(
+        id = id,
+        branchId = branchId,
+        customerId = customerId,
+        workOrderId = workOrderId,
+        type = VoucherType.from(voucherType),
+        serie = serie.orEmpty(),
+        number = number ?: 0,
+        subtotal = money(subtotal, currency),
+        igvAmount = money(igvAmount, currency),
+        totalAmount = money(totalAmount, currency),
+        paidAmount = money(paidAmount, currency),
+        pendingBalance = money(pendingBalance, currency),
+        paymentStatus = paymentStatus.toEnum<VoucherPaymentStatus>(),
+        status = status.toEnum<VoucherStatus>(),
+        customerInfo = customerInfo?.toDomain(),
+        pdfUrl = digitalReceipts?.pdfUrl,
+        xmlUrl = digitalReceipts?.xmlUrl,
+        cdrUrl = digitalReceipts?.cdrUrl,
+        sunatResponseCode = sunatResponse?.responseCode,
+        sunatDescription = sunatResponse?.description,
+        lines = lines.orEmpty().map { it.toDomain() },
+        payments = payments.orEmpty().map { it.toDomain(currency) },
+        issuedAt = issuedAt.toInstant()
+    )
+}
+
+fun CustomerFiscalInfoDto.toDomain() = CustomerFiscalInfo(
+    documentType = documentType.toEnum<FiscalDocumentType>(),
+    taxId = taxId.orEmpty(),
+    legalName = legalName.orEmpty(),
+    fiscalAddress = fiscalAddress
+)
+
+fun VoucherLineDto.toDomain() = VoucherLine(
+    id = id,
+    itemId = itemId,
+    itemType = itemType.toEnum<VoucherItemType>(),
+    description = description.orEmpty(),
+    quantity = quantity ?: BigDecimal.ZERO,
+    unitValue = unitValue,
+    unitPrice = unitPrice,
+    igvAmount = igvAmount,
+    totalLine = totalLine
+)
+
+fun VoucherPaymentDto.toDomain(fallbackCurrency: String = Money.PEN) = Payment(
+    id = id,
+    voucherId = voucherId,
+    amount = money(amount, currency ?: fallbackCurrency),
+    method = paymentMethod.toEnum<PaymentMethod>(),
+    transactionReference = transactionReference,
+    status = status,
+    paidAt = paidAt.toInstant()
+)
+
+fun SeriesConfigurationDto.toDomain() = FiscalSeries(
+    id = id,
+    branchId = branchId,
+    type = VoucherType.from(voucherType),
+    serie = serie.orEmpty(),
+    currentCorrelative = currentCorrelative ?: 0,
+    active = active ?: false
+)
+
+/** `voucherType` sale como código SUNAT; `unitPriceWithIgv` ya viene con IGV desde el borrador. */
+fun VoucherDraft.toRequest(branchId: String, serie: String) = IssueVoucherRequestDto(
+    branchId = branchId,
+    currency = currency,
+    customerId = customerId,
+    customerInfo = CustomerFiscalInfoDto(
+        documentType = customerInfo.documentType?.name,
+        taxId = customerInfo.taxId,
+        legalName = customerInfo.legalName,
+        fiscalAddress = customerInfo.fiscalAddress
+    ),
+    lines = lines.map {
+        VoucherLineRequestDto(
+            description = it.description,
+            itemType = it.itemType.name,
+            quantity = it.quantity,
+            unitPriceWithIgv = it.unitPriceWithIgv,
+            itemId = it.itemId
+        )
+    },
+    serie = serie,
+    voucherType = type.code,
+    workOrderId = workOrderId
+)
+
+private fun money(amount: BigDecimal?, currency: String): Money =
+    runCatching { Money(amount ?: BigDecimal.ZERO, currency) }.getOrElse { Money(BigDecimal.ZERO, Money.PEN) }
+
+private fun String?.toInstant(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
+private inline fun <reified T : Enum<T>> String?.toEnum(): T? = enumValues<T>().firstOrNull { it.name == this }
