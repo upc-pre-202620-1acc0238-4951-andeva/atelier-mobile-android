@@ -251,6 +251,13 @@ class WorkOrderRepositoryImpl @Inject constructor(
     override suspend fun rejectQuotation(id: String, reason: String): Result<WorkOrder> =
         header { workOrderService.rejectQuotation(id, ReasonRequestDto(reason.trim())) }
 
+    override suspend fun start(id: String): Result<WorkOrder> = header { workOrderService.start(id) }
+
+    override suspend fun complete(id: String): Result<WorkOrder> = header { workOrderService.complete(id) }
+
+    override suspend fun cancel(id: String, reason: String): Result<WorkOrder> =
+        header { workOrderService.cancel(id, ReasonRequestDto(reason.trim())) }
+
     override suspend fun getPartMovements(id: String): Result<List<PartMovement>> =
         apiCall(gson, { workOrderService.getPartMovements(id) }) { dtos -> dtos.map { it.toDomain() } }
 

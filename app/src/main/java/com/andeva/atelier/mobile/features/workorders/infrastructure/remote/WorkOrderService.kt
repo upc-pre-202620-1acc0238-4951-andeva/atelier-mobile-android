@@ -67,6 +67,15 @@ interface WorkOrderService {
     @POST("api/v1/work-orders/{workOrderId}/quotation/reject")
     suspend fun rejectQuotation(@Path("workOrderId") id: String, @Body body: ReasonRequestDto): Response<WorkOrderDto>
 
+    @POST("api/v1/work-orders/{workOrderId}/start")
+    suspend fun start(@Path("workOrderId") id: String): Response<WorkOrderDto>
+
+    @POST("api/v1/work-orders/{workOrderId}/complete")
+    suspend fun complete(@Path("workOrderId") id: String): Response<WorkOrderDto>
+
+    @POST("api/v1/work-orders/{workOrderId}/cancel")
+    suspend fun cancel(@Path("workOrderId") id: String, @Body body: ReasonRequestDto): Response<WorkOrderDto>
+
     @GET("api/v1/work-orders/{workOrderId}/part-movements")
     suspend fun getPartMovements(@Path("workOrderId") id: String): Response<List<PartMovementDto>>
 
