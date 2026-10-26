@@ -30,7 +30,7 @@ Reglas para todas las sesiones:
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
-| 9 | `bays`, `cashier`, `reports`, `team` | 🔄 En curso: `bays`, `cashier` y `reports` hechos sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, una rama por feature |
+| 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team` |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
 
@@ -274,7 +274,7 @@ Núcleo extendido: en `AppDatabase` los DAOs `TelemetryReadingDao`, `VehicleFaul
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo con un ELM327 real y contra el backend, en especial H16 (lote sin instalación) y H17 (qué es `deviceIdentifier`).
 
-## Paso 9 — `bays`, `cashier`, `reports`, `team` 🔄
+## Paso 9 — `bays`, `cashier`, `reports`, `team` ✅
 
 - **`bays`:** US40 · tablero con refresco cada 15–30 s mientras la pantalla está visible.
 - **`cashier`:** US37–US39 · todo en línea (dinero y documentos fiscales); pase de salida en PDF. `voucherType` va y vuelve como código SUNAT (`"01"` factura, `"03"` boleta, `"07"` nota de crédito), no como nombre del enum ([api/README.md](api/README.md) §8).
@@ -328,6 +328,18 @@ Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los 
 | `DownloadFleetHealthPdfUseCase(customerId)` → `Result<File>` | `features/reports/application` | US43 E2. PDF consolidado de salud de la flota de un cliente. Habilitar con `Session.canReadAiReports()` (permiso `iot:health_reports:read` y plan con IA). Un cliente de otro taller da 404 con el `message` |
 | `ReportPeriod.month(YearMonth)`, `ReportPeriod.year(Year)` | `features/reports/domain` | Presets de mes y año (el mes y el año actuales salen de `BusinessTime`). Un rango con `from` posterior a `to` falla con `InvalidReportInputException("period")` |
 | Excepciones | `features/reports/domain` | `InvalidReportInputException(field)`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
+
+### Parte `team` ✅ (sin `presentation`)
+
+Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Todo en línea, sin caché Room ni cambios en el esquema. Hueco H32 en [03](03-traceability.md#huecos-abiertos).
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `GetBranchDailyAttendanceUseCase(date)` → `Result<List<TeamAttendance>>` | `features/team/application` | US10. Asistencia de la sede de la sesión en un día de Lima. Habilitar con `Session.has(Permission.ATTENDANCE_AUDIT_ALL)`; sin ese permiso devuelve lista vacía sin llamar. Sin sede, `MissingBranchException`. Un día o una respuesta mal formados hacen fallar la lectura en vez de ocultar filas. `jobTitle` puede ser null (solo con `iam:members:read`, H32) |
+| `GetPendingJustificationsUseCase(days = 7)` → `Result<PendingJustifications>` | `features/team/application` | US10. Bandeja de descargos `PENDING` de los últimos `days` días de Lima, del más reciente al más viejo. Habilitar con `ATTENDANCE_AUDIT_ALL` (sin él, vacía sin llamar). `failedDates` no vacío significa "faltan días": avisarlo y ofrecer reintentar; si fallan todos los días, falla con el `message` del primero. Un día mal formado cuenta como fallido (H32) |
+| `GetCollaboratorAttendanceUseCase(membershipId, attendanceId)` → `Result<TeamAttendance?>` | `features/team/application` | Destino del push `OVERTIME_RECORDED` (`PushDestination.CollaboratorAttendance`). Busca el registro en los últimos 30 días de Lima; devuelve null si no está. No se filtra por permiso (el historial admite `audit_all` o `read_own`) |
+| `ApproveJustificationUseCase(id)`, `RejectJustificationUseCase(id)` → `Result<TeamAttendance>` | `features/team/application` | US10 (`hr:justifications:approve`). No se filtran: ocultar los botones sin `Permission.JUSTIFICATIONS_APPROVE`; el backend responde 403 con su `message`. Un descargo ya revisado devuelve el `message` del backend |
+| Errores | `features/team` | `MissingBranchException`, `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
 
 ---
 
