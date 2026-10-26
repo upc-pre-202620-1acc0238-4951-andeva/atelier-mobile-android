@@ -21,11 +21,19 @@ import okhttp3.mockwebserver.SocketPolicy
 import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -34,6 +42,15 @@ class BayRepositoryImplTest {
     private val env = BayTestEnv()
     private lateinit var repository: BayRepositoryImpl
 
+    /**
+     * Los tableros observados corren en hilos reales. Se cancelan y se esperan antes de cerrar Room y el servidor:
+     * si no, una consulta a medias falla con la base ya cerrada y el error aparece en el test siguiente.
+     */
+    private val uncaught = CopyOnWriteArrayList<Throwable>()
+    private val collectors = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> uncaught += e }
+    )
+
     @Before
     fun setUp() {
         env.start()
@@ -41,7 +58,15 @@ class BayRepositoryImplTest {
     }
 
     @After
-    fun tearDown() = env.stop()
+    fun tearDown() {
+        runBlocking { collectors.coroutineContext.job.cancelAndJoin() }
+        env.stop()
+        assertEquals(emptyList<Throwable>(), uncaught)
+    }
+
+    private fun observeInto(emissions: Channel<List<BayBoardItem>>) {
+        collectors.launch { repository.observeBoard().collect { emissions.send(it) } }
+    }
 
     @Test
     fun `refresca las bahias de la sede de la sesion`() = runTest {
@@ -81,7 +106,7 @@ class BayRepositoryImplTest {
         repository.refreshBranchBays().getOrThrow()
 
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
         val board = emissions.untilLoaded()
 
         val occupied = board.first { it.bay.id == "bay1" }
@@ -103,7 +128,7 @@ class BayRepositoryImplTest {
         env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
         repository.refreshBranchBays().getOrThrow()
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
 
         val first = emissions.untilLoaded().single()
         repository.refreshBranchBays().getOrThrow()
@@ -164,7 +189,7 @@ class BayRepositoryImplTest {
         env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
         repository.refreshBranchBays().getOrThrow()
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
 
         val occupant = emissions.next().single().occupant!!
 
@@ -181,7 +206,7 @@ class BayRepositoryImplTest {
         env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
         repository.refreshBranchBays().getOrThrow()
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
 
         emissions.next()
         repository.refreshBranchBays().getOrThrow()
@@ -206,7 +231,7 @@ class BayRepositoryImplTest {
         env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
         repository.refreshBranchBays().getOrThrow()
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
         assertEquals(listOf("m9"), emissions.untilLoaded().single().occupant!!.mechanicIds)
         env.responses["GET /api/v1/work-orders/wo1"] = env.json(env.workOrderDetail(tasks = listOf(env.task("t1", "m7"))))
 
@@ -224,12 +249,34 @@ class BayRepositoryImplTest {
         env.responses["GET /api/v1/work-orders/wo1"] = env.json(env.workOrderDetail(tasks = listOf(env.task())))
         repository.refreshBranchBays().getOrThrow()
         val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
-        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        observeInto(emissions)
 
         var occupant = emissions.next().single().occupant!!
         while (occupant.internalNumber == null) occupant = emissions.next().single().occupant!!
 
         assertEquals(15, occupant.internalNumber)
+    }
+
+    @Test
+    fun `un detalle ilegible deja la bahia sin mecanicos y no tumba el tablero`() = runTest {
+        env.signIn()
+        env.cachePlate()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = MockResponse().setBody("""{"id":"wo1","tasks":"ilegible"}""")
+        env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
+        repository.refreshBranchBays().getOrThrow()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        observeInto(emissions)
+        assertEquals("ABC123", emissions.next().single().occupant!!.plate)
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { while (env.requested("GET", "/api/v1/work-orders/wo1").isEmpty()) delay(10) }
+        }
+
+        repository.refreshBranchBays().getOrThrow()
+
+        val occupant = emissions.next().single().occupant!!
+        assertEquals(emptyList<String>(), occupant.mechanicIds)
+        assertNull(occupant.laborElapsed)
     }
 
     private fun summaryEntity() = env.gson

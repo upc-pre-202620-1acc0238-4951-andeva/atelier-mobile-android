@@ -21,6 +21,7 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOr
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderService
 import com.google.gson.Gson
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
@@ -130,16 +131,21 @@ class BayRepositoryImpl @Inject constructor(
      * Guarda también la cabecera de la orden (`work_orders`) para que el tablero tenga el `internalNumber` aunque la
      * lista de órdenes nunca se haya refrescado. La placa sigue saliendo de la caché de vehículos (la llena `tasks` o
      * `reception`); no hay endpoint propio para ella. null si falla: esa bahía sale sin mecánicos hasta que la
-     * colección se reinicie.
+     * colección se reinicie. Un cuerpo ilegible (Gson lanza fuera de `apiCall`) también es un fallo de esa bahía y
+     * no del tablero.
      */
-    private suspend fun loadTasks(workOrderId: String): List<TaskDetail>? =
+    private suspend fun loadTasks(workOrderId: String): List<TaskDetail>? = try {
         apiCall(gson, { workOrderService.getWorkOrder(workOrderId) }) { it }
             .mapCatching { dto ->
                 workOrderDao.saveHeader(dto.toEntity(clock.millis()))
                 dto.tasks.orEmpty().map { it.toDomain() }
             }
             .getOrNull()
-
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
 
     /** La cabecera nueva trae la bahía; la recarga de bahías es de cortesía y no desmiente la reasignación. */
     override suspend fun reassignBay(workOrderId: String, bayId: String): Result<Unit> =
