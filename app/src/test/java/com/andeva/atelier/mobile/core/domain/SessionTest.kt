@@ -49,4 +49,14 @@ class SessionTest {
         assertFalse(session(permissions, plan(iot = true, ai = false)).canUseAiDiagnostics())
         assertTrue(session(permissions, plan(iot = false, ai = true)).canUseAiDiagnostics())
     }
+
+    @Test
+    fun `canReadAiReports exige permiso y plan con IA`() {
+        val permissions = setOf(Permission.HEALTH_REPORTS_READ.value)
+        assertTrue(session(permissions, plan(iot = false, ai = true)).canReadAiReports())
+        assertFalse(session(permissions, plan(iot = true, ai = false)).canReadAiReports())
+        assertFalse(session(emptySet(), plan(iot = true, ai = true)).canReadAiReports())
+        assertFalse(session(setOf(Permission.HEALTH_REPORTS_GENERATE.value), plan(iot = true, ai = true)).canReadAiReports())
+        assertTrue(session(permissions, null).canReadAiReports())
+    }
 }

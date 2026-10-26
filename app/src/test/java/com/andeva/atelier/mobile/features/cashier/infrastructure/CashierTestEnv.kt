@@ -96,6 +96,9 @@ class CashierTestEnv {
         db.close()
     }
 
+    /** Servicio Retrofit contra el backend simulado, para tests de otras features. */
+    fun <T> api(service: Class<T>): T = retrofit.create(service)
+
     fun repository(workOrderDao: WorkOrderDao = db.workOrderDao()) = CashierRepositoryImpl(
         cashierService = retrofit.create(CashierService::class.java),
         handoverService = retrofit.create(HandoverService::class.java),
