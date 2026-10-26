@@ -30,7 +30,7 @@ Reglas para todas las sesiones:
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
-| 9 | `bays`, `cashier`, `reports`, `team` | 🔄 En curso: `bays` hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, una rama por feature |
+| 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team` |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
 
@@ -287,7 +287,7 @@ Núcleo extendido: en `AppDatabase` los DAOs `TelemetryReadingDao`, `VehicleFaul
 
 Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo con un ELM327 real y contra el backend, en especial H16 (lote sin instalación) y H17 (qué es `deviceIdentifier`).
 
-## Paso 9 — `bays`, `cashier`, `reports`, `team` 🔄
+## Paso 9 — `bays`, `cashier`, `reports`, `team` ✅
 
 - **`bays`:** US40 · tablero con refresco cada 15–30 s mientras la pantalla está visible.
 - **`cashier`:** US37–US39 · todo en línea (dinero y documentos fiscales); pase de salida en PDF. `voucherType` va y vuelve como código SUNAT (`"01"` factura, `"03"` boleta, `"07"` nota de crédito), no como nombre del enum ([api/README.md](api/README.md) §8).
@@ -306,6 +306,54 @@ Solo `domain`, `application` e `infrastructure`; la pantalla del tablero, las ru
 | `ReassignTaskMechanicUseCase(taskId, mechanicId)` | `features/bays/application` | US40 E1. `mechanicId` = membershipId (H11); la lista sale de `GetBranchMechanicsUseCase`. Tras reasignar, el tablero muestra un momento los ocupantes sin mecánico hasta que se recargan los detalles |
 | Excepciones | `features/bays/domain` | `BayUnavailableException`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
 
+### Parte `cashier` ✅ (sin `presentation`)
+
+Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Caché Room `vouchers` (solo `VoucherSummary`, la cabecera: sin moneda, líneas ni cobros; el comprobante completo se lee en línea); sin cambios en el esquema. Huecos H26–H29 en [03](03-traceability.md#huecos-abiertos).
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `PrepareVoucherUseCase(workOrderId)` → `Result<VoucherDraft>` | `features/cashier/application` | US37, US39. Arma el borrador de una orden `COMPLETED` (si no, `InvalidCashierInputException("status")`): líneas con IGV, moneda y factura o boleta sugerida desde `GET /customers/{id}` (H27). El total puede diferir en céntimos del de la orden (H26). El cajero edita el borrador antes de emitir |
+| `IssueVoucherUseCase(draft)` → `Result<IssueOutcome>` | `features/cashier/application` | US37 E1–E3 (`invoicing:invoices:issue_sunat`). Tres resultados: `Issued`, `AlreadyIssued` (la orden ya tenía uno vigente, no se emitió otro) e `IssuedPendingDetails(voucherId)` (se emitió pero la respuesta no se pudo leer: recargar el comprobante). Sin líneas o con una descripción vacía o genérica ("Product {uuid}", "Standard Service"; ver `VoucherLineDraft.needsDescription`): `InvalidCashierInputException("lines")`, la UI pide editarla (H26). Factura sin documento `RUC` de 11 dígitos: `InvalidCashierInputException("taxId")`. Sin serie activa del tipo: `MissingFiscalSeriesException` → llevar a la configuración de series (US42). Ver H28 |
+| `GetWorkOrderVouchersUseCase(workOrderId)` → `Result<List<Voucher>>` | `features/cashier/application` | Lee los comprobantes completos de la orden en la red y deja las cabeceras en la caché. Úsalo para recargar tras `IssuedPendingDetails` |
+| `ObserveWorkOrderVouchersUseCase(workOrderId)` → `Flow<List<VoucherSummary>>` | `features/cashier/application` | Cabeceras en caché, sin red. `VoucherSummary` no trae moneda, líneas ni cobros: para el detalle, `GetWorkOrderVouchersUseCase` |
+| `RegisterPaymentUseCase(voucherId, amount, method, transactionReference?)` → `Result<Voucher>` | `features/cashier/application` | US38 E1/E2 (`invoicing:payments:create`). El saldo sale del `pendingBalance` del comprobante, no de la orden. Monto con a lo sumo 2 decimales (regla de la app, no de la API), mínimo 0,01 y sin pasar del saldo; referencia hasta 100 caracteres (`InvalidCashierInputException("amount" / "transactionReference")`). Comprobante anulado, rechazado o nota de crédito: `InvalidCashierInputException("status")`. Si queda `PAID`, recarga la orden. `PaymentOutcomeUnknownException` (timeout, respuesta 5xx o sin cuerpo, o relectura fallida tras cobrar): no cobrar de nuevo; mostrar antes el historial con `GetVoucherPaymentsUseCase` (H28) |
+| `GetVoucherPaymentsUseCase(voucherId)` → `Result<List<Payment>>` | `features/cashier/application` | US38. Historial de cobros del comprobante, en línea |
+| `GetDailyCashSummaryUseCase(date)` → `Result<DailyCashSummary>` | `features/cashier/application` | US38. Caja de la sede de la sesión en un día (`date` de `BusinessTime`); sin sede, `MissingBranchException` sin llamar |
+| `MarkWorkOrderPaidUseCase(workOrderId)` → `Result<WorkOrder>` | `features/cashier/application` | US39 E2. Pago formal de la orden; el backend rechaza si queda saldo (docs/03): mostrar su `message` |
+| `DownloadExitPassUseCase(workOrderId)` → `Result<File>` | `features/cashier/application` | US39 E2/E3 (`invoicing:exit_passes:issue`). PDF del pase de salida; una orden sin pagar da el `message` del 422 |
+| `DeliverVehicleUseCase(workOrderId)` → `Result<WorkOrder>` | `features/cashier/application` | US39 E2 (`operations:vehicle_handover:execute`). Entrega el vehículo y libera la bahía; sin firma del cliente (H29) |
+| `GetBranchSeriesUseCase()` → `Result<List<FiscalSeries>>` | `features/cashier/application` | US42. Series de la sede de la sesión; sin sede, `MissingBranchException` |
+| `ConfigureSeriesUseCase(type, serie, initialCorrelative?)` → `Result<FiscalSeries>` | `features/cashier/application` | US42 E1/E2 (`invoicing:fiscal_config:manage`). Serie que no corresponde al tipo o correlativo negativo: `InvalidCashierInputException("serie" / "initialCorrelative")`. Serie repetida: 409 con el `message` |
+| `SetSeriesActiveUseCase(id, active)` → `Result<Unit>` | `features/cashier/application` | US42. Activa o desactiva una serie |
+| `StartWorkOrderUseCase(id)`, `CompleteWorkOrderUseCase(id)` → `Result<WorkOrder>` | `features/workorders/application` | `operations:work_orders:update`, en línea. Completar cierra también las operaciones técnicas de bahía |
+| `CancelWorkOrderUseCase(id, reason)` → `Result<WorkOrder>` | `features/workorders/application` | `operations:work_orders:cancel`, en línea. Motivo de 1 a 1000 caracteres (`InvalidWorkOrderInputException("reason")` sin llamar) |
+| `ReceptionRepository.getCustomer(id)` → `Result<Customer>` | `features/reception/domain` | Lectura en línea de un cliente; la usa `PrepareVoucherUseCase` (el Cajero tiene `crm:customers:read`) |
+| Excepciones | `features/cashier/domain` | `InvalidCashierInputException(field)`, `MissingFiscalSeriesException`, `PaymentOutcomeUnknownException`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
+
+### Parte `reports` ✅ (sin `presentation`)
+
+Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Todo en línea, sin caché Room ni cambios en el esquema. Huecos H30 y H31 en [03](03-traceability.md#huecos-abiertos).
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `GetCashFlowSummaryUseCase(period)` → `Result<CashFlowSummary>` | `features/reports/application` | US41. Flujo de caja del taller (todas las sedes, H30) en un `ReportPeriod`. Habilitar con `Session.has(Permission.CASHFLOW_EXPORT_PDF)`. `netCashFlow` y el `amount` y el `runningBalance` de cada movimiento pueden ser negativos. Un reporte sin moneda o con una moneda desconocida falla en vez de mostrarse en PEN; la app solo garantiza que no inventa una moneda, no que la etiqueta sea correcta. H31: `accountsReceivable` y `totalExpenses` llegan siempre en 0 y la moneda va siempre como `PEN`: no mostrarlos como cifras reales. Un reporte mal formado falla sin `message` del backend: mostrar un error genérico |
+| `DownloadCashFlowPdfUseCase(period)` → `Result<File>` | `features/reports/application` | US41. PDF del flujo de caja del mismo periodo; abrir con un visor PDF. Habilitar con `Session.has(Permission.CASHFLOW_EXPORT_PDF)`. Sin red falla con `IOException` (deshabilitar con `ConnectivityObserver`) |
+| `DownloadFleetHealthPdfUseCase(customerId)` → `Result<File>` | `features/reports/application` | US43 E2. PDF consolidado de salud de la flota de un cliente. Habilitar con `Session.canReadAiReports()` (permiso `iot:health_reports:read` y plan con IA). Un cliente de otro taller da 404 con el `message` |
+| `ReportPeriod.month(YearMonth)`, `ReportPeriod.year(Year)` | `features/reports/domain` | Presets de mes y año (el mes y el año actuales salen de `BusinessTime`). Un rango con `from` posterior a `to` falla con `InvalidReportInputException("period")` |
+| Excepciones | `features/reports/domain` | `InvalidReportInputException(field)`. El resto es `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
+
+### Parte `team` ✅ (sin `presentation`)
+
+Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Todo en línea, sin caché Room ni cambios en el esquema. Hueco H32 en [03](03-traceability.md#huecos-abiertos).
+
+| Pieza lista para la UI | Dónde | Para qué |
+| --- | --- | --- |
+| `GetBranchDailyAttendanceUseCase(date)` → `Result<List<TeamAttendance>>` | `features/team/application` | US10. Asistencia de la sede de la sesión en un día de Lima. Habilitar con `Session.has(Permission.ATTENDANCE_AUDIT_ALL)`; sin ese permiso devuelve lista vacía sin llamar. Sin sede, `MissingBranchException`. Un día o una respuesta mal formados hacen fallar la lectura en vez de ocultar filas. `jobTitle` puede ser null (solo con `iam:members:read`, H32) |
+| `GetPendingJustificationsUseCase(days = 7)` → `Result<PendingJustifications>` | `features/team/application` | US10. Bandeja de descargos `PENDING` de los últimos `days` días de Lima, del más reciente al más viejo. Habilitar con `ATTENDANCE_AUDIT_ALL` (sin él, vacía sin llamar). `failedDates` no vacío significa "faltan días": avisarlo y ofrecer reintentar; si fallan todos los días, falla con el `message` del primero. Un día mal formado cuenta como fallido (H32) |
+| `GetCollaboratorAttendanceUseCase(membershipId, attendanceId)` → `Result<TeamAttendance?>` | `features/team/application` | Destino del push `OVERTIME_RECORDED` (`PushDestination.CollaboratorAttendance`). Busca el registro en los últimos 30 días de Lima; devuelve null si no está. No se filtra por permiso (el historial admite `audit_all` o `read_own`) |
+| `ApproveJustificationUseCase(id)`, `RejectJustificationUseCase(id)` → `Result<TeamAttendance>` | `features/team/application` | US10 (`hr:justifications:approve`). No se filtran: ocultar los botones sin `Permission.JUSTIFICATIONS_APPROVE`; el backend responde 403 con su `message`. Un descargo ya revisado devuelve el `message` del backend |
+| Errores | `features/team` | `MissingBranchException`, `ApiException` (mostrar `message`) o `IOException` (deshabilitar con `ConnectivityObserver`) |
+
 ---
 
 ## Pendientes y riesgos conocidos
@@ -316,3 +364,4 @@ Solo `domain`, `application` e `infrastructure`; la pantalla del tablero, las ru
 | Configuración local | Faltan `API_BASE_URL`, `GOOGLE_WEB_CLIENT_ID`, `SUPABASE_*` en `local.properties` y `app/google-services.json` | Pasos 2, 5, 6 |
 | Tokens en DataStore sin cifrar | `SessionManager` guarda ambos tokens en DataStore normal ([api/README.md](api/README.md) §2). Cifrarlos (Tink / Android Keystore) es decisión de la app, no del backend | Decidir antes de producción |
 | Pantallas sin diseño | Las pantallas se entregan funcionales; el estilo lo aplica la otra parte del equipo | Todos |
+| `retryOnConnectionFailure` de OkHttp | Queda en su valor por defecto (`true`) en `NetworkModule` del núcleo: podría reenviar un `POST` no idempotente (comprobantes, cobros) tras un fallo de conexión antes de que la guarda de la app lo vea. Decidirlo en `core` antes de producción | Paso 9 (`cashier`) |

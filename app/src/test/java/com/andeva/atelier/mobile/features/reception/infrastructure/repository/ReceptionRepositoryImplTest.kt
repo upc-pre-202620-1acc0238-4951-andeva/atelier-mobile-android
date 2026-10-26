@@ -68,6 +68,18 @@ class ReceptionRepositoryImplTest {
     }
 
     @Test
+    fun `getCustomer lee en linea y guarda en la cache`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/customers/c1"] = env.json(env.customer())
+
+        val customer = repository.getCustomer("c1").getOrThrow()
+
+        assertEquals("Ana Torres", customer.displayName)
+        assertEquals("45678912", customer.taxId)
+        assertEquals("Ana Torres", repository.observeCustomer("c1").first()!!.displayName)
+    }
+
+    @Test
     fun `sin red la placa ya vista sale de la cache`() = runTest {
         env.signIn()
         env.responses["GET /api/v1/vehicles/by-plate/ABC123"] = env.json(env.vehicle())

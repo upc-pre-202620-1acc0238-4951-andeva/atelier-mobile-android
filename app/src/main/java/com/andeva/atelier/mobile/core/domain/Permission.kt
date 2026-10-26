@@ -32,6 +32,7 @@ value class Permission(val value: String) {
         val WORK_ORDERS_READ = Permission("operations:work_orders:read")
         val WORK_ORDERS_CREATE = Permission("operations:work_orders:create")
         val WORK_ORDERS_UPDATE = Permission("operations:work_orders:update")
+        val WORK_ORDERS_CANCEL = Permission("operations:work_orders:cancel")
         val INSPECTIONS_UPLOAD_PHOTOS = Permission("operations:inspections:upload_photos")
         val PROPOSALS_CREATE = Permission("operations:proposals:create")
         val PROPOSALS_NOTIFY = Permission("operations:proposals:notify")

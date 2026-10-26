@@ -5,6 +5,7 @@ import com.andeva.atelier.mobile.features.workorders.domain.NewWorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.NewWorkOrderTask
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalApproval
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalSeverity
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -47,5 +48,24 @@ class WorkOrderUseCasesTest {
         val photo = File("x.jpg")
         coEvery { repository.submitProposal("wo1", "Fuga en el radiador", ProposalSeverity.MEDIUM, photo, null) } returns Result.success(Unit)
         assertTrue(submit("wo1", "Fuga en el radiador", ProposalSeverity.MEDIUM, photo).isSuccess)
+    }
+
+    @Test
+    fun `cancelar sin motivo no llega al backend`() = runTest {
+        val cancel = CancelWorkOrderUseCase(repository)
+
+        assertEquals("reason", field(cancel("wo1", " ")))
+        assertEquals("reason", field(cancel("wo1", "x".repeat(1001))))
+        coVerify(exactly = 0) { repository.cancel(any(), any()) }
+    }
+
+    @Test
+    fun `iniciar y completar delegan en el repositorio`() = runTest {
+        val order = mockk<WorkOrder>()
+        coEvery { repository.start("wo1") } returns Result.success(order)
+        coEvery { repository.complete("wo1") } returns Result.success(order)
+
+        assertEquals(order, StartWorkOrderUseCase(repository)("wo1").getOrThrow())
+        assertEquals(order, CompleteWorkOrderUseCase(repository)("wo1").getOrThrow())
     }
 }

@@ -140,6 +140,48 @@ class WorkOrderRepositoryImplTest {
     }
 
     @Test
+    fun `cancelar quita la orden de la cache de la sede`() = runTest {
+        env.signIn()
+        env.responses["POST /api/v1/work-orders"] = env.json(env.workOrder(), 201)
+        repository.open(NewWorkOrder("v1", "c1", 42000)).getOrThrow()
+        env.responses["POST /api/v1/work-orders/wo1/cancel"] = env.json(env.workOrder(status = "CANCELED"))
+
+        val canceled = repository.cancel("wo1", " Cliente desiste ").getOrThrow()
+
+        assertEquals(WorkOrderStatus.CANCELED, canceled.status)
+        assertNull(repository.observeWorkOrder("wo1").first())
+        assertEquals("""{"reason":"Cliente desiste"}""", env.requested("POST", "/api/v1/work-orders/wo1/cancel").single().body.readUtf8())
+    }
+
+    @Test
+    fun `iniciar y completar dejan la cabecera al dia`() = runTest {
+        env.signIn()
+        env.responses["POST /api/v1/work-orders"] = env.json(env.workOrder(), 201)
+        repository.open(NewWorkOrder("v1", "c1", 42000)).getOrThrow()
+        env.responses["POST /api/v1/work-orders/wo1/start"] = env.json(env.workOrder(status = "IN_PROGRESS"))
+        env.responses["POST /api/v1/work-orders/wo1/complete"] = env.json(env.workOrder(status = "COMPLETED"))
+
+        assertEquals(WorkOrderStatus.IN_PROGRESS, repository.start("wo1").getOrThrow().status)
+        assertEquals(WorkOrderStatus.IN_PROGRESS, repository.observeWorkOrder("wo1").first()!!.status)
+        assertEquals(WorkOrderStatus.COMPLETED, repository.complete("wo1").getOrThrow().status)
+        assertEquals(WorkOrderStatus.COMPLETED, repository.observeWorkOrder("wo1").first()!!.status)
+    }
+
+    @Test
+    fun `transicion invalida devuelve el message del 422`() = runTest {
+        env.signIn()
+        env.responses["POST /api/v1/work-orders/wo1/start"] = env.error(422, "UNPROCESSABLE_ENTITY", "La orden no puede iniciarse")
+        env.responses["POST /api/v1/work-orders/wo1/complete"] = env.error(422, "UNPROCESSABLE_ENTITY", "Hay tareas sin terminar")
+        env.responses["POST /api/v1/work-orders/wo1/cancel"] = env.error(422, "UNPROCESSABLE_ENTITY", "La orden ya esta pagada")
+
+        assertEquals("La orden no puede iniciarse", repository.start("wo1").exceptionOrNull()!!.message)
+        assertEquals("Hay tareas sin terminar", repository.complete("wo1").exceptionOrNull()!!.message)
+        val canceled = repository.cancel("wo1", "Motivo").exceptionOrNull()!!
+        assertEquals("La orden ya esta pagada", canceled.message)
+        assertEquals(422, (canceled as ApiException).httpStatus)
+    }
+
+    @Test
     fun `la proforma se guarda en cacheDir pdfs y un 422 trae el message`() = runTest {
         env.signIn()
         env.responses["GET /api/v1/work-orders/wo1/quotation/pdf"] = MockResponse().setResponseCode(200)
