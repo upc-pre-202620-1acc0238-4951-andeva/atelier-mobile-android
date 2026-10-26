@@ -167,7 +167,7 @@ data class RejectProposalRequestDto(
     @SerializedName("customerNotes") val customerNotes: String
 )
 
-/** `CancelWorkOrderResource` (rechazo de la proforma). */
+/** `CancelWorkOrderResource`: motivo de rechazo de la proforma y de cancelación de la orden. */
 data class ReasonRequestDto(
     @SerializedName("reason") val reason: String
 )

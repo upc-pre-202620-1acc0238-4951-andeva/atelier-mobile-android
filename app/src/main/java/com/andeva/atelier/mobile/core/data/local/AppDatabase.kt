@@ -17,6 +17,7 @@ import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftD
 import com.andeva.atelier.mobile.features.attendance.infrastructure.local.ShiftEntity
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayEntity
+import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherDao
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherEntity
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertDao
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertEntity
@@ -68,6 +69,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderDao(): WorkOrderDao
     abstract fun partDao(): PartDao
     abstract fun batchDao(): BatchDao
+    abstract fun voucherDao(): VoucherDao
     abstract fun telemetryReadingDao(): TelemetryReadingDao
     abstract fun vehicleFaultDao(): VehicleFaultDao
     abstract fun predictiveAlertDao(): PredictiveAlertDao

@@ -16,6 +16,9 @@ interface ReceptionRepository {
 
     fun observeCustomer(id: String): Flow<Customer?>
 
+    /** `GET /customers/{id}` en línea (caja: puede no haberlo visto nunca); lo guarda en la caché `customers`. */
+    suspend fun getCustomer(id: String): Result<Customer>
+
     /** Por documento o nombre. Sin red busca en la caché `customers`. */
     suspend fun searchCustomers(query: String): Result<List<Customer>>
 

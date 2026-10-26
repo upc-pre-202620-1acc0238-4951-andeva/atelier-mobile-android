@@ -66,6 +66,14 @@ interface WorkOrderRepository {
 
     suspend fun rejectQuotation(id: String, reason: String): Result<WorkOrder>
 
+    /** Pasa la orden a `IN_PROGRESS`; un 422 trae el `message` de la transición inválida. */
+    suspend fun start(id: String): Result<WorkOrder>
+
+    suspend fun complete(id: String): Result<WorkOrder>
+
+    /** Libera bahía y reservas; la orden `CANCELED` sale de la caché de la sede. */
+    suspend fun cancel(id: String, reason: String): Result<WorkOrder>
+
     suspend fun getPartMovements(id: String): Result<List<PartMovement>>
 
     suspend fun getProfitability(id: String): Result<Profitability>
