@@ -30,7 +30,7 @@ Reglas para todas las sesiones:
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
-| 9 | `bays`, `cashier`, `reports`, `team` | 🔄 En curso: `bays`, `cashier` y `reports` hechos sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, una rama por feature |
+| 9 | `bays`, `cashier`, `reports`, `team` | 🔄 En curso: `bays`, `cashier` y `reports` hechos sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, una rama por feature |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
 
@@ -319,11 +319,11 @@ Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los 
 
 ### Parte `reports` ✅ (sin `presentation`)
 
-Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Todo en línea, sin caché Room ni cambios en el esquema. Hueco H30 en [03](03-traceability.md#huecos-abiertos).
+Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los textos los hace la otra parte del equipo. Todo en línea, sin caché Room ni cambios en el esquema. Huecos H30 y H31 en [03](03-traceability.md#huecos-abiertos).
 
 | Pieza lista para la UI | Dónde | Para qué |
 | --- | --- | --- |
-| `GetCashFlowSummaryUseCase(period)` → `Result<CashFlowSummary>` | `features/reports/application` | US41. Flujo de caja del taller (todas las sedes, H30) en un `ReportPeriod`. Habilitar con `Session.has(Permission.CASHFLOW_EXPORT_PDF)`. `netCashFlow` y el `amount` y el `runningBalance` de cada movimiento pueden ser negativos. Un reporte sin moneda o con una moneda desconocida falla en vez de mostrarse en PEN |
+| `GetCashFlowSummaryUseCase(period)` → `Result<CashFlowSummary>` | `features/reports/application` | US41. Flujo de caja del taller (todas las sedes, H30) en un `ReportPeriod`. Habilitar con `Session.has(Permission.CASHFLOW_EXPORT_PDF)`. `netCashFlow` y el `amount` y el `runningBalance` de cada movimiento pueden ser negativos. Un reporte sin moneda o con una moneda desconocida falla en vez de mostrarse en PEN; la app solo garantiza que no inventa una moneda, no que la etiqueta sea correcta. H31: `accountsReceivable` y `totalExpenses` llegan siempre en 0 y la moneda va siempre como `PEN`: no mostrarlos como cifras reales. Un reporte mal formado falla sin `message` del backend: mostrar un error genérico |
 | `DownloadCashFlowPdfUseCase(period)` → `Result<File>` | `features/reports/application` | US41. PDF del flujo de caja del mismo periodo; abrir con un visor PDF. Habilitar con `Session.has(Permission.CASHFLOW_EXPORT_PDF)`. Sin red falla con `IOException` (deshabilitar con `ConnectivityObserver`) |
 | `DownloadFleetHealthPdfUseCase(customerId)` → `Result<File>` | `features/reports/application` | US43 E2. PDF consolidado de salud de la flota de un cliente. Habilitar con `Session.canReadAiReports()` (permiso `iot:health_reports:read` y plan con IA). Un cliente de otro taller da 404 con el `message` |
 | `ReportPeriod.month(YearMonth)`, `ReportPeriod.year(Year)` | `features/reports/domain` | Presets de mes y año (el mes y el año actuales salen de `BusinessTime`). Un rango con `from` posterior a `to` falla con `InvalidReportInputException("period")` |
