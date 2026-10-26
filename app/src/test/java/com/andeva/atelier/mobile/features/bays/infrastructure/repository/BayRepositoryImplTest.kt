@@ -232,6 +232,26 @@ class BayRepositoryImplTest {
         assertEquals(15, occupant.internalNumber)
     }
 
+    @Test
+    fun `un detalle ilegible deja la bahia sin mecanicos y no tumba el tablero`() = runTest {
+        env.signIn()
+        env.cachePlate()
+        env.responses["GET /api/v1/work-bays"] = env.json(listOf(env.bay("bay1", "Elevador 1", "OCCUPIED", "wo1")))
+        env.responses["GET /api/v1/work-orders/wo1"] = MockResponse().setBody("""{"id":"wo1","tasks":"ilegible"}""")
+        env.db.workOrderDao().replaceBranch("b1", listOf(summaryEntity()))
+        repository.refreshBranchBays().getOrThrow()
+        val emissions = Channel<List<BayBoardItem>>(Channel.UNLIMITED)
+        backgroundScope.launch(Dispatchers.Default) { repository.observeBoard().collect { emissions.send(it) } }
+        assertEquals("ABC123", emissions.next().single().occupant!!.plate)
+        while (env.requested("GET", "/api/v1/work-orders/wo1").isEmpty()) Thread.sleep(10)
+
+        repository.refreshBranchBays().getOrThrow()
+
+        val occupant = emissions.next().single().occupant!!
+        assertEquals(emptyList<String>(), occupant.mechanicIds)
+        assertNull(occupant.laborElapsed)
+    }
+
     private fun summaryEntity() = env.gson
         .fromJson(env.gson.toJson(env.workOrderSummary()), WorkOrderDto::class.java)
         .toEntity(env.clock.millis())
