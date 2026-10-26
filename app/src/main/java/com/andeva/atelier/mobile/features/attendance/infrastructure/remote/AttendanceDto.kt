@@ -16,6 +16,8 @@ data class AttendanceDto(
     @SerializedName("distanceToBranchMeters") val distanceToBranchMeters: Double?,
     @SerializedName("justificationReason") val justificationReason: String?,
     @SerializedName("justificationStatus") val justificationStatus: String?,
+    @SerializedName("justificationReviewedBy") val justificationReviewedBy: String? = null,
+    @SerializedName("justificationReviewedAt") val justificationReviewedAt: String? = null,
     @SerializedName("workedMinutes") val workedMinutes: Long?,
     @SerializedName("regularMinutes") val regularMinutes: Long?,
     @SerializedName("overtimeMinutes") val overtimeMinutes: Long?
