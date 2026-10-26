@@ -65,10 +65,12 @@ class TeamRepositoryImpl @Inject constructor(
     /** El `history` cubre los últimos 30 días de Lima (hoy−29 … hoy); el push no trae la fecha del registro. */
     override suspend fun getCollaboratorAttendance(membershipId: String, attendanceId: String): Result<TeamAttendance?> {
         val today = BusinessTime.limaDate(clock.instant())
-        return apiCall(
-            gson,
-            { teamAttendanceService.history(membershipId, today.minusDays(HISTORY_DAYS - 1).toString(), today.toString()) }
-        ) { it }
+        return safely {
+            apiCall(
+                gson,
+                { teamAttendanceService.history(membershipId, today.minusDays(HISTORY_DAYS - 1).toString(), today.toString()) }
+            ) { it }
+        }
             .mapCatching { dtos -> dtos.toTeam().firstOrNull { it.id == attendanceId } }
     }
 

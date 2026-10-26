@@ -255,6 +255,14 @@ class TeamRepositoryImplTest {
     }
 
     @Test
+    fun `un historial con cuerpo ilegible falla sin lanzar`() = runTest {
+        env.signIn()
+        env.responses["GET /api/v1/hr/attendances/employee/m1/history"] = env.json(mapOf("not" to "an array"))
+
+        assertTrue(repository.getCollaboratorAttendance("m1", "a1").isFailure)
+    }
+
+    @Test
     fun `un cuerpo de perfiles ilegible deja jobTitle null y devuelve las asistencias`() = runTest {
         env.signIn()
         env.responses["GET $employees"] = env.json(mapOf("not" to "an array"))
