@@ -235,4 +235,50 @@ class TeamRepositoryImplTest {
         assertEquals("2026-09-25", url.queryParameter("startDate"))
         assertEquals("2026-10-24", url.queryParameter("endDate"))
     }
+
+    @Test
+    fun `un dia con cuerpo ilegible queda en failedDates y los demas se devuelven`() = runTest {
+        env.signIn(permissions = emptyList())
+        env.handler = { request ->
+            when (request.requestUrl!!.queryParameter("date")) {
+                "2026-10-22" -> env.json(mapOf("not" to "an array"))
+                "2026-10-21" -> env.json(listOf(env.attendance("a21", justificationStatus = "PENDING")))
+                "2026-10-20" -> env.json(listOf(mapOf("id" to "x", "branchId" to "b1", "membershipId" to "m1", "workedMinutes" to "abc")))
+                else -> env.json(emptyList<Any>())
+            }
+        }
+
+        val result = repository.getPendingJustifications().getOrThrow()
+
+        assertEquals(listOf(LocalDate.of(2026, 10, 22), LocalDate.of(2026, 10, 20)), result.failedDates)
+        assertEquals(listOf("a21"), result.items.map { it.id })
+    }
+
+    @Test
+    fun `un cuerpo de perfiles ilegible deja jobTitle null y devuelve las asistencias`() = runTest {
+        env.signIn()
+        env.responses["GET $employees"] = env.json(mapOf("not" to "an array"))
+        env.responses["GET $daily"] = env.json(listOf(env.attendance("a1")))
+
+        val item = repository.getBranchDaily(LocalDate.of(2026, 10, 24)).getOrThrow().single()
+
+        assertNull(item.jobTitle)
+    }
+
+    @Test
+    fun `a las 22h de Lima el dia de negocio sigue siendo el de Lima`() = runTest {
+        val late = TeamTestEnv(java.time.Instant.parse("2026-10-25T03:00:00Z"))
+        late.start()
+        try {
+            late.signIn(permissions = emptyList())
+            late.handler = { late.json(emptyList<Any>()) }
+
+            late.repository().getPendingJustifications().getOrThrow()
+
+            val dates = late.requested("GET", daily).map { it.requestUrl!!.queryParameter("date") }
+            assertEquals((18..24).map { "2026-10-$it" }, dates.sortedBy { it })
+        } finally {
+            late.stop()
+        }
+    }
 }

@@ -28,9 +28,9 @@ import java.util.concurrent.TimeUnit
  * Backend simulado (MockWebServer, despachador por ruta y query) + sesión en memoria para los tests de `team`.
  * Hora fija: 2026-10-24 09:00 de Lima.
  */
-class TeamTestEnv {
+class TeamTestEnv(now: Instant = Instant.parse("2026-10-24T14:00:00Z")) {
     val gson = Gson()
-    val clock: Clock = Clock.fixed(Instant.parse("2026-10-24T14:00:00Z"), ZoneOffset.UTC)
+    val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
     private val server = MockWebServer()
 
     /** "METHOD /ruta" sin query → respuesta. Lo demás, 404. */

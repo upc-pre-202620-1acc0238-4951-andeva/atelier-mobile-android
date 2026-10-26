@@ -13,6 +13,7 @@ import com.andeva.atelier.mobile.features.team.domain.TeamRepository
 import com.andeva.atelier.mobile.features.team.infrastructure.remote.TeamAttendanceService
 import com.andeva.atelier.mobile.features.team.infrastructure.remote.toTeamAttendanceOrNull
 import com.google.gson.Gson
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -72,10 +73,10 @@ class TeamRepositoryImpl @Inject constructor(
     }
 
     override suspend fun approveJustification(id: String): Result<TeamAttendance> =
-        apiCall(gson, { teamAttendanceService.approveJustification(id) }) { it }.mapCatching { it.toTeamOrThrow() }
+        safely { apiCall(gson, { teamAttendanceService.approveJustification(id) }) { it } }.mapCatching { it.toTeamOrThrow() }
 
     override suspend fun rejectJustification(id: String): Result<TeamAttendance> =
-        apiCall(gson, { teamAttendanceService.rejectJustification(id) }) { it }.mapCatching { it.toTeamOrThrow() }
+        safely { apiCall(gson, { teamAttendanceService.rejectJustification(id) }) { it } }.mapCatching { it.toTeamOrThrow() }
 
     private suspend fun branchIdOrFailure(): Result<String> {
         val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
@@ -84,20 +85,29 @@ class TeamRepositoryImpl @Inject constructor(
     }
 
     private suspend fun readDay(branchId: String, date: LocalDate): Result<List<TeamAttendance>> =
-        apiCall(gson, { teamAttendanceService.branchDaily(branchId, date.toString()) }) { it }
+        safely { apiCall(gson, { teamAttendanceService.branchDaily(branchId, date.toString()) }) { it } }
             .mapCatching { it.toTeam() }
 
     /** `membershipId → jobTitle`. Es decoración: sin `iam:members:read` no se pide, y si falla queda vacío. */
     private suspend fun jobTitles(branchId: String): Map<String, String> {
         val session = sessionManager.getSession() ?: return emptyMap()
         if (!session.has(Permission.MEMBERS_READ)) return emptyMap()
-        return apiCall(gson, { employeeService.getByBranch(branchId) }) { profiles ->
+        return safely { apiCall(gson, { employeeService.getByBranch(branchId) }) { profiles ->
             profiles.mapNotNull { profile ->
                 val member = profile.membershipId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 val title = profile.jobTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 member to title
             }.toMap()
-        }.getOrDefault(emptyMap())
+        } }.getOrDefault(emptyMap())
+    }
+
+    /** Una respuesta que Gson no puede leer (RuntimeException) llega como fallo, no como excepción. */
+    private suspend fun <T> safely(block: suspend () -> Result<T>): Result<T> = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     private fun TeamAttendance.withTitle(titles: Map<String, String>) = copy(jobTitle = titles[membershipId])
