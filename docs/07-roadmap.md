@@ -122,14 +122,28 @@ Pendiente de este paso: la capa `presentation` (otra parte del equipo).
 - **Cachés:** `branches`, `shifts`, `attendances`.
 - **Ubicación:** `LocationProvider` (interfaz en dominio, implementación con `FusedLocationProviderClient`), ubicación fresca, precisión ≤ 50 m, detectar ubicación simulada.
 
-**Alcance entregado: solo `domain`, `application` e `infrastructure`.** La capa `presentation` (pantallas de asistencia y de mi turno, ViewModels, rutas, textos y el pedido de `ACCESS_FINE_LOCATION`) la hace la otra parte del equipo.
+**Alcance entregado:** `domain`, `application` e `infrastructure` existentes, más `presentation` con la pantalla de asistencia, mi turno, historial y descargos. Archivos en `features/attendance/presentation/{AttendanceUiState.kt,AttendanceViewModel.kt,AttendanceScreen.kt,navigation/AttendanceNavGraph.kt}`. `AppNavHost` conecta temporalmente `MainStartRoute` con `AttendanceRoute` hasta integrar Attendance en el contenedor definitivo con pestañas de `main`.
+
+Decisiones de flujo:
+
+- **Ingreso:** la pantalla verifica `ATTENDANCE_CLOCK_IN`, la sede y el turno asignados, y solicita `ACCESS_FINE_LOCATION` al intentar marcar. Informa si la operación se registró o quedó pendiente de sincronización.
+- **Salida:** verifica `ATTENDANCE_CLOCK_OUT` y utiliza `ClockOutUseCase`, respetando las operaciones pendientes.
+- **Mi turno:** muestra el turno, la sede, la tolerancia y los días laborables o de descanso de lunes a domingo. Si no hay turno asignado, muestra el estado vacío.
+- **Historial y descargos:** muestra los registros de asistencia y permite enviar un motivo de hasta 500 caracteres mediante `SubmitJustificationUseCase`, con el permiso `JUSTIFICATIONS_CREATE`.
+- **Actualización:** al abrir la pantalla ejecuta `RefreshAttendanceUseCase`; también permite actualizar manualmente y muestra los errores correspondientes.
+- **Navegación:** la conexión desde `MainStartRoute` es provisional; al integrar el contenedor de `main`, Attendance debe incorporarse como uno de sus destinos.
 
 | Pieza lista para la UI | Dónde | Para qué |
 | --- | --- | --- |
+| `AttendanceUiState` | `features/attendance/presentation` | Estado de la jornada, turno, historial, carga, errores, avisos y formulario de descargo |
+| `AttendanceViewModel` | `features/attendance/presentation` | Combina los casos de uso de jornada, turno e historial y ejecuta la actualización, ingreso, salida y envío de descargos |
+| `AttendanceScreen` | `features/attendance/presentation` | Pantalla de asistencia, botones de ingreso/salida, turno semanal, historial y formulario de descargo; solicita el permiso de ubicación al intentar marcar ingreso |
+| `attendanceNavGraph` / `AttendanceRoute` / `AttendanceHomeRoute` | `features/attendance/presentation/navigation` | Define el grafo y el destino de la pantalla de Attendance |
+| `AppNavHost` | `navigation/` | Registra el grafo de Attendance y conecta temporalmente `MainStartRoute` con `AttendanceRoute` |
 | `RefreshAttendanceUseCase` → `Result<Unit>` | `features/attendance/application` | Al abrir Asistencia. Recarga perfil laboral (sede y turno de la sesión), sedes y turno (24 h) y los últimos 30 días. Falla solo si no se pudo leer la asistencia: seguir con la caché y mostrar "Actualizado hace N min" |
 | `ObserveTodayAttendanceUseCase` → `Flow<TodayAttendance>` | `features/attendance/application` | Botón de marcar: `NotClockedIn`, `ClockInQueued`, `ClockedIn`, `ClockOutQueued` o `Completed`. Incluye lo que espera señal, así no se marca dos veces |
 | `ObserveAttendanceHistoryUseCase` → `Flow<List<Attendance>>` | `features/attendance/application` | Historial con `status`, minutos trabajados, regulares y sobretiempo, y estado del descargo |
-| `ObserveWeeklyScheduleUseCase` → `Flow<WeeklySchedule?>` | `features/attendance/application` | US09: turno, sede, tolerancia y `days` de lunes a domingo; trae `branchId`/`shiftId` para marcar. null sin turno asignado |
+| `ObserveWeeklyScheduleUseCase` → `Flow<WeeklySchedule?>` | `features/attendance/application` | US09: turno, sede, tolerancia y `days` de lunes a domingo; trae `branchId`/`shiftId` para marcar. `null` sin turno asignado |
 | `ClockInUseCase(branchId, shiftId)` → `ClockInResult` | `features/attendance/application` | US06. `outcome` (`Recorded`, `Queued`, `AlreadyQueued`) y `geofence` (distancia, si está dentro y si la ubicación es simulada: solo avisos, decide el backend) |
 | `ClockOutUseCase` → `SubmitOutcome` | `features/attendance/application` | US08. Sin red se encola detrás del ingreso pendiente |
 | `SubmitJustificationUseCase(id, reason)` → `SubmitOutcome` | `features/attendance/application` | US10 E1. El dictamen llega por push `JUSTIFICATION_REVIEWED` (`PushDestination.MyAttendance`) |
@@ -139,8 +153,7 @@ Pendiente de este paso: la capa `presentation` (otra parte del equipo).
 
 Núcleo extendido: `BusinessTime` (día de Lima), `ClockModule` (`Clock` inyectable), `PendingOperationDao.findByDedupeKey` / `observeByDedupeKey`, y `EmployeeService` movido de `auth` a `core/data/remote/employee/` (lo usan `auth` y `attendance`).
 
-Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador. `status-today` sin jornada responde 404 (hueco H2, cerrado en [03](03-traceability.md#huecos-cerrados)).
-
+**Pendiente de este paso:** corregir y verificar cualquier error de compilación; ejecutar `./gradlew assembleDebug testDebugUnitTest`; probar contra el backend en un emulador el ingreso/salida, los permisos y la ubicación, el turno, el historial, los descargos y la sincronización offline. `status-today` sin jornada responde 404 (hueco H2, cerrado en [03](03-traceability.md#huecos-cerrados)).
 ## Paso 5 — `tasks` ✅
 
 - **Historias:** US26–US30, US23 E1–E3, US33 E1, US35 E1/E3 · **API:** [api/operations.md](api/operations.md), [api/crm.md](api/crm.md) (placa), [api/inventory.md](api/inventory.md) (buscar repuesto)

@@ -13,6 +13,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
+import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
+import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
 import kotlinx.serialization.Serializable
 
 /** Grafo sin sesión. Sus pantallas las define la feature `auth` (`authNavGraph`). */
@@ -40,7 +42,15 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
     ) {
         authNavGraph(navController)
         navigation<MainNavGraphRoute>(startDestination = MainStartRoute) {
-            composable<MainStartRoute> { }
+            composable<MainStartRoute> {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    navController.navigate(AttendanceRoute) {
+                        popUpTo<MainStartRoute> { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+            attendanceNavGraph(navController)
         }
     }
 
