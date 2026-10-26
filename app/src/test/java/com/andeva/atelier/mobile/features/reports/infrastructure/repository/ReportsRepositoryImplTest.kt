@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
@@ -45,7 +46,7 @@ class ReportsRepositoryImplTest {
         "movements" to listOf(
             mapOf(
                 "transactionId" to "tx1", "movementDate" to "2026-10-05T15:00:00Z", "type" to "INCOME", "category" to "SALES",
-                "concept" to "Boleta B001-7", "referenceNumber" to "B001-7", "amount" to 118.0, "runningBalance" to 118.0
+                "concept" to "Boleta B001-7", "referenceNumber" to "B001-7", "amount" to -118.5, "runningBalance" to -30.25
             )
         )
     )
@@ -62,7 +63,11 @@ class ReportsRepositoryImplTest {
         assertEquals(0, BigDecimal("1180.5").compareTo(result.totalIncome.amount))
         assertEquals("PEN", result.totalIncome.currency)
         assertEquals(0, BigDecimal("-20.25").compareTo(result.netCashFlow))
-        assertEquals("tx1", result.movements.single().transactionId)
+        val movement = result.movements.single()
+        assertEquals("tx1", movement.transactionId)
+        assertEquals(0, BigDecimal("-118.5").compareTo(movement.amount))
+        assertEquals(0, BigDecimal("-30.25").compareTo(movement.runningBalance))
+        assertEquals(Instant.parse("2026-10-05T15:00:00Z"), movement.movementDate)
     }
 
     @Test

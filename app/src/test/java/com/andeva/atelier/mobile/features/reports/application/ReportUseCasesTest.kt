@@ -1,5 +1,6 @@
 package com.andeva.atelier.mobile.features.reports.application
 
+import com.andeva.atelier.mobile.features.reports.domain.InvalidReportInputException
 import com.andeva.atelier.mobile.features.reports.domain.ReportPeriod
 import com.andeva.atelier.mobile.features.reports.domain.ReportsRepository
 import io.mockk.coEvery
@@ -46,6 +47,14 @@ class ReportUseCasesTest {
 
         assertEquals(file, DownloadFleetHealthPdfUseCase(repository)("c-1").getOrThrow())
         coVerify(exactly = 1) { repository.downloadFleetHealthPdf("c-1") }
+    }
+
+    @Test
+    fun `un cliente de flota en blanco falla sin llamar al repositorio`() = runTest {
+        val result = DownloadFleetHealthPdfUseCase(repository)("  ")
+
+        assertEquals("customerId", (result.exceptionOrNull() as InvalidReportInputException).field)
+        coVerify(exactly = 0) { repository.downloadFleetHealthPdf(any()) }
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.andeva.atelier.mobile.features.reports.application
 
+import com.andeva.atelier.mobile.features.reports.domain.InvalidReportInputException
 import com.andeva.atelier.mobile.features.reports.domain.ReportsRepository
 import java.io.File
 import javax.inject.Inject
@@ -8,5 +9,8 @@ import javax.inject.Inject
 class DownloadFleetHealthPdfUseCase @Inject constructor(
     private val reportsRepository: ReportsRepository
 ) {
-    suspend operator fun invoke(customerId: String): Result<File> = reportsRepository.downloadFleetHealthPdf(customerId)
+    suspend operator fun invoke(customerId: String): Result<File> {
+        if (customerId.isBlank()) return Result.failure(InvalidReportInputException("customerId"))
+        return reportsRepository.downloadFleetHealthPdf(customerId)
+    }
 }
