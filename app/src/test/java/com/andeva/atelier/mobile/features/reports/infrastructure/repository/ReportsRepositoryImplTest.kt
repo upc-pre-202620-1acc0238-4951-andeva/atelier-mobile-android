@@ -39,9 +39,9 @@ class ReportsRepositoryImplTest {
     @After
     fun tearDown() = env.stop()
 
-    private fun summary(totalIncome: Double? = 1180.5) = mapOf(
+    private fun summary(totalIncome: Double? = 1180.5, currency: String? = "PEN") = mapOf(
         "totalIncome" to totalIncome, "totalExpenses" to 200.0, "accountsReceivable" to 50.0, "netCashFlow" to -20.25,
-        "currency" to "PEN",
+        "currency" to currency,
         "movements" to listOf(
             mapOf(
                 "transactionId" to "tx1", "movementDate" to "2026-10-05T15:00:00Z", "type" to "INCOME", "category" to "SALES",
@@ -68,6 +68,20 @@ class ReportsRepositoryImplTest {
     @Test
     fun `un importe que falta es un fallo y no un cero`() = runTest {
         env.responses["GET /api/v1/invoicing/financial-reports/cash-flow"] = env.json(summary(totalIncome = null))
+
+        assertTrue(repository.getCashFlow(period).isFailure)
+    }
+
+    @Test
+    fun `una moneda que falta es un fallo y no PEN`() = runTest {
+        env.responses["GET /api/v1/invoicing/financial-reports/cash-flow"] = env.json(summary(currency = null))
+
+        assertTrue(repository.getCashFlow(period).isFailure)
+    }
+
+    @Test
+    fun `una moneda desconocida es un fallo y no PEN`() = runTest {
+        env.responses["GET /api/v1/invoicing/financial-reports/cash-flow"] = env.json(summary(currency = "EUR"))
 
         assertTrue(repository.getCashFlow(period).isFailure)
     }

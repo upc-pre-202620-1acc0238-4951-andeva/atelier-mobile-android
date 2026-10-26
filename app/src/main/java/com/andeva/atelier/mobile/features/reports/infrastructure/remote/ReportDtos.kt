@@ -31,7 +31,8 @@ data class CashFlowMovementDto(
 
 /** Un importe o fecha que falta lanza `IllegalArgumentException`: nunca se inventa un 0. */
 fun CashFlowSummaryDto.toDomain(): CashFlowSummary {
-    val known = if (currency == Money.PEN || currency == Money.USD) currency else Money.PEN
+    // Sin moneda por defecto: `Money` rechaza lo que no sea PEN/USD.
+    val known = requireNotNull(currency) { "Missing currency" }
     return CashFlowSummary(
         totalIncome = Money(requireNotNull(totalIncome) { "Missing totalIncome" }, known),
         totalExpenses = Money(requireNotNull(totalExpenses) { "Missing totalExpenses" }, known),
