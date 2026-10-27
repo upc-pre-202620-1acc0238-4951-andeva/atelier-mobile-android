@@ -214,4 +214,36 @@
     <string name="register_customer_submit">Registrar cliente y vehículo</string>
     <string name="register_customer_retry_vehicle">Registrar vehículo</string>
     <string name="register_customer_saved_pending_vehicle">El cliente ya se guardó. Falta registrar el vehículo.</string>
+
+    <!-- Recepción: búsqueda y citas (US11) -->
+    <string name="search_title">Recepción</string>
+    <string name="search_subtitle">Busca la unidad por placa o al cliente por documento.</string>
+    <string name="search_mode_plate">Placa</string>
+    <string name="search_mode_document">DNI / RUC</string>
+    <string name="search_field_plate">Placa del vehículo</string>
+    <string name="search_field_document">Documento del cliente</string>
+    <string name="search_submit">Buscar</string>
+    <string name="search_vehicle_owner">Titular: %1$s</string>
+    <string name="search_vehicle_no_owner">Sin titular registrado</string>
+    <string name="search_not_found_title">Vehículo no registrado.</string>
+    <string name="search_not_found_body">Es un primer ingreso. Registra al cliente y su vehículo, o afilia su cuenta de Atelier.</string>
+    <string name="search_customers_empty">No hay clientes con ese documento.</string>
+    <string name="search_customers_title">Clientes encontrados</string>
+    <string name="search_customer_vehicles_title">Vehículos de %1$s</string>
+    <string name="search_loading">Cargando…</string>
+    <string name="search_customer_vehicles_empty">Este cliente no tiene vehículos.</string>
+    <string name="search_register">Registrar cliente y vehículo</string>
+    <string name="search_affiliate">Afiliar por correo</string>
+    <string name="search_appointments_title">Citas de hoy</string>
+    <string name="search_appointments_empty">No hay citas para hoy.</string>
+    <string name="search_appointments_refresh">Actualizar citas</string>
+    <string name="search_appointment_line">%1$s · %2$s</string>
+    <string name="search_appointment_unknown_plate">Placa sin cargar</string>
+    <string name="search_appointment_arrived">Marcar llegada</string>
+    <string name="appointment_status_pending">Pendiente</string>
+    <string name="appointment_status_confirmed">Confirmada</string>
+    <string name="appointment_status_arrived">Llegó</string>
+    <string name="appointment_status_canceled">Cancelada</string>
+    <string name="search_arrival_ready">Llegada registrada. La orden en borrador ya está lista.</string>
+    <string name="search_arrival_pending">Llegada registrada. La orden se está creando: actualiza en unos segundos.</string>
 </resources>
