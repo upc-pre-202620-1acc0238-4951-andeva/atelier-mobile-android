@@ -63,6 +63,7 @@ fun VehicleSearchScreen(
     onBack: () -> Unit,
     onRegisterNew: () -> Unit,
     onAffiliate: () -> Unit,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: VehicleSearchViewModel = hiltViewModel()
 ) {
@@ -78,6 +79,7 @@ fun VehicleSearchScreen(
         onRefresh = viewModel::refresh,
         onRegisterNew = onRegisterNew,
         onAffiliate = onAffiliate,
+        onOpenWorkOrder = onOpenWorkOrder,
         modifier = modifier
     )
 }
@@ -94,6 +96,7 @@ internal fun VehicleSearchContent(
     onRefresh: () -> Unit,
     onRegisterNew: () -> Unit,
     onAffiliate: () -> Unit,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val plateMode = state.mode == SearchMode.PLATE
@@ -155,9 +158,9 @@ internal fun VehicleSearchContent(
 
             state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
 
-            SearchResults(state, onSelectCustomer, onRegisterNew, onAffiliate)
+            SearchResults(state, onSelectCustomer, onRegisterNew, onAffiliate, onOpenWorkOrder)
 
-            Appointments(state, onMarkArrived, onRefresh)
+            Appointments(state, onMarkArrived, onRefresh, onOpenWorkOrder)
         }
     }
 }
@@ -174,9 +177,16 @@ private fun SearchResults(
     state: VehicleSearchUiState,
     onSelectCustomer: (Customer) -> Unit,
     onRegisterNew: () -> Unit,
-    onAffiliate: () -> Unit
+    onAffiliate: () -> Unit,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
 ) {
-    state.vehicleResult?.let { VehicleResultCard(it) }
+    state.vehicleResult?.let { result ->
+        VehicleResultCard(result)
+        val customerId = result.owner?.id ?: result.vehicle.currentOwnerId
+        if (state.canOpenWorkOrder && customerId != null) {
+            StartServiceButton { onOpenWorkOrder(result.vehicle.id, customerId, null) }
+        }
+    }
 
     if (state.vehicleNotFound) {
         AtelierBanner(
@@ -218,10 +228,20 @@ private fun SearchResults(
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
-            else -> state.customerVehicles.forEach { VehicleRow(it) }
+            else -> state.customerVehicles.forEach { vehicle ->
+                VehicleRow(vehicle)
+                if (state.canOpenWorkOrder) StartServiceButton { onOpenWorkOrder(vehicle.id, customer.id, null) }
+            }
         }
     }
 }
+
+@Composable
+private fun StartServiceButton(onClick: () -> Unit) = AtelierButton(
+    text = stringResource(R.string.search_start_service),
+    onClick = onClick,
+    modifier = Modifier.fillMaxWidth()
+)
 
 @Composable
 private fun NotFoundActions(canRegister: Boolean, onRegisterNew: () -> Unit, onAffiliate: () -> Unit) {
@@ -241,7 +261,12 @@ private fun NotFoundActions(canRegister: Boolean, onRegisterNew: () -> Unit, onA
 }
 
 @Composable
-private fun Appointments(state: VehicleSearchUiState, onMarkArrived: (String) -> Unit, onRefresh: () -> Unit) {
+private fun Appointments(
+    state: VehicleSearchUiState,
+    onMarkArrived: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
+) {
     if (!state.canViewAppointments) return
     SectionTitle(stringResource(R.string.search_appointments_title))
     state.arrival?.let { arrival ->
@@ -251,6 +276,15 @@ private fun Appointments(state: VehicleSearchUiState, onMarkArrived: (String) ->
             icon = Icons.Outlined.CheckCircle,
             kind = if (ready) BannerKind.Ok else BannerKind.Info
         )
+        if (arrival is ArrivalResult.WorkOrderReady && state.canOpenWorkOrder) {
+            AtelierButton(
+                text = stringResource(R.string.search_complete_order),
+                onClick = {
+                    onOpenWorkOrder(arrival.appointment.vehicleId, arrival.appointment.customerId, arrival.workOrderId)
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
     if (state.appointments.isEmpty()) {
         Text(
@@ -404,10 +438,11 @@ private fun VehicleSearchPreviewResult() = AtelierWorkshopTheme(darkTheme = true
         state = VehicleSearchUiState(
             query = "ABC123", searched = true, vehicleResult = VehicleWithOwner(previewVehicle, previewOwner),
             appointments = listOf(previewAppointment),
-            canSearch = true, canViewAppointments = true, canMarkArrival = true, canRegister = true
+            canSearch = true, canViewAppointments = true, canMarkArrival = true, canRegister = true,
+            canOpenWorkOrder = true
         ),
         onBack = {}, onModeChange = {}, onQueryChange = {}, onSearch = {}, onSelectCustomer = {},
-        onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}
+        onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}, onOpenWorkOrder = { _, _, _ -> }
     )
 }
 
@@ -420,6 +455,6 @@ private fun VehicleSearchPreviewNotFound() = AtelierWorkshopTheme(darkTheme = fa
             error = UiText.Dynamic("Ocurrió un error. Inténtalo de nuevo.")
         ),
         onBack = {}, onModeChange = {}, onQueryChange = {}, onSearch = {}, onSelectCustomer = {},
-        onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}
+        onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}, onOpenWorkOrder = { _, _, _ -> }
     )
 }

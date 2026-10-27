@@ -63,7 +63,8 @@ class VehicleSearchViewModelTest {
 
     private val allPermissions = listOf(
         Permission.VEHICLES_READ, Permission.CUSTOMERS_READ, Permission.APPOINTMENTS_READ,
-        Permission.APPOINTMENTS_UPDATE, Permission.CUSTOMERS_CREATE, Permission.VEHICLES_CREATE
+        Permission.APPOINTMENTS_UPDATE, Permission.CUSTOMERS_CREATE, Permission.VEHICLES_CREATE,
+        Permission.WORK_ORDERS_CREATE
     )
 
     private fun sessionWith(permissions: List<Permission>) = Session(
@@ -96,12 +97,14 @@ class VehicleSearchViewModelTest {
         vm.settle()
         val state = vm.uiState.value
         assertTrue(state.canSearch && state.canViewAppointments && state.canMarkArrival && state.canRegister)
+        assertTrue(state.canOpenWorkOrder)
 
         val solo = viewModel(listOf(Permission.VEHICLES_READ, Permission.CUSTOMERS_READ))
         solo.settle()
         assertTrue(solo.uiState.value.canSearch)
         assertFalse(solo.uiState.value.canMarkArrival)
         assertFalse(solo.uiState.value.canRegister)
+        assertFalse(solo.uiState.value.canOpenWorkOrder)
     }
 
     @Test

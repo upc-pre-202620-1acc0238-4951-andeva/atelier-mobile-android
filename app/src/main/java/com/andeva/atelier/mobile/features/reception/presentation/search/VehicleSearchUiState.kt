@@ -30,7 +30,8 @@ data class VehicleSearchUiState(
     val canSearch: Boolean = false,
     val canViewAppointments: Boolean = false,
     val canMarkArrival: Boolean = false,
-    val canRegister: Boolean = false
+    val canRegister: Boolean = false,
+    val canOpenWorkOrder: Boolean = false
 ) {
     val canSubmitSearch: Boolean get() = canSearch && query.isNotBlank() && !isSearching
     val vehicleNotFound: Boolean get() = searched && mode == SearchMode.PLATE && vehicleResult == null

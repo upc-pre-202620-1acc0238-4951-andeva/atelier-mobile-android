@@ -54,7 +54,8 @@ class VehicleSearchViewModel @Inject constructor(
                         canViewAppointments = canViewAppointments,
                         canMarkArrival = session?.has(Permission.APPOINTMENTS_UPDATE) == true,
                         canRegister = session?.has(Permission.CUSTOMERS_CREATE) == true &&
-                            session.has(Permission.VEHICLES_CREATE)
+                            session.has(Permission.VEHICLES_CREATE),
+                        canOpenWorkOrder = session?.has(Permission.WORK_ORDERS_CREATE) == true
                     )
                 }
                 // La sesión llega de forma asíncrona: la agenda se carga al conocer el permiso, una sola vez.

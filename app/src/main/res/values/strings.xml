@@ -244,6 +244,32 @@
     <string name="appointment_status_confirmed">Confirmada</string>
     <string name="appointment_status_arrived">Llegó</string>
     <string name="appointment_status_canceled">Cancelada</string>
+    <string name="search_start_service">Iniciar atención</string>
+    <string name="search_complete_order">Completar orden</string>
     <string name="search_arrival_ready">Llegada registrada. La orden en borrador ya está lista.</string>
     <string name="search_arrival_pending">Llegada registrada. La orden se está creando: actualiza en unos segundos.</string>
+
+    <!-- Órdenes de trabajo: apertura (US12) -->
+    <string name="workorder_invalid_input">Revisa los datos marcados.</string>
+    <string name="open_order_title">Abrir orden</string>
+    <string name="open_order_draft_notice">Este vehículo ya tiene una orden en borrador. Completa sus datos de ingreso.</string>
+    <string name="open_order_saved_pending_tasks">La orden ya se abrió. Faltan agregar algunas faenas.</string>
+    <string name="open_order_mileage">Kilometraje (km)</string>
+    <string name="open_order_field_mileage">Ingresa el kilometraje como un número.</string>
+    <string name="open_order_fuel">Nivel de combustible</string>
+    <string name="fuel_reserve">Reserva</string>
+    <string name="fuel_quarter">1/4</string>
+    <string name="fuel_half">1/2</string>
+    <string name="fuel_three_quarters">3/4</string>
+    <string name="fuel_full">Lleno</string>
+    <string name="open_order_reason">Motivo de ingreso</string>
+    <string name="open_order_field_reason">El motivo es demasiado largo (máximo 2000 caracteres).</string>
+    <string name="open_order_tasks">Faenas iniciales</string>
+    <string name="open_order_tasks_empty">No hay servicios para elegir. Puedes abrir la orden sin faenas.</string>
+    <string name="open_order_task_added">%1$s (agregada)</string>
+    <string name="open_order_mechanic">Asignar a (opcional)</string>
+    <string name="open_order_mechanic_none">Sin asignar</string>
+    <string name="open_order_mechanic_fallback">Colaborador %1$s</string>
+    <string name="open_order_submit">Abrir orden</string>
+    <string name="open_order_retry_tasks">Agregar faenas pendientes</string>
 </resources>

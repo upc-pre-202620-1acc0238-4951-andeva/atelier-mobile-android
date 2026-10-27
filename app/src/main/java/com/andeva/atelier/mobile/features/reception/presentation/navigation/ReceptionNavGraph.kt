@@ -7,6 +7,7 @@ import androidx.navigation.navigation
 import com.andeva.atelier.mobile.features.reception.presentation.affiliation.AffiliationScreen
 import com.andeva.atelier.mobile.features.reception.presentation.register.RegisterCustomerScreen
 import com.andeva.atelier.mobile.features.reception.presentation.search.VehicleSearchScreen
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.OpenWorkOrderRoute
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -31,7 +32,10 @@ fun NavGraphBuilder.receptionNavGraph(navController: NavController) {
             VehicleSearchScreen(
                 onBack = { navController.popBackStack() },
                 onRegisterNew = { navController.navigate(RegisterCustomerRoute()) },
-                onAffiliate = { navController.navigate(AffiliationRoute) }
+                onAffiliate = { navController.navigate(AffiliationRoute) },
+                onOpenWorkOrder = { vehicleId, customerId, workOrderId ->
+                    navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId))
+                }
             )
         }
         composable<AffiliationRoute> {
