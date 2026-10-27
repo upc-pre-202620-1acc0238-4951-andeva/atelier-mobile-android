@@ -55,6 +55,7 @@ import com.andeva.atelier.mobile.features.workorders.presentation.components.rem
 fun IntakeGalleryScreen(
     onBack: () -> Unit,
     onDone: () -> Unit,
+    onOpenProposals: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: IntakeGalleryViewModel = hiltViewModel()
 ) {
@@ -70,6 +71,7 @@ fun IntakeGalleryScreen(
         state = state,
         onBack = onBack,
         onDone = onDone,
+        onOpenProposals = { onOpenProposals(viewModel.workOrderId) },
         onNoteChange = viewModel::onNoteChange,
         onCapture = { angle ->
             capturingAngle = angle
@@ -84,6 +86,7 @@ internal fun IntakeGalleryContent(
     state: IntakeGalleryUiState,
     onBack: () -> Unit,
     onDone: () -> Unit,
+    onOpenProposals: () -> Unit,
     onNoteChange: (String) -> Unit,
     onCapture: (InspectionAngle) -> Unit,
     modifier: Modifier = Modifier
@@ -167,13 +170,24 @@ internal fun IntakeGalleryContent(
             )
         }
 
-        AtelierButton(
-            text = stringResource(R.string.gallery_done),
-            onClick = onDone,
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
-        )
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            AtelierButton(
+                text = stringResource(R.string.gallery_done),
+                onClick = onDone,
+                modifier = Modifier.fillMaxWidth()
+            )
+            AtelierButton(
+                text = stringResource(R.string.gallery_proposals),
+                onClick = onOpenProposals,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text
+            )
+        }
     }
 }
 
@@ -254,7 +268,7 @@ private fun PhotoStatus.chipKind(): ChipKind = when (this) {
 private fun IntakeGalleryPreviewEmpty() = AtelierWorkshopTheme(darkTheme = true) {
     IntakeGalleryContent(
         state = IntakeGalleryUiState(isLoading = false, canUpload = true, canRead = true),
-        onBack = {}, onDone = {}, onNoteChange = {}, onCapture = {}
+        onBack = {}, onDone = {}, onOpenProposals = {}, onNoteChange = {}, onCapture = {}
     )
 }
 
@@ -265,6 +279,6 @@ private fun IntakeGalleryPreviewNoPermission() = AtelierWorkshopTheme(darkTheme 
         state = IntakeGalleryUiState(
             isLoading = false, error = UiText.Dynamic("La foto no se pudo guardar.")
         ),
-        onBack = {}, onDone = {}, onNoteChange = {}, onCapture = {}
+        onBack = {}, onDone = {}, onOpenProposals = {}, onNoteChange = {}, onCapture = {}
     )
 }

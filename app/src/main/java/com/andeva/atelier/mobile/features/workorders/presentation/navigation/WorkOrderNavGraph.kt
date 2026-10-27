@@ -3,9 +3,11 @@ package com.andeva.atelier.mobile.features.workorders.presentation.navigation
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.finding.ReportFindingScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.intake.IntakeGalleryScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.open.OpenWorkOrderScreen
+import com.andeva.atelier.mobile.features.workorders.presentation.proposals.ProposalsPanelScreen
 import kotlinx.serialization.Serializable
 
 /**
@@ -22,6 +24,10 @@ data class OpenWorkOrderRoute(
 /** US13: galería pericial de la orden. */
 @Serializable
 data class IntakeGalleryRoute(val workOrderId: String)
+
+/** US15: panel de propuestas de la orden. */
+@Serializable
+data class ProposalsPanelRoute(val workOrderId: String)
 
 /** US14: reporte de un hallazgo en foso para la orden. */
 @Serializable
@@ -46,7 +52,15 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
     composable<IntakeGalleryRoute> {
         IntakeGalleryScreen(
             onBack = { navController.popBackStack() },
-            onDone = { navController.popBackStack() }
+            onDone = { navController.popBackStack() },
+            onOpenProposals = { workOrderId -> navController.navigate(ProposalsPanelRoute(workOrderId)) }
+        )
+    }
+    composable<ProposalsPanelRoute> { entry ->
+        val workOrderId = entry.toRoute<ProposalsPanelRoute>().workOrderId
+        ProposalsPanelScreen(
+            onBack = { navController.popBackStack() },
+            onReportFinding = { navController.navigate(ReportFindingRoute(workOrderId)) }
         )
     }
     composable<ReportFindingRoute> {

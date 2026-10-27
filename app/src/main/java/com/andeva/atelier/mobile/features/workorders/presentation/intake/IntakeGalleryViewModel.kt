@@ -33,7 +33,7 @@ class IntakeGalleryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
+    val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
 
     private val _uiState = MutableStateFlow(IntakeGalleryUiState())
     val uiState: StateFlow<IntakeGalleryUiState> = _uiState.asStateFlow()

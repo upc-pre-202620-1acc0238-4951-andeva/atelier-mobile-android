@@ -315,4 +315,27 @@
     <string name="finding_service_none">Sin sugerencia</string>
     <string name="finding_pending_title">Pendientes de envío</string>
     <string name="finding_submit">Enviar hallazgo</string>
+
+    <string name="proposals_title">Propuestas</string>
+    <string name="proposals_subtitle">Notifica al cliente cada hallazgo y registra si lo aprobó o no.</string>
+    <string name="proposals_empty">Esta orden no tiene propuestas.</string>
+    <string name="proposals_report">Reportar hallazgo</string>
+    <string name="proposals_notify">Notificar al cliente</string>
+    <string name="proposals_approve">Registrar aprobación</string>
+    <string name="proposals_reject">Registrar rechazo</string>
+    <string name="proposals_notified">Correo enviado a %1$s.</string>
+    <string name="proposals_approved">Propuesta aprobada. Se creó la tarea en la orden.</string>
+    <string name="proposals_rejected">Propuesta rechazada.</string>
+    <string name="proposals_customer_notes">Observaciones del cliente: %1$s</string>
+    <string name="proposals_service">Servicio de la tarea</string>
+    <string name="proposals_final_price">Precio final (sin IGV)</string>
+    <string name="proposals_labor_hours">Horas de labor</string>
+    <string name="proposals_notes_optional">Observaciones (opcional)</string>
+    <string name="proposals_customer_notes_label">Observaciones del cliente</string>
+    <string name="proposals_field_service">Elige un servicio para la tarea.</string>
+    <string name="proposals_field_amount">Ingresa un número de 0 en adelante.</string>
+    <string name="proposals_field_notes">Escribe las observaciones (máximo 1000 caracteres).</string>
+    <string name="proposals_confirm">Confirmar</string>
+    <string name="proposals_cancel">Cancelar</string>
+    <string name="gallery_proposals">Propuestas de la orden</string>
 </resources>
