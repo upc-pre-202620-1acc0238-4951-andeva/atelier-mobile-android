@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.andeva.atelier.mobile.features.auth.presentation.branch.BranchSelectionScreen
 import com.andeva.atelier.mobile.features.auth.presentation.login.LoginScreen
 import com.andeva.atelier.mobile.features.auth.presentation.register.RegisterScreen
 import com.andeva.atelier.mobile.features.auth.presentation.verifyemail.VerifyEmailScreen
@@ -21,6 +22,17 @@ data class RegisterRoute(val token: String? = null)
 /** A4. */
 @Serializable
 data class VerifyEmailRoute(val email: String)
+
+/**
+ * Ya con sesión: la ve el grafo principal cuando `Session.needsBranchChoice` (cuenta sin perfil laboral).
+ * Al terminar, quien la registra decide a dónde ir (`onDone`).
+ */
+@Serializable
+data object BranchSelectionRoute
+
+fun NavGraphBuilder.branchSelectionDestination(onDone: () -> Unit) {
+    composable<BranchSelectionRoute> { BranchSelectionScreen(onDone = onDone) }
+}
 
 /**
  * Grafo sin sesión. Al iniciar sesión o aceptar la invitación no se navega desde aquí:

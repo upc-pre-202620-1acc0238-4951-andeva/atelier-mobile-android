@@ -23,7 +23,7 @@ Reglas para todas las sesiones:
 | --- | --- | --- | --- |
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
 | 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
-| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` solo A5 login, A3 registro por invitación y A4 código (falta A6 recuperar, A5b sede, Google y probar con backend) | `feature/auth` |
+| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` con A5 login, A3 registro por invitación, A4 código y A5b elegir sede (falta A6 recuperar, Google y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
@@ -83,6 +83,7 @@ Decisiones de flujo (contrato real, no el de la galería):
 - **A3 muestra el rol** de la invitación en lugar de la fecha de vencimiento: `GET /invitations/validate` no devuelve `expiresAt`.
 - **Contraseña:** además de 8–64 caracteres (backend), la UI exige una mayúscula y confirmación, como la galería.
 - **"¿Olvidaste tu contraseña?"** solo se dibuja si se pasa `onForgotPassword` (pendiente A6).
+- **A5b Elegir sede (US03):** solo la ven las cuentas que entraron sin perfil laboral (H33 de [03](03-traceability.md#huecos-abiertos)). `AppNavHost` la muestra antes de `attendance` cuando `Session.needsBranchChoice`. La sede elegida va en `SessionManager.SELECTED_BRANCH_ID` (el perfil laboral no se toca, así un 404 posterior no la borra) y "Elegir después" entra sin sede como antes. Casos de uso: `GetSelectableBranchesUseCase`, `SelectBranchUseCase`, `SkipBranchChoiceUseCase`.
 
 | Pieza lista para la UI | Dónde | Para qué |
 | --- | --- | --- |
@@ -92,7 +93,7 @@ Decisiones de flujo (contrato real, no el de la galería):
 
 Con éxito, sign-in, Google y aceptar invitación ya dejan la sesión guardada: `AppNavHost` cambia de grafo solo.
 
-Pendiente de este paso: pantallas A6 (recuperar contraseña), A5b (elegir sede), cierre de sesión y pedido de `POST_NOTIFICATIONS`; probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
+Pendiente de este paso: pantalla A6 (recuperar contraseña), cierre de sesión y pedido de `POST_NOTIFICATIONS`; probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
 
 ## Paso 3 — `main` ✅
 

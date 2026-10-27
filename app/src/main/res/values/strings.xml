@@ -142,4 +142,16 @@
     <string name="day_saturday">Sábado</string>
     <string name="day_sunday">Domingo</string>
 
+
+    <!-- Auth: A5b Elegir sede -->
+    <string name="branch_title">Elige tu sede</string>
+    <string name="branch_subtitle">Tu cuenta no tiene una sede asignada. Elige en cuál vas a trabajar.</string>
+    <string name="branch_geofence">Marcación en un radio de %1$d m</string>
+    <string name="branch_continue">Continuar</string>
+    <string name="branch_continue_in">Continuar en %1$s</string>
+    <string name="branch_later">Elegir después</string>
+    <string name="branch_retry">Reintentar</string>
+    <string name="branch_loading">Cargando sedes</string>
+    <string name="branch_empty_title">Tu taller aún no tiene sedes activas.</string>
+    <string name="branch_empty_body">Pide al administrador que cree una y vuelve a entrar.</string>
 </resources>

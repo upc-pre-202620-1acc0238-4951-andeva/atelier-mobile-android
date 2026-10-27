@@ -27,8 +27,10 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -118,6 +120,7 @@ class AuthRepositoryImplTest {
         val session = sessionManager.getSession()!!
         assertEquals("b1", session.branchId)
         assertEquals("s1", session.shiftId)
+        assertFalse(session.needsBranchChoice)               // con sede asignada no se ofrece elegir
         coVerify { deviceTokenRegistrar.registerCurrentToken() }
     }
 
@@ -132,6 +135,20 @@ class AuthRepositoryImplTest {
         val session = sessionManager.getSession()!!
         assertEquals("u1", session.userId)
         assertNull(session.branchId)
+        assertTrue(session.needsBranchChoice)                // 404: dueño o administrador, puede elegir sede
+    }
+
+    @Test
+    fun `un corte de red al pedir el perfil no deja elegir sede`() = runTest {
+        responses["/api/v1/auth/sign-in"] = json(user())
+        responses["/api/v1/hr/employees/membership/m1"] = MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START)
+
+        val result = repository.signIn("mecanico@taller.pe", "secreto123")
+
+        assertTrue(result.isSuccess)
+        val session = sessionManager.getSession()!!
+        assertNull(session.branchId)
+        assertFalse(session.needsBranchChoice)               // un técnico con mala señal no debe poder escoger cualquier sede
     }
 
     @Test

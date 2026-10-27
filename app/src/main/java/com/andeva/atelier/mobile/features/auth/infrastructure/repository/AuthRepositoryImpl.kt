@@ -8,6 +8,7 @@ import com.andeva.atelier.mobile.core.data.remote.session.AuthenticatedUserDto
 import com.andeva.atelier.mobile.core.data.remote.session.RefreshTokenRequestDto
 import com.andeva.atelier.mobile.core.data.sync.CacheMaintenanceDao
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
+import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.di.RefreshClient
 import com.andeva.atelier.mobile.core.notifications.DeviceTokenRegistrar
 import com.andeva.atelier.mobile.features.auth.domain.AcceptInvitation
@@ -111,12 +112,17 @@ class AuthRepositoryImpl @Inject constructor(
      * al guardar, AppNavHost cambia de grafo y destruye el ViewModel que llamó.
      */
     private suspend fun startSession(user: AuthenticatedUserDto) {
-        val profile = user.membershipId?.let { membershipId ->
+        val profileResult = user.membershipId?.let { membershipId ->
             // Dueño o administrador sin perfil laboral (404) o sin red: se entra sin sede
             apiCall(gson, { employeeService.getByMembership("Bearer ${user.token}", membershipId) }) { it }
-                .getOrNull()
         }
+        val profile = profileResult?.getOrNull()
+        // Solo un 404 (o no tener membresía) significa "sin perfil laboral"; un corte de red no debe dejar elegir sede
+        val withoutWorkProfile = user.membershipId == null ||
+            (profileResult?.exceptionOrNull() as? ApiException)?.httpStatus == 404
         withContext(NonCancellable) {
+            // La marca va antes de guardar: al guardar `AppNavHost` ya lee la sesión y debe ver "elegir sede"
+            if (withoutWorkProfile) sessionManager.markBranchChoicePending()
             sessionManager.save(user)
             sessionManager.updateAssignment(profile?.branchId, profile?.assignedShiftId)
             // Sin google-services.json no hay FCM: el login sigue igual

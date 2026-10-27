@@ -13,7 +13,8 @@ import javax.inject.Inject
 sealed interface SessionState {
     data object Loading : SessionState
     data object SignedOut : SessionState
-    data object SignedIn : SessionState
+    /** [needsBranchChoice]: cuenta sin perfil laboral que aún no eligió sede (A5b). */
+    data class SignedIn(val needsBranchChoice: Boolean = false) : SessionState
 }
 
 @HiltViewModel
@@ -22,6 +23,6 @@ class AppNavHostViewModel @Inject constructor(
 ) : ViewModel() {
     /** Cuando el refresh falla la sesión se borra y esto vuelve a [SessionState.SignedOut]. */
     val sessionState: StateFlow<SessionState> = sessionManager.session
-        .map { if (it == null) SessionState.SignedOut else SessionState.SignedIn }
+        .map { if (it == null) SessionState.SignedOut else SessionState.SignedIn(it.needsBranchChoice) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SessionState.Loading)
 }

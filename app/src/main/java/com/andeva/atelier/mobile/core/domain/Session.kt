@@ -9,8 +9,9 @@ data class Session(
     val membershipId: String?,
     val permissions: Set<String>,
     val plan: Plan?,                                  // null: sin plan conocido → no ocultar, el backend decide
-    val branchId: String? = null,                     // de GET /hr/employees/membership/{membershipId}
-    val shiftId: String? = null
+    val branchId: String? = null,                     // de GET /hr/employees/membership/{membershipId}, o la elegida a mano
+    val shiftId: String? = null,
+    val needsBranchChoice: Boolean = false            // sin perfil laboral y aún sin elegir sede (pantalla A5b)
 ) {
     fun has(permission: Permission) = permission.value in permissions
 

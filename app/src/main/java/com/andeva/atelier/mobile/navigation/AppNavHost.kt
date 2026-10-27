@@ -12,7 +12,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import com.andeva.atelier.mobile.features.auth.presentation.navigation.BranchSelectionRoute
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
+import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSelectionDestination
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
 import kotlinx.serialization.Serializable
@@ -33,7 +35,7 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     if (sessionState == SessionState.Loading) return
 
-    val signedIn = sessionState == SessionState.SignedIn
+    val signedIn = sessionState is SessionState.SignedIn
     val navController = rememberNavController()
 
     NavHost(
@@ -44,12 +46,23 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
         navigation<MainNavGraphRoute>(startDestination = MainStartRoute) {
             composable<MainStartRoute> {
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    navController.navigate(AttendanceRoute) {
+                    // Cuenta sin perfil laboral: primero elige sede (A5b); el resto entra directo
+                    val needsBranch = (sessionState as? SessionState.SignedIn)?.needsBranchChoice == true
+                    val destination: Any = if (needsBranch) BranchSelectionRoute else AttendanceRoute
+                    navController.navigate(destination) {
                         popUpTo<MainStartRoute> { inclusive = true }
                         launchSingleTop = true
                     }
                 }
             }
+            branchSelectionDestination(
+                onDone = {
+                    navController.navigate(AttendanceRoute) {
+                        popUpTo<BranchSelectionRoute> { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
             attendanceNavGraph(navController)
         }
     }

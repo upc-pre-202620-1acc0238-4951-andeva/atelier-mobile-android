@@ -49,13 +49,13 @@ fun Modifier.rise(index: Int = 0): Modifier {
     }
 }
 
-/** Al presionar el control se encoge a 97 % (160 ms). */
+/** Al presionar el control se encoge a [pressed] (97 % por defecto, 160 ms). */
 @Composable
-fun Modifier.pressScale(interactionSource: InteractionSource): Modifier {
+fun Modifier.pressScale(interactionSource: InteractionSource, pressed: Float = 0.97f): Modifier {
     if (rememberReducedMotion()) return this
-    val pressed by interactionSource.collectIsPressedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
+        targetValue = if (isPressed) pressed else 1f,
         animationSpec = tween(durationMillis = 160, easing = EaseOutQuint),
         label = "pressScale"
     )

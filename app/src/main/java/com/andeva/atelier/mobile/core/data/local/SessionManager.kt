@@ -34,6 +34,10 @@ class SessionManager @Inject constructor(
         val PERMISSIONS = stringSetPreferencesKey("permissions")
         val BRANCH_ID = stringPreferencesKey("branch_id")
         val SHIFT_ID = stringPreferencesKey("shift_id")
+        /** Sede elegida a mano por una cuenta sin perfil laboral; la asignada (BRANCH_ID) siempre gana. */
+        val SELECTED_BRANCH_ID = stringPreferencesKey("selected_branch_id")
+        /** El login no encontró perfil laboral: se ofrece elegir sede una vez. */
+        val BRANCH_CHOICE_PENDING = booleanPreferencesKey("branch_choice_pending")
         val PLAN_TIER = stringPreferencesKey("plan_tier")
         val PLAN_STATUS = stringPreferencesKey("plan_status")
         val PLAN_ACCESS_GRANTED = booleanPreferencesKey("plan_access_granted")
@@ -81,9 +85,37 @@ class SessionManager @Inject constructor(
     /** Sede y turno asignados, de GET /hr/employees/membership/{membershipId}. */
     suspend fun updateAssignment(branchId: String?, shiftId: String?) {
         dataStore.edit {
-            if (branchId != null) it[BRANCH_ID] = branchId else it.remove(BRANCH_ID)
+            if (branchId != null) {
+                it[BRANCH_ID] = branchId
+                // Con sede asignada ya no hay nada que elegir
+                it.remove(SELECTED_BRANCH_ID)
+                it.remove(BRANCH_CHOICE_PENDING)
+            } else {
+                it.remove(BRANCH_ID)
+            }
             if (shiftId != null) it[SHIFT_ID] = shiftId else it.remove(SHIFT_ID)
         }
+    }
+
+    /** El login no encontró perfil laboral (dueño o administrador): la app ofrece elegir sede una vez. */
+    suspend fun markBranchChoicePending() {
+        dataStore.edit { it[BRANCH_CHOICE_PENDING] = true }
+    }
+
+    /**
+     * Sede de trabajo elegida a mano. No toca BRANCH_ID: `updateAssignment` se reescribe con cada lectura del
+     * perfil laboral (y un 404 la borra), la elegida sobrevive hasta que el backend asigne una.
+     */
+    suspend fun selectBranch(branchId: String) {
+        dataStore.edit {
+            it[SELECTED_BRANCH_ID] = branchId
+            it.remove(BRANCH_CHOICE_PENDING)
+        }
+    }
+
+    /** "Elegir después": se entra sin sede y no se vuelve a ofrecer en esta sesión. */
+    suspend fun dismissBranchChoice() {
+        dataStore.edit { it.remove(BRANCH_CHOICE_PENDING) }
     }
 
     suspend fun clear() {
@@ -110,8 +142,9 @@ class SessionManager @Inject constructor(
                     aiDiagnosticsEnabled = this[AI_DIAGNOSTICS_ENABLED] ?: true
                 )
             },
-            branchId = this[BRANCH_ID],
-            shiftId = this[SHIFT_ID]
+            branchId = this[BRANCH_ID] ?: this[SELECTED_BRANCH_ID],
+            shiftId = this[SHIFT_ID],
+            needsBranchChoice = this[BRANCH_CHOICE_PENDING] == true && this[BRANCH_ID] == null && this[SELECTED_BRANCH_ID] == null
         )
     }
 }
