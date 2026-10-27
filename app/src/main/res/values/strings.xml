@@ -272,4 +272,24 @@
     <string name="open_order_mechanic_fallback">Colaborador %1$s</string>
     <string name="open_order_submit">Abrir orden</string>
     <string name="open_order_retry_tasks">Agregar faenas pendientes</string>
+
+    <!-- Órdenes de trabajo: galería de recepción (US13) -->
+    <string name="gallery_title">Fotos de recepción</string>
+    <string name="gallery_subtitle">Toca un panel para fotografiarlo. Las fotos se guardan aunque no haya señal.</string>
+    <string name="gallery_note">Nota del daño (opcional)</string>
+    <string name="gallery_camera_denied">Sin permiso de cámara no se pueden tomar fotos.</string>
+    <string name="gallery_take_photo">Tomar foto: %1$s</string>
+    <string name="gallery_angle_front">Frente</string>
+    <string name="gallery_angle_rear">Trasera</string>
+    <string name="gallery_angle_left">Lateral izquierdo</string>
+    <string name="gallery_angle_right">Lateral derecho</string>
+    <string name="gallery_angle_roof">Techo</string>
+    <string name="gallery_angle_dashboard">Tablero</string>
+    <string name="gallery_angle_other">Otra foto</string>
+    <string name="gallery_other">Otras fotos</string>
+    <string name="gallery_add_other">Agregar otra foto</string>
+    <string name="gallery_status_uploaded">Subida</string>
+    <string name="gallery_status_queued">En cola</string>
+    <string name="gallery_status_failed">Falló</string>
+    <string name="gallery_done">Listo</string>
 </resources>

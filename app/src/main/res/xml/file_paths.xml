@@ -3,4 +3,8 @@
     <cache-path
         name="pdfs"
         path="pdfs/" />
+    <!-- Fotos tomadas con la cámara del sistema, antes de comprimirlas y encolarlas -->
+    <cache-path
+        name="capture"
+        path="capture/" />
 </paths>
