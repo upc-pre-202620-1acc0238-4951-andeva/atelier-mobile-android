@@ -154,4 +154,64 @@
     <string name="branch_loading">Cargando sedes</string>
     <string name="branch_empty_title">Tu taller aún no tiene sedes activas.</string>
     <string name="branch_empty_body">Pide al administrador que cree una y vuelve a entrar.</string>
+
+    <!-- Recepción: errores de campo -->
+    <string name="reception_invalid_input">Revisa los datos marcados.</string>
+    <string name="reception_field_email">Ingresa un correo válido.</string>
+    <string name="reception_field_tax_id_person">El documento debe tener entre 8 y 20 caracteres.</string>
+    <string name="reception_field_tax_id_company">El RUC debe tener entre 11 y 20 caracteres.</string>
+    <string name="reception_field_phone">Máximo 20 caracteres.</string>
+    <string name="reception_field_first_name">Ingresa los nombres (máximo 100 caracteres).</string>
+    <string name="reception_field_last_name">Ingresa los apellidos (máximo 100 caracteres).</string>
+    <string name="reception_field_company_name">Ingresa la razón social (máximo 150 caracteres).</string>
+    <string name="reception_field_plate">Ingresa la placa (máximo 15 caracteres).</string>
+    <string name="reception_field_brand">Ingresa la marca (máximo 50 caracteres).</string>
+    <string name="reception_field_model">Ingresa el modelo (máximo 50 caracteres).</string>
+    <string name="reception_field_vin">Máximo 17 caracteres.</string>
+    <string name="reception_field_year">El año debe ser 1950 o posterior.</string>
+    <string name="reception_no_permission">Tu perfil no tiene permiso para esta acción.</string>
+
+    <!-- Recepción: afiliación (US44) -->
+    <string name="affiliation_title">Afiliar cliente</string>
+    <string name="affiliation_subtitle">Busca el correo del conductor para ver si ya usa Atelier.</string>
+    <string name="affiliation_email">Correo del conductor</string>
+    <string name="affiliation_search">Buscar</string>
+    <string name="affiliation_already_title">Ya es cliente del taller.</string>
+    <string name="affiliation_already_body">%1$s ya está afiliado. No hace falta registrarlo otra vez.</string>
+    <string name="affiliation_found_title">Cuenta de Atelier encontrada.</string>
+    <string name="affiliation_found_body">%1$s tiene %2$d vehículo(s) registrado(s). Pide su documento para afiliarlo.</string>
+    <string name="affiliation_not_found_title">Sin cuenta en Atelier.</string>
+    <string name="affiliation_not_found_body">Registra al cliente y su vehículo en el taller.</string>
+    <string name="affiliation_tax_id">Documento (DNI)</string>
+    <string name="affiliation_phone">Teléfono (opcional)</string>
+    <string name="affiliation_submit">Afiliar al taller</string>
+    <string name="affiliation_register_walk_in">Registrar cliente presencial</string>
+    <string name="affiliation_done">Cliente afiliado: %1$s</string>
+
+    <!-- Recepción: alta de cliente y vehículo (US11 E2, US44 E2) -->
+    <string name="register_customer_title">Registrar cliente</string>
+    <string name="register_customer_individual">Persona</string>
+    <string name="register_customer_company">Empresa</string>
+    <string name="register_customer_section_customer">Cliente</string>
+    <string name="register_customer_section_vehicle">Vehículo</string>
+    <string name="register_customer_first_name">Nombres</string>
+    <string name="register_customer_last_name">Apellidos</string>
+    <string name="register_customer_company_name">Razón social</string>
+    <string name="register_customer_tax_id_person">Documento (DNI)</string>
+    <string name="register_customer_tax_id_company">RUC</string>
+    <string name="register_customer_email">Correo (opcional)</string>
+    <string name="register_customer_phone">Teléfono (opcional)</string>
+    <string name="register_vehicle_plate">Placa</string>
+    <string name="register_vehicle_brand">Marca</string>
+    <string name="register_vehicle_model">Modelo</string>
+    <string name="register_vehicle_engine">Motor</string>
+    <string name="register_vehicle_vin">VIN (opcional)</string>
+    <string name="register_vehicle_year">Año (opcional)</string>
+    <string name="engine_gasoline">Gasolina</string>
+    <string name="engine_diesel">Diésel</string>
+    <string name="engine_electric">Eléctrico</string>
+    <string name="engine_hybrid">Híbrido</string>
+    <string name="register_customer_submit">Registrar cliente y vehículo</string>
+    <string name="register_customer_retry_vehicle">Registrar vehículo</string>
+    <string name="register_customer_saved_pending_vehicle">El cliente ya se guardó. Falta registrar el vehículo.</string>
 </resources>

@@ -17,6 +17,7 @@ import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGr
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSelectionDestination
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
+import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
 import kotlinx.serialization.Serializable
 
 /** Grafo sin sesión. Sus pantallas las define la feature `auth` (`authNavGraph`). */
@@ -64,6 +65,7 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
                 }
             )
             attendanceNavGraph(navController)
+            receptionNavGraph(navController)
         }
     }
 
