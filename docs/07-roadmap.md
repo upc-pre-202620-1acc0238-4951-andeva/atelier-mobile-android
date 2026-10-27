@@ -27,7 +27,7 @@ Reglas para todas las sesiones:
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
-| 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/reception-workorders` |
+| 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho; `presentation` de EP03 (US11–US15, US44) entregada (faltan proforma, lista y detalle de orden, el acceso desde `main` y probar con backend) | `feature/reception-workorders`, `feature/reception-workorders-ui` |
 | 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
 | 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team` |
@@ -222,7 +222,20 @@ Núcleo extendido: `PhotoCapture` (`core/media`, ahora también la usa `tasks`),
 
 También en este paso: `attendance` trata solo el 404 de `status-today` como "sin jornada" (H2), `UpdateTaskPartQuantityUseCase` devuelve la tarea recargada (H9) y `auth` acepta el enlace completo del correo como token (H1).
 
-Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial H10 (cuánto tarda en aparecer la orden de una cita) y H11.
+**`presentation` de EP03 entregada** (rama `feature/reception-workorders-ui`): `features/reception/presentation` y `features/workorders/presentation`, sobre los componentes de `core/designsystem` sin modificarlos. Cada pantalla tiene su `ViewModel` con `UiState`, sus textos en `strings.xml` y pruebas de `ViewModel`.
+
+| Historia | Pantalla | Casos de uso que usa | Notas |
+| --- | --- | --- | --- |
+| US44 | Afiliación por correo (`AffiliationScreen`) y alta de cliente y vehículo (`RegisterCustomerScreen`) | `LookupAffiliationUseCase`, `AffiliateCustomerUseCase`, `RegisterIndividualCustomerUseCase`, `RegisterCompanyCustomerUseCase`, `RegisterVehicleUseCase` | `nextStep` decide el flujo. Si el vehículo falla al registrarse, el cliente ya creado se conserva y el reintento no lo duplica |
+| US11 | Búsqueda por placa o documento y citas de hoy (`VehicleSearchScreen`, inicio del grafo de recepción) | `FindVehicleByPlateUseCase`, `SearchCustomersUseCase`, `GetCustomerVehiclesUseCase`, `RefreshAppointmentsUseCase`, `MarkAppointmentArrivedUseCase` | Una placa sin registro lleva al alta o a la afiliación. Tras marcar la llegada, `WorkOrderReady` abre la orden y `WorkOrderPending` pide actualizar (H10) |
+| US12 | Apertura de orden (`OpenWorkOrderScreen`) | `OpenWorkOrderUseCase`, `UpdateWorkOrderUseCase`, `AddWorkOrderTaskUseCase`, `FindDraftWorkOrderForVehicleUseCase`, `GetServiceCatalogUseCase`, `GetBranchMechanicsUseCase` | Si el vehículo ya tiene un borrador lo completa (evita el 409). Si falla una faena la orden queda guardada y el reintento agrega solo las que faltan. El combustible va al inicio del diagnóstico (H34) |
+| US13 | Galería de recepción (`IntakeGalleryScreen`) | `AttachIntakePhotoUseCase`, `ObservePendingIntakePhotosUseCase`, `GetWorkOrderDetailUseCase` | Cámara del sistema con `TakePicture` y el `FileProvider` existente (ruta `capture/`); se pide `CAMERA` antes de abrirla. El panel va al inicio de la descripción de la foto |
+| US14 | Reporte de hallazgo (`ReportFindingScreen`) | `SubmitProposalUseCase`, `ObservePendingProposalsUseCase`, `GetServiceCatalogUseCase` | Foto obligatoria; `HIGH` no se ofrece. Sin red queda "pendiente de envío" |
+| US15 | Panel de propuestas (`ProposalsPanelScreen`) | `GetWorkOrderDetailUseCase`, `NotifyProposalUseCase`, `ApproveProposalUseCase`, `RejectProposalUseCase` | En línea. Precio sin IGV; el backend calcula el 18 % |
+
+Navegación: `receptionNavGraph` y `workOrderNavGraph` están registrados en `AppNavHost`. El recorrido es búsqueda → abrir orden → galería → propuestas → reportar hallazgo. Mientras no exista el contenedor de `main` no hay una pestaña que abra `ReceptionNavGraphRoute`: hasta entonces se llega a las pantallas desde un acceso provisional o con las vistas previas de Android Studio.
+
+Pendiente de este paso: probarlo contra el backend en un emulador (cámara en un dispositivo o con cámara virtual), en especial H10 (cuánto tarda en aparecer la orden de una cita) y H11; las pantallas de proforma (US22, US24, US25), lista y detalle de orden y rentabilidad; y conectar `ReceptionNavGraphRoute` a la pestaña "Recepción" cuando `main` tenga `presentation`.
 
 ## Paso 7 — `inventory` ✅
 
