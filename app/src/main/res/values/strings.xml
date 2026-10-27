@@ -292,4 +292,27 @@
     <string name="gallery_status_queued">En cola</string>
     <string name="gallery_status_failed">Falló</string>
     <string name="gallery_done">Listo</string>
+
+    <!-- Órdenes de trabajo: hallazgo en foso (US14) y propuestas (US15) -->
+    <string name="severity_low">Baja</string>
+    <string name="severity_medium">Media</string>
+    <string name="severity_high">Alta</string>
+    <string name="severity_critical">Crítica</string>
+    <string name="proposal_status_pending">En revisión</string>
+    <string name="proposal_status_approved">Aprobada</string>
+    <string name="proposal_status_rejected">Rechazada</string>
+    <string name="finding_title">Reportar hallazgo</string>
+    <string name="finding_subtitle">Describe el imprevisto que encontraste y adjunta una foto como prueba.</string>
+    <string name="finding_saved">Hallazgo guardado. Se enviará a supervisión en cuanto haya señal.</string>
+    <string name="finding_severity">Severidad</string>
+    <string name="finding_description">Descripción técnica</string>
+    <string name="finding_field_description">Ingresa la descripción (máximo 2000 caracteres).</string>
+    <string name="finding_photo">Foto del hallazgo</string>
+    <string name="finding_take_photo">Tomar foto</string>
+    <string name="finding_change_photo">Cambiar foto</string>
+    <string name="finding_photo_required">La foto es obligatoria para enviar el hallazgo.</string>
+    <string name="finding_service">Servicio sugerido (opcional)</string>
+    <string name="finding_service_none">Sin sugerencia</string>
+    <string name="finding_pending_title">Pendientes de envío</string>
+    <string name="finding_submit">Enviar hallazgo</string>
 </resources>

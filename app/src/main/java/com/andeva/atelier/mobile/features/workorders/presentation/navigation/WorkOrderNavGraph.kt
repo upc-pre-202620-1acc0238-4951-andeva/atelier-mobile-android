@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.workorders.presentation.navigation
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.andeva.atelier.mobile.features.workorders.presentation.finding.ReportFindingScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.intake.IntakeGalleryScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.open.OpenWorkOrderScreen
 import kotlinx.serialization.Serializable
@@ -21,6 +22,10 @@ data class OpenWorkOrderRoute(
 /** US13: galería pericial de la orden. */
 @Serializable
 data class IntakeGalleryRoute(val workOrderId: String)
+
+/** US14: reporte de un hallazgo en foso para la orden. */
+@Serializable
+data class ReportFindingRoute(val workOrderId: String)
 
 /**
  * Destinos de órdenes de trabajo. Se llega a ellos desde otra pantalla con el id de la orden o del vehículo, así que
@@ -43,5 +48,8 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
             onBack = { navController.popBackStack() },
             onDone = { navController.popBackStack() }
         )
+    }
+    composable<ReportFindingRoute> {
+        ReportFindingScreen(onBack = { navController.popBackStack() })
     }
 }
