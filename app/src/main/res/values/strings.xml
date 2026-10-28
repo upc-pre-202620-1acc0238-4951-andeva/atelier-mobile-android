@@ -338,4 +338,30 @@
     <string name="proposals_confirm">Confirmar</string>
     <string name="proposals_cancel">Cancelar</string>
     <string name="gallery_proposals">Propuestas de la orden</string>
+
+    <!-- Attendance presentation: geocerca y estados visuales -->
+    <string name="attendance_locating">Obteniendo ubicación…</string>
+    <string name="attendance_refreshing_short">Actualizando</string>
+    <string name="attendance_pending_badge">Pendiente de sincronizar</string>
+    <string name="attendance_completed_badge">Jornada finalizada</string>
+    <string name="attendance_active_badge">Jornada activa</string>
+    <string name="attendance_ready_badge">Listo para marcar</string>
+    <string name="attendance_geofence_title">Geocerca del taller</string>
+    <string name="attendance_geofence_radius">Radio permitido: %1$d m</string>
+    <string name="attendance_geofence_no_branch">La sede no está disponible en caché.</string>
+    <string name="attendance_retry_location">Actualizar GPS</string>
+    <string name="attendance_distance_value">%1$d m</string>
+    <string name="attendance_distance_from_branch">del centro del taller</string>
+    <string name="attendance_gps_unavailable_short">Sin GPS</string>
+    <string name="attendance_mock_short">GPS simulado</string>
+    <string name="attendance_gps_ready">GPS disponible</string>
+    <string name="attendance_inside_geofence">Dentro del perímetro</string>
+    <string name="attendance_outside_geofence">Fuera del perímetro</string>
+    <string name="attendance_grace_label">Tolerancia de ingreso</string>
+    <string name="attendance_branch_label">Sede asignada</string>
+    <string name="attendance_no_shift_short">Sin turno asignado</string>
+    <string name="attendance_weekly_schedule">Semana laboral</string>
+    <string name="attendance_map_radius">Vista esquemática · radio %1$d m</string>
+    <string name="attendance_map_no_data">Vista esquemática · la sede aparecerá al cargar los datos</string>
+
 </resources>

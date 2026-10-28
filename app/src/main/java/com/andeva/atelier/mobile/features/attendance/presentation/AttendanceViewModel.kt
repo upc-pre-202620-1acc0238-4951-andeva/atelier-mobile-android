@@ -18,6 +18,8 @@ import com.andeva.atelier.mobile.features.attendance.application.SubmitJustifica
 import com.andeva.atelier.mobile.features.attendance.domain.Attendance
 import com.andeva.atelier.mobile.features.attendance.domain.AttendanceId
 import com.andeva.atelier.mobile.features.attendance.domain.InvalidJustificationException
+import com.andeva.atelier.mobile.features.attendance.domain.LocationProvider
+import com.andeva.atelier.mobile.features.attendance.domain.AttendanceValidation
 import com.andeva.atelier.mobile.features.attendance.domain.LocationPermissionDeniedException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationTooInaccurateException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationUnavailableException
@@ -42,7 +44,8 @@ class AttendanceViewModel @Inject constructor(
     private val refreshAttendance: RefreshAttendanceUseCase,
     private val clockInUseCase: ClockInUseCase,
     private val clockOutUseCase: ClockOutUseCase,
-    private val submitJustificationUseCase: SubmitJustificationUseCase
+    private val submitJustificationUseCase: SubmitJustificationUseCase,
+    private val locationProvider: LocationProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AttendanceUiState())
@@ -106,6 +109,32 @@ class AttendanceViewModel @Inject constructor(
                 }
                 .onFailure { error -> _uiState.update { it.copy(error = error.toAttendanceUiText()) } }
             _uiState.update { it.copy(isSubmitting = false) }
+        }
+    }
+
+    /**
+     * Obtiene una ubicación fresca para la vista previa de la geocerca. La marcación vuelve a
+     * solicitar ubicación dentro de ClockInUseCase; esta vista previa nunca autoriza la marcación.
+     */
+    fun previewLocation() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLocating = true, error = null, locationWarning = null) }
+            locationProvider.currentLocation()
+                .onSuccess { location ->
+                    val warning = when {
+                        location.isMock -> UiText.Resource(R.string.attendance_mock_location_warning)
+                        !AttendanceValidation.isAccurate(location) ->
+                            UiText.Resource(R.string.attendance_location_inaccurate, location.accuracyMeters.toInt())
+                        else -> null
+                    }
+                    _uiState.update { it.copy(deviceLocation = location, locationWarning = warning) }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(error = error.toAttendanceUiText(), deviceLocation = null)
+                    }
+                }
+            _uiState.update { it.copy(isLocating = false) }
         }
     }
 
