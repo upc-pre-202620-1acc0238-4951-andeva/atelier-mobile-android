@@ -364,4 +364,25 @@
     <string name="attendance_map_radius">Vista esquemática · radio %1$d m</string>
     <string name="attendance_map_no_data">Vista esquemática · la sede aparecerá al cargar los datos</string>
 
+    <!-- Tasks presentation: US26 bandeja del mecánico -->
+    <string name="tasks_title">Mis tareas</string>
+    <string name="tasks_subtitle">Faenas asignadas en bahía, por prioridad.</string>
+    <string name="tasks_empty">No tienes tareas asignadas.</string>
+    <string name="tasks_no_permission">Tu perfil no tiene permiso para ver tareas.</string>
+    <string name="tasks_cache_notice">Sin conexión: mostrando las tareas guardadas.</string>
+    <string name="tasks_refresh">Actualizar</string>
+    <string name="task_status_assigned">Asignada</string>
+    <string name="task_status_in_progress">En curso</string>
+    <string name="task_status_on_hold">En pausa</string>
+    <string name="task_status_suspended">Suspendida</string>
+    <string name="task_status_completed">Completada</string>
+    <string name="task_status_cancelled">Cancelada</string>
+    <string name="task_status_pending">Pendiente</string>
+    <string name="task_suspension_pending">Suspensión por aprobar</string>
+    <string name="task_card_plate">Placa %1$s</string>
+    <string name="task_card_bay">Bahía %1$s</string>
+    <string name="task_card_work_order">OT #%1$d</string>
+    <string name="task_card_estimated">%1$s h estimadas</string>
+    <string name="task_card_no_plate">Vehículo sin placa en caché</string>
+
 </resources>
