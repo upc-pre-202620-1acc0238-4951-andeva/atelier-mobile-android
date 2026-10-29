@@ -409,4 +409,29 @@
     <string name="task_field_hours">Escribe un número de horas mayor o igual a 0.</string>
     <string name="task_field_notes">Máximo 1000 caracteres.</string>
 
+    <!-- Inventory presentation: US31 catálogo de repuestos -->
+    <string name="catalog_title">Repuestos</string>
+    <string name="catalog_search_label">Buscar repuesto</string>
+    <string name="catalog_search_hint">Nombre o SKU</string>
+    <string name="catalog_no_permission">Tu perfil no tiene permiso para ver el catálogo.</string>
+    <string name="catalog_cache_notice">Sin conexión: mostrando el catálogo guardado.</string>
+    <string name="catalog_empty">Todavía no hay repuestos en el catálogo.</string>
+    <string name="catalog_empty_filtered">Ningún repuesto coincide con la búsqueda.</string>
+    <string name="catalog_clear_filters">Quitar filtros</string>
+    <string name="category_lubricants">Lubricantes</string>
+    <string name="category_brakes">Frenos</string>
+    <string name="category_suspension">Suspensión</string>
+    <string name="category_engine">Motor</string>
+    <string name="category_electrical">Eléctrico</string>
+    <string name="category_tires">Llantas</string>
+    <string name="category_filters">Filtros</string>
+    <string name="category_bodywork">Carrocería</string>
+    <string name="category_accessories">Accesorios</string>
+    <string name="stock_out">Agotado</string>
+    <string name="stock_low">Stock mínimo</string>
+    <string name="stock_ok">Disponible</string>
+    <string name="part_sku">SKU %1$s</string>
+    <string name="part_stock">Stock: %1$s</string>
+    <string name="part_price">%1$s sin IGV</string>
+
 </resources>
