@@ -5,6 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import com.andeva.atelier.mobile.features.inventory.presentation.catalog.PartsCatalogScreen
+import com.andeva.atelier.mobile.features.inventory.presentation.detail.PartDetailScreen
 import kotlinx.serialization.Serializable
 
 /** Grafo de inventario (EP07). */
@@ -26,6 +27,9 @@ fun NavGraphBuilder.inventoryNavGraph(navController: NavController) {
                 onBack = { navController.popBackStack() },
                 onOpenPart = { partId -> navController.navigate(PartDetailRoute(partId)) }
             )
+        }
+        composable<PartDetailRoute> {
+            PartDetailScreen(onBack = { navController.popBackStack() })
         }
     }
 }
