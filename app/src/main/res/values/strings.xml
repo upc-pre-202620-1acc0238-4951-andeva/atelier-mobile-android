@@ -473,4 +473,8 @@
     <string name="return_body">Las unidades vuelven al lote del que salieron y se rebaja el costo imputado en la orden.</string>
     <string name="return_confirm">Devolver repuesto</string>
 
+    <!-- Acceso provisional (solo debug) hasta integrar main -->
+    <string name="debug_open_tasks">Mis tareas</string>
+    <string name="debug_open_catalog">Repuestos</string>
+
 </resources>
