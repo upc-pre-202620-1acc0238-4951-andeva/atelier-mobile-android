@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.TaskDetailScreen
 import com.andeva.atelier.mobile.features.tasks.presentation.mytasks.MyTasksScreen
 import kotlinx.serialization.Serializable
 
@@ -26,6 +27,9 @@ fun NavGraphBuilder.tasksNavGraph(navController: NavController) {
                 onBack = { navController.popBackStack() },
                 onOpenTask = { workOrderId, taskId -> navController.navigate(TaskDetailRoute(workOrderId, taskId)) }
             )
+        }
+        composable<TaskDetailRoute> {
+            TaskDetailScreen(onBack = { navController.popBackStack() })
         }
     }
 }
