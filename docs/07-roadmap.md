@@ -26,9 +26,9 @@ Reglas para todas las sesiones:
 | 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` con A5 login, A3 registro por invitación, A4 código y A5b elegir sede (falta A6 recuperar, Google y probar con backend) | `feature/auth` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
-| 5 | `tasks` — tareas del mecánico | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/tasks` |
+| 5 | `tasks` — tareas del mecánico | ✅ Hecho; `presentation` de US26, US27 y US33 entregada (faltan fotos de desmontaje, suspensión y probar con backend) | `feature/tasks`, `feature/tasks-inventory-ui` |
 | 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho; `presentation` de EP03 (US11–US15, US44) entregada (faltan proforma, lista y detalle de orden, el acceso desde `main` y probar con backend) | `feature/reception-workorders`, `feature/reception-workorders-ui` |
-| 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/inventory` |
+| 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho; `presentation` de US31 y US32 entregada (faltan lector de código, alertas, órdenes de compra y probar con backend) | `feature/inventory`, `feature/tasks-inventory-ui` |
 | 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
 | 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team` |
 
@@ -182,7 +182,18 @@ Núcleo extendido: `BusinessTime` (día de Lima), `ClockModule` (`Clock` inyecta
 
 Núcleo extendido: `VehicleDao` (`features/reception`, `ReceptionDaoModule`), `BayDao` (`features/bays`, `BayDaoModule`), `PendingOperationDao.observeByTypeAndDedupePrefix`, `PendingUploadDao.observeByTarget`. Servicios de solo lectura `VehicleLookupService`, `WorkBayLookupService` y `PartSearchService` vivían en `features/tasks/infrastructure/remote`; los pasos 6, 7 y 9 los movieron a su feature (`VehicleService` en `reception`, `InventoryService` en `inventory`; `WorkBayLookupService` pasó a ser `WorkBayService` en `bays` y `tasks` ahora lo inyecta).
 
-Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador. Los huecos H3, H4, H7 y H8 ya están confirmados contra el código del backend ([03](03-traceability.md#huecos-cerrados)). Queda H9: tras cambiar la cantidad de un repuesto, recargar la tarea en vez de usar la respuesta del `PUT` ([03](03-traceability.md#huecos-abiertos)).
+**`presentation` de EP06 entregada** (rama `feature/tasks-inventory-ui`): `features/tasks/presentation`, sobre los componentes de `core/designsystem` sin modificarlos. Cada pantalla tiene su `ViewModel` con `UiState`, sus textos en `strings.xml` y pruebas de `ViewModel`.
+
+| Historia | Pantalla | Casos de uso que usa | Notas |
+| --- | --- | --- | --- |
+| US26 | Mis tareas (`MyTasksScreen`, inicio del grafo `TasksNavGraphRoute`) | `ObserveMyTasksUseCase`, `RefreshMyTasksUseCase` | Lee Room y recarga al abrir y con *Actualizar*. Sin red sigue con la caché y lo avisa. Falta conectar el push `TASK_ASSIGNED` a la recarga: lo consume `main` (`PushInbox`) |
+| US27 | Detalle de tarea (`TaskDetailScreen`) con cronómetro, pausa y cierre | `ObserveTaskUseCase`, `GetTaskDetailUseCase`, `StartTaskUseCase`, `PauseTaskUseCase`, `CompleteTaskUseCase`, `SuggestLaborHoursUseCase` | El cronómetro cuenta `startedAt` menos `totalPausedSeconds` (H3). `END_OF_SHIFT` anticipado muestra el `message` del backend. Al cerrar, las horas sugeridas se confirman y la tarea sale de la bandeja |
+| US32 E2/E3 | Imputar repuesto (`ChargePartDialog` en el detalle de tarea) | `SearchPartsUseCase`, `AddPartToTaskUseCase` | Búsqueda en línea con debounce; el agotado no se puede elegir. El 409 de stock insuficiente muestra su `message` y deja abierto el formulario |
+| US33 | Repuestos imputados (`TaskPartsSection`) con corregir cantidad y devolver | `UpdateTaskPartQuantityUseCase`, `RemovePartFromTaskUseCase` | Solo con `operations:work_orders:update`. Tras imputar o devolver se recarga el detalle (H9). La auditoría `part-movements` (US33 E2) queda para la pantalla de orden |
+
+Fuera de esta entrega: suspensión por repuesto (US29), fotos de desmontaje y montaje (US28) y el cierre de la orden.
+
+Pendiente de este paso: suspensión, fotos y pantalla de supervisor, y probarlo contra el backend en un emulador. Los huecos H3, H4, H7 y H8 ya están confirmados contra el código del backend ([03](03-traceability.md#huecos-cerrados)). Queda H9: tras cambiar la cantidad de un repuesto, recargar la tarea en vez de usar la respuesta del `PUT` ([03](03-traceability.md#huecos-abiertos)).
 
 ## Paso 6 — `reception` + `workorders` ✅
 
@@ -265,7 +276,16 @@ Recibir se deshabilita sin red con `ConnectivityObserver`. El push `LOW_STOCK` p
 
 Núcleo extendido: `StoragePaths.purchaseReceipt`, permisos `BATCHES_RECEIVE` y `PURCHASE_ORDERS_READ`, y en `AppDatabase` los DAOs `PartDao` y `BatchDao`. `PartSearchService` de `tasks` pasa a ser `InventoryService` en `inventory` (`tasks` sigue buscando en línea para imputar). Sin cambios en el esquema Room.
 
-Pendiente de este paso: la capa `presentation` (otra parte del equipo) y probarlo contra el backend en un emulador, en especial la recepción con comprobante (H15).
+**`presentation` de EP07 entregada** (rama `feature/tasks-inventory-ui`): `features/inventory/presentation`, sobre los componentes de `core/designsystem` sin modificarlos. Cada pantalla tiene su `ViewModel` con `UiState`, sus textos en `strings.xml` y pruebas de `ViewModel`.
+
+| Historia | Pantalla | Casos de uso que usa | Notas |
+| --- | --- | --- | --- |
+| US31 | Catálogo (`PartsCatalogScreen`, inicio del grafo `InventoryNavGraphRoute`) | `ObservePartsCatalogUseCase`, `RefreshPartsCatalogUseCase`, `SearchPartsCatalogUseCase` | Búsqueda por nombre o SKU con debounce de 300 ms y chips de las 9 `ItemCategory`. El agotado se marca en rojo. Sin red usa la caché. **No hay filtro por marca**: `PartResource` no trae marca (H35) |
+| US32 E1 | Detalle de repuesto (`PartDetailScreen`) con la línea de tiempo FIFO (`BatchFifoTimeline`) | `ObservePartUseCase`, `ObservePartBatchesUseCase`, `RefreshPartBatchesUseCase` | Los lotes se ordenan del más antiguo al más nuevo y el primero con saldo se marca "Siguiente en salir". Solo con `inventory:batches:read` |
+
+Acceso: mientras `main` no tenga pestañas, `DebugEntryPoints` (solo builds debug) muestra botones a Mis tareas y Repuestos en la pantalla de asistencia. Se retira al integrar `main`.
+
+Pendiente de este paso: lector de código de barras, bandeja de alertas, órdenes de compra y recepción, y probarlo contra el backend en un emulador, en especial la recepción con comprobante (H15).
 
 ## Paso 8 — `diagnostics` ✅
 
