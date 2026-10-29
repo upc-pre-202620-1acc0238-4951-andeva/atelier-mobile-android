@@ -434,4 +434,19 @@
     <string name="part_stock">Stock: %1$s</string>
     <string name="part_price">%1$s sin IGV</string>
 
+    <!-- Inventory presentation: US32 lotes FIFO -->
+    <string name="part_detail_title">Detalle de repuesto</string>
+    <string name="batches_title">Lotes en orden FIFO</string>
+    <string name="batches_subtitle">El descargo consume primero el lote más antiguo con saldo.</string>
+    <string name="batches_empty">Este repuesto no tiene lotes registrados.</string>
+    <string name="batches_no_permission">Tu perfil no tiene permiso para ver los lotes.</string>
+    <string name="batches_cache_notice">Sin conexión: mostrando los lotes guardados.</string>
+    <string name="batch_next">Siguiente en salir</string>
+    <string name="batch_waiting">Con saldo</string>
+    <string name="batch_depleted">Agotado</string>
+    <string name="batch_number">Lote %1$s</string>
+    <string name="batch_arrival">Ingresó el %1$s</string>
+    <string name="batch_remaining">Saldo: %1$s</string>
+    <string name="batch_unit_cost">Costo unitario: %1$s</string>
+
 </resources>
