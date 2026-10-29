@@ -41,12 +41,12 @@ class MyTasksViewModelTest {
         missingItemDescription = null, pendingSuspensionReason = null, startedAt = null, totalPausedSeconds = 0
     )
 
-    private fun sessionWith(vararg permissions: Permission) = Session(
+    private fun sessionWith(permissions: List<Permission>) = Session(
         userId = "u", email = "m@taller.pe", fullName = "Mecánico", tenantId = "t", tenantName = "Taller",
         membershipId = "m", permissions = permissions.map { it.value }.toSet(), plan = null
     )
 
-    private fun viewModel(session: Session? = sessionWith(Permission.TASKS_READ)): MyTasksViewModel {
+    private fun viewModel(session: Session? = sessionWith(listOf(Permission.TASKS_READ))): MyTasksViewModel {
         val observeSession = mockk<ObserveSessionUseCase>()
         every { observeSession() } returns flowOf(session)
         every { repository.observeMyTasks() } returns tasks
@@ -100,7 +100,7 @@ class MyTasksViewModelTest {
     @Test
     fun `sin el permiso de lectura marca la pantalla como no permitida`() = runTest(mainRule.dispatcher) {
         coEvery { repository.refreshMyTasks() } returns Result.success(Unit)
-        val vm = viewModel(sessionWith(Permission.PARTS_READ))
+        val vm = viewModel(sessionWith(listOf(Permission.PARTS_READ)))
         settle()
         assertFalse(vm.uiState.value.canRead)
     }
