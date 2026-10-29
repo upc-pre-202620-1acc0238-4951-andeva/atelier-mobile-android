@@ -18,6 +18,7 @@ import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSel
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
+import com.andeva.atelier.mobile.features.tasks.presentation.navigation.tasksNavGraph
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.workOrderNavGraph
 import kotlinx.serialization.Serializable
 
@@ -68,6 +69,7 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
             attendanceNavGraph(navController)
             receptionNavGraph(navController)
             workOrderNavGraph(navController)
+            tasksNavGraph(navController)
         }
     }
 
