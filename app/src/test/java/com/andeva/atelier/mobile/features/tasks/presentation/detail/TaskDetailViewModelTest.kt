@@ -3,21 +3,28 @@ package com.andeva.atelier.mobile.features.tasks.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.ApiException
+import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.CompleteTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.GetTaskDetailUseCase
 import com.andeva.atelier.mobile.features.tasks.application.ObserveTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.PauseTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.SearchPartsUseCase
 import com.andeva.atelier.mobile.features.tasks.application.StartTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SuggestLaborHoursUseCase
+import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
+import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.Task
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
+import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.domain.TaskRepository
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import io.mockk.coEvery
@@ -62,19 +69,33 @@ class TaskDetailViewModelTest {
         missingItemDescription = null, pendingSuspensionReason = null, startedAt = startedAt, totalPausedSeconds = paused
     )
 
+    private fun producto(productId: String = "p1", quantity: String = "2") = TaskProduct(
+        id = "tp-$productId", productId = productId, productName = "Pastillas", quantity = BigDecimal(quantity),
+        unitPrice = Money(BigDecimal("50.00"), Money.PEN), totalAmount = Money(BigDecimal("100.00"), Money.PEN)
+    )
+
+    private fun repuesto(id: String = "p1", stock: String = "10") = PartOption(
+        id = id, name = "Pastillas", sku = "BRK-001", category = "BRAKES",
+        basePrice = BigDecimal("50.00"), totalStock = BigDecimal(stock), unitOfMeasure = "UNIT"
+    )
+
     private fun detalle(
         status: TaskStatus,
         hold: HoldReason? = null,
         startedAt: Instant? = null,
-        paused: Long = 0
+        paused: Long = 0,
+        products: List<TaskProduct> = emptyList()
     ) = TaskDetail(
         id = id, workOrderId = "wo1", serviceId = "s1", serviceName = "Frenos", mechanicId = "m1", mechanicName = null,
         status = status, description = "Cambio de pastillas", price = null, holdReason = hold,
         missingItemDescription = null, totalPausedSeconds = paused, startedAt = startedAt, completedAt = null,
-        pendingSuspensionReason = null, pendingSuspensionRequestedAt = null, products = emptyList(), evidenceImages = emptyList()
+        pendingSuspensionReason = null, pendingSuspensionRequestedAt = null, products = products, evidenceImages = emptyList()
     )
 
-    private val mechanic = listOf(Permission.TASKS_READ, Permission.TASKS_TRACK_TIME, Permission.TASKS_COMPLETE)
+    private val mechanic = listOf(
+        Permission.TASKS_READ, Permission.TASKS_TRACK_TIME, Permission.TASKS_COMPLETE, Permission.TASKS_CHARGE_PARTS
+    )
+    private val supervisor = mechanic + Permission.WORK_ORDERS_UPDATE
 
     private fun sessionWith(permissions: List<Permission>) = Session(
         userId = "u", email = "m@taller.pe", fullName = "Mecánico", tenantId = "t", tenantName = "Taller",
@@ -93,6 +114,10 @@ class TaskDetailViewModelTest {
             PauseTaskUseCase(repository),
             CompleteTaskUseCase(repository),
             SuggestLaborHoursUseCase(clock),
+            SearchPartsUseCase(repository),
+            AddPartToTaskUseCase(repository),
+            UpdateTaskPartQuantityUseCase(repository),
+            RemovePartFromTaskUseCase(repository),
             SavedStateHandle(mapOf("workOrderId" to "wo1", "taskId" to "t1"))
         )
     }
@@ -261,5 +286,191 @@ class TaskDetailViewModelTest {
         settle()
 
         assertTrue(vm.uiState.value.completed)
+    }
+
+    // --- US32 E2/E3: imputar repuesto ---
+
+    @Test
+    fun `imputar un repuesto recarga los productos de la tarea`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        coEvery { repository.getDetail(id) } returnsMany listOf(
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now)),
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto())))
+        )
+        coEvery { repository.searchParts("pastillas") } returns Result.success(listOf(repuesto()))
+        coEvery { repository.addPart(id, "p1", BigDecimal("2")) } returns Result.success(producto())
+        val vm = viewModel()
+        settle()
+
+        vm.onChargeClick()
+        vm.onChargeQueryChange("pastillas")
+        settle()
+        assertEquals(listOf("p1"), vm.uiState.value.chargeForm?.results?.map { it.id })
+
+        vm.onPartSelect(repuesto())
+        vm.onChargeQuantityChange("2")
+        vm.onChargeConfirm()
+        settle()
+
+        assertNull(vm.uiState.value.chargeForm)
+        assertEquals(1, vm.uiState.value.products.size)
+        assertNull(vm.uiState.value.busyAction)
+    }
+
+    @Test
+    fun `stock insuficiente muestra el 409 del backend y deja abierto el formulario`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        coEvery { repository.addPart(id, "p1", BigDecimal("50")) } returns Result.failure(
+            ApiException(409, "CONFLICT", "Insufficient stock for SKU: requested 50, available 10")
+        )
+        val vm = viewModel()
+        settle()
+
+        vm.onChargeClick()
+        vm.onPartSelect(repuesto())
+        vm.onChargeQuantityChange("50")
+        vm.onChargeConfirm()
+        settle()
+
+        assertEquals(
+            "Insufficient stock for SKU: requested 50, available 10",
+            (vm.uiState.value.error as UiText.Dynamic).value
+        )
+        assertNotNull(vm.uiState.value.chargeForm)
+        assertTrue(vm.uiState.value.products.isEmpty())
+    }
+
+    @Test
+    fun `un repuesto agotado no se puede elegir`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel()
+        settle()
+
+        vm.onChargeClick()
+        vm.onPartSelect(repuesto(stock = "0"))
+
+        assertNull(vm.uiState.value.chargeForm?.selected)
+    }
+
+    @Test
+    fun `cantidad invalida al imputar marca el campo sin llamar al backend`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel()
+        settle()
+
+        vm.onChargeClick()
+        vm.onPartSelect(repuesto())
+        vm.onChargeQuantityChange("dos")
+        vm.onChargeConfirm()
+        settle()
+
+        assertEquals("quantity", vm.uiState.value.invalidField)
+        coVerify(exactly = 0) { repository.addPart(any(), any(), any()) }
+    }
+
+    @Test
+    fun `cantidad cero la rechaza el caso de uso antes de llamar`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel()
+        settle()
+
+        vm.onChargeClick()
+        vm.onPartSelect(repuesto())
+        vm.onChargeQuantityChange("0")
+        vm.onChargeConfirm()
+        settle()
+
+        assertEquals("quantity", vm.uiState.value.invalidField)
+        coVerify(exactly = 0) { repository.addPart(any(), any(), any()) }
+    }
+
+    @Test
+    fun `sin permiso de imputar no se abre el formulario`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel(listOf(Permission.TASKS_READ, Permission.TASKS_TRACK_TIME))
+        settle()
+
+        vm.onChargeClick()
+        assertNull(vm.uiState.value.chargeForm)
+    }
+
+    // --- US33: devolver y corregir ---
+
+    @Test
+    fun `devolver un repuesto lo quita de la tarea`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        coEvery { repository.getDetail(id) } returnsMany listOf(
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto()))),
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        )
+        coEvery { repository.removePart(id, "p1") } returns Result.success(Unit)
+        val vm = viewModel(supervisor)
+        settle()
+        assertEquals(1, vm.uiState.value.products.size)
+
+        vm.onReturnPartClick(vm.uiState.value.products.first())
+        assertEquals(PartEditMode.RETURN, vm.uiState.value.partEdit?.mode)
+        vm.onPartEditConfirm()
+        settle()
+
+        assertNull(vm.uiState.value.partEdit)
+        assertTrue(vm.uiState.value.products.isEmpty())
+        coVerify(exactly = 1) { repository.removePart(id, "p1") }
+    }
+
+    @Test
+    fun `solo con permiso de orden se puede devolver`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto())))
+        val vm = viewModel(mechanic)
+        settle()
+
+        vm.onReturnPartClick(vm.uiState.value.products.first())
+        assertNull(vm.uiState.value.partEdit)
+        assertFalse(vm.uiState.value.canEditParts)
+    }
+
+    @Test
+    fun `corregir la cantidad usa el detalle recargado`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto(quantity = "2"))))
+        coEvery { repository.updatePartQuantity(id, "p1", BigDecimal("1")) } returns Result.success(
+            detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto(quantity = "1")))
+        )
+        val vm = viewModel(supervisor)
+        settle()
+
+        vm.onEditPartClick(vm.uiState.value.products.first())
+        assertEquals("2", vm.uiState.value.partEdit?.quantity)
+        vm.onPartQuantityChange("1")
+        vm.onPartEditConfirm()
+        settle()
+
+        assertNull(vm.uiState.value.partEdit)
+        assertEquals(BigDecimal("1"), vm.uiState.value.products.first().quantity)
+    }
+
+    @Test
+    fun `un error al devolver muestra el mensaje y conserva el formulario`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto())))
+        coEvery { repository.removePart(id, "p1") } returns Result.failure(
+            ApiException(403, "FORBIDDEN", "No puedes retirar este repuesto.")
+        )
+        val vm = viewModel(supervisor)
+        settle()
+
+        vm.onReturnPartClick(vm.uiState.value.products.first())
+        vm.onPartEditConfirm()
+        settle()
+
+        assertEquals("No puedes retirar este repuesto.", (vm.uiState.value.error as UiText.Dynamic).value)
+        assertNotNull(vm.uiState.value.partEdit)
+        assertEquals(1, vm.uiState.value.products.size)
     }
 }
