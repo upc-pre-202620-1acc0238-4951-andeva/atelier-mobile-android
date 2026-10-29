@@ -364,4 +364,117 @@
     <string name="attendance_map_radius">Vista esquemática · radio %1$d m</string>
     <string name="attendance_map_no_data">Vista esquemática · la sede aparecerá al cargar los datos</string>
 
+    <!-- Tasks presentation: US26 bandeja del mecánico -->
+    <string name="tasks_title">Mis tareas</string>
+    <string name="tasks_subtitle">Faenas asignadas en bahía, por prioridad.</string>
+    <string name="tasks_empty">No tienes tareas asignadas.</string>
+    <string name="tasks_no_permission">Tu perfil no tiene permiso para ver tareas.</string>
+    <string name="tasks_cache_notice">Sin conexión: mostrando las tareas guardadas.</string>
+    <string name="tasks_refresh">Actualizar</string>
+    <string name="task_status_assigned">Asignada</string>
+    <string name="task_status_in_progress">En curso</string>
+    <string name="task_status_on_hold">En pausa</string>
+    <string name="task_status_suspended">Suspendida</string>
+    <string name="task_status_completed">Completada</string>
+    <string name="task_status_cancelled">Cancelada</string>
+    <string name="task_status_pending">Pendiente</string>
+    <string name="task_suspension_pending">Suspensión por aprobar</string>
+    <string name="task_card_plate">Placa %1$s</string>
+    <string name="task_card_bay">Bahía %1$s</string>
+    <string name="task_card_work_order">OT #%1$d</string>
+    <string name="task_card_estimated">%1$s h estimadas</string>
+    <string name="task_card_no_plate">Vehículo sin placa en caché</string>
+
+    <!-- Tasks presentation: US27 detalle, cronómetro, pausa y cierre -->
+    <string name="task_detail_title">Detalle de tarea</string>
+    <string name="task_invalid_input">Revisa los datos marcados.</string>
+    <string name="task_timer_label">Labor efectiva</string>
+    <string name="task_timer_paused_total">En pausa acumulada: %1$s</string>
+    <string name="task_start">Iniciar faena</string>
+    <string name="task_resume">Reanudar</string>
+    <string name="task_pause">Pausar</string>
+    <string name="task_complete">Terminar tarea</string>
+    <string name="task_started">Faena en curso.</string>
+    <string name="task_paused">Tarea en pausa.</string>
+    <string name="task_suspended_notice">Tarea suspendida: solo un supervisor puede levantarla.</string>
+    <string name="task_pause_title">Pausar tarea</string>
+    <string name="task_pause_body">Elige el motivo de la pausa.</string>
+    <string name="task_pause_break">Refrigerio</string>
+    <string name="task_pause_end_of_shift">Fin de turno</string>
+    <string name="task_complete_title">Terminar tarea</string>
+    <string name="task_complete_body">Confirma las horas efectivas trabajadas. Puedes corregir la sugerencia del cronómetro.</string>
+    <string name="task_complete_hours">Horas efectivas</string>
+    <string name="task_complete_notes">Notas (opcional)</string>
+    <string name="task_complete_confirm">Confirmar cierre</string>
+    <string name="task_field_hours">Escribe un número de horas mayor o igual a 0.</string>
+    <string name="task_field_notes">Máximo 1000 caracteres.</string>
+
+    <!-- Inventory presentation: US31 catálogo de repuestos -->
+    <string name="catalog_title">Repuestos</string>
+    <string name="catalog_search_label">Buscar repuesto</string>
+    <string name="catalog_search_hint">Nombre o SKU</string>
+    <string name="catalog_no_permission">Tu perfil no tiene permiso para ver el catálogo.</string>
+    <string name="catalog_cache_notice">Sin conexión: mostrando el catálogo guardado.</string>
+    <string name="catalog_empty">Todavía no hay repuestos en el catálogo.</string>
+    <string name="catalog_empty_filtered">Ningún repuesto coincide con la búsqueda.</string>
+    <string name="catalog_clear_filters">Quitar filtros</string>
+    <string name="category_lubricants">Lubricantes</string>
+    <string name="category_brakes">Frenos</string>
+    <string name="category_suspension">Suspensión</string>
+    <string name="category_engine">Motor</string>
+    <string name="category_electrical">Eléctrico</string>
+    <string name="category_tires">Llantas</string>
+    <string name="category_filters">Filtros</string>
+    <string name="category_bodywork">Carrocería</string>
+    <string name="category_accessories">Accesorios</string>
+    <string name="stock_out">Agotado</string>
+    <string name="stock_low">Stock mínimo</string>
+    <string name="stock_ok">Disponible</string>
+    <string name="part_sku">SKU %1$s</string>
+    <string name="part_stock">Stock: %1$s</string>
+    <string name="part_price">%1$s sin IGV</string>
+
+    <!-- Inventory presentation: US32 lotes FIFO -->
+    <string name="part_detail_title">Detalle de repuesto</string>
+    <string name="batches_title">Lotes en orden FIFO</string>
+    <string name="batches_subtitle">El descargo consume primero el lote más antiguo con saldo.</string>
+    <string name="batches_empty">Este repuesto no tiene lotes registrados.</string>
+    <string name="batches_no_permission">Tu perfil no tiene permiso para ver los lotes.</string>
+    <string name="batches_cache_notice">Sin conexión: mostrando los lotes guardados.</string>
+    <string name="batch_next">Siguiente en salir</string>
+    <string name="batch_waiting">Con saldo</string>
+    <string name="batch_depleted">Agotado</string>
+    <string name="batch_number">Lote %1$s</string>
+    <string name="batch_arrival">Ingresó el %1$s</string>
+    <string name="batch_remaining">Saldo: %1$s</string>
+    <string name="batch_unit_cost">Costo unitario: %1$s</string>
+
+    <!-- Tasks presentation: US32 imputar repuesto y US33 devolución -->
+    <string name="task_parts_title">Repuestos de la tarea</string>
+    <string name="task_parts_empty">Todavía no hay repuestos imputados.</string>
+    <string name="task_parts_charge">Imputar repuesto</string>
+    <string name="task_part_unnamed">Repuesto sin nombre</string>
+    <string name="task_part_quantity">Cantidad: %1$s</string>
+    <string name="task_part_unit_price">Unitario: %1$s</string>
+    <string name="task_part_total">Total: %1$s</string>
+    <string name="task_part_edit">Corregir cantidad</string>
+    <string name="task_part_return">Devolver a inventario</string>
+    <string name="task_part_charged">Repuesto imputado: el stock bajó por lotes FIFO.</string>
+    <string name="task_part_updated">Cantidad actualizada.</string>
+    <string name="task_part_returned">Repuesto devuelto al lote de origen.</string>
+    <string name="task_field_quantity">Escribe una cantidad mayor a 0.</string>
+    <string name="charge_title">Imputar repuesto</string>
+    <string name="charge_quantity">Cantidad</string>
+    <string name="charge_confirm">Imputar a la tarea</string>
+    <string name="edit_part_title">Corregir cantidad</string>
+    <string name="edit_part_body">El backend recalcula el costo de la orden con la nueva cantidad.</string>
+    <string name="edit_part_confirm">Guardar cantidad</string>
+    <string name="return_title">Devolver a inventario</string>
+    <string name="return_body">Las unidades vuelven al lote del que salieron y se rebaja el costo imputado en la orden.</string>
+    <string name="return_confirm">Devolver repuesto</string>
+
+    <!-- Acceso provisional (solo debug) hasta integrar main -->
+    <string name="debug_open_tasks">Mis tareas</string>
+    <string name="debug_open_catalog">Repuestos</string>
+
 </resources>
