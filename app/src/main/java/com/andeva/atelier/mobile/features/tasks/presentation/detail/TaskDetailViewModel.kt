@@ -7,19 +7,27 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.CompleteTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.GetTaskDetailUseCase
 import com.andeva.atelier.mobile.features.tasks.application.ObserveTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.PauseTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.SearchPartsUseCase
 import com.andeva.atelier.mobile.features.tasks.application.StartTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SuggestLaborHoursUseCase
+import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
 import com.andeva.atelier.mobile.features.tasks.domain.InvalidTaskInputException
+import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
+import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.presentation.invalidTaskField
 import com.andeva.atelier.mobile.features.tasks.presentation.toTaskUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +39,9 @@ import javax.inject.Inject
 /**
  * US27: detalle de la tarea con cronómetro. Iniciar y reanudar (`/start`), pausar con motivo (`/pause`) y cerrar
  * con las horas efectivas (US30). Todo en línea; la tarea se ve sin red desde Room.
+ *
+ * US32 E2/E3: imputa un repuesto con la regla FIFO del backend (409 si no hay saldo). US33: corrige la cantidad o
+ * devuelve el repuesto al lote de origen.
  */
 @HiltViewModel
 class TaskDetailViewModel @Inject constructor(
@@ -41,6 +52,10 @@ class TaskDetailViewModel @Inject constructor(
     private val pauseTask: PauseTaskUseCase,
     private val completeTask: CompleteTaskUseCase,
     private val suggestLaborHours: SuggestLaborHoursUseCase,
+    private val searchParts: SearchPartsUseCase,
+    private val addPart: AddPartToTaskUseCase,
+    private val updatePartQuantity: UpdateTaskPartQuantityUseCase,
+    private val removePart: RemovePartFromTaskUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -140,7 +155,151 @@ class TaskDetailViewModel @Inject constructor(
         }
     }
 
-    internal fun run(action: TaskAction, call: suspend () -> Result<TaskDetail>) {
+    // --- US32 E2/E3: imputar un repuesto a la tarea ---
+
+    private var searchJob: Job? = null
+
+    fun onChargeClick() {
+        if (!_uiState.value.canOpenCharge) return
+        _uiState.update { it.copy(chargeForm = ChargeForm(), notice = null, error = null, invalidField = null) }
+    }
+
+    fun onChargeDismiss() {
+        searchJob?.cancel()
+        _uiState.update { if (it.isBusy) it else it.copy(chargeForm = null, error = null, invalidField = null) }
+    }
+
+    private fun editCharge(change: (ChargeForm) -> ChargeForm) = _uiState.update {
+        val form = it.chargeForm
+        if (form == null || it.isBusy) it else it.copy(chargeForm = change(form), error = null, invalidField = null)
+    }
+
+    /** Busca en línea por nombre o SKU con debounce; un texto vacío limpia la lista. */
+    fun onChargeQueryChange(value: String) {
+        searchJob?.cancel()
+        if (value.isBlank()) {
+            editCharge { it.copy(query = value, selected = null, results = emptyList(), isSearching = false) }
+            return
+        }
+        editCharge { it.copy(query = value, selected = null) }
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            editCharge { it.copy(isSearching = true) }
+            searchParts(value.trim())
+                .onSuccess { parts -> editCharge { it.copy(results = parts, isSearching = false) } }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(chargeForm = it.chargeForm?.copy(isSearching = false), error = e.toTaskUiText())
+                    }
+                }
+        }
+    }
+
+    /** Un repuesto agotado no se puede elegir (US31 E3). */
+    fun onPartSelect(part: PartOption) {
+        if (!part.isAvailable) return
+        editCharge { it.copy(selected = part) }
+    }
+
+    fun onChargeQuantityChange(value: String) = editCharge { it.copy(quantity = value) }
+
+    fun onChargeConfirm() {
+        val state = _uiState.value
+        val form = state.chargeForm ?: return
+        val part = form.selected ?: return
+        if (state.isBusy) return
+        val quantity = form.quantity.toAmount()
+        if (quantity == null) {
+            fail(InvalidTaskInputException("quantity"))
+            return
+        }
+        _uiState.update { it.copy(busyAction = TaskAction.CHARGE, error = null, invalidField = null) }
+        viewModelScope.launch {
+            // El descargo FIFO lo hace el backend; 409 con el message si pide más de lo que hay.
+            addPart(taskId, part.id, quantity)
+                .onSuccess { reloadDetail(UiText.Resource(R.string.task_part_charged)) }
+                .onFailure(::fail)
+        }
+    }
+
+    // --- US33: corregir la cantidad o devolver el repuesto al lote de origen ---
+
+    fun onEditPartClick(product: TaskProduct) = openPartEdit(product, PartEditMode.EDIT_QUANTITY)
+
+    fun onReturnPartClick(product: TaskProduct) = openPartEdit(product, PartEditMode.RETURN)
+
+    private fun openPartEdit(product: TaskProduct, mode: PartEditMode) {
+        val state = _uiState.value
+        if (!state.canEditParts || state.isBusy) return
+        _uiState.update {
+            it.copy(
+                partEdit = PartEditForm(product, mode, product.quantity.stripTrailingZeros().toPlainString()),
+                notice = null, error = null, invalidField = null
+            )
+        }
+    }
+
+    fun onPartEditDismiss() = _uiState.update { if (it.isBusy) it else it.copy(partEdit = null, error = null, invalidField = null) }
+
+    fun onPartQuantityChange(value: String) = _uiState.update {
+        val edit = it.partEdit
+        if (edit == null || it.isBusy) it else it.copy(partEdit = edit.copy(quantity = value), error = null, invalidField = null)
+    }
+
+    fun onPartEditConfirm() {
+        val state = _uiState.value
+        val edit = state.partEdit ?: return
+        if (!state.canEditParts || state.isBusy) return
+        when (edit.mode) {
+            PartEditMode.RETURN -> {
+                _uiState.update { it.copy(busyAction = TaskAction.REMOVE_PART, error = null, invalidField = null) }
+                viewModelScope.launch {
+                    // Las unidades vuelven al lote del que salieron y la orden rebaja el costo imputado.
+                    removePart(taskId, edit.product.productId)
+                        .onSuccess { reloadDetail(UiText.Resource(R.string.task_part_returned)) }
+                        .onFailure(::fail)
+                }
+            }
+            PartEditMode.EDIT_QUANTITY -> {
+                val quantity = edit.quantity.toAmount()
+                if (quantity == null) {
+                    fail(InvalidTaskInputException("quantity"))
+                    return
+                }
+                _uiState.update { it.copy(busyAction = TaskAction.EDIT_PART, error = null, invalidField = null) }
+                viewModelScope.launch {
+                    updatePartQuantity(taskId, edit.product.productId, quantity)
+                        .onSuccess { detail ->
+                            _uiState.update {
+                                it.copy(
+                                    busyAction = null, partEdit = null, detail = detail,
+                                    notice = UiText.Resource(R.string.task_part_updated)
+                                )
+                            }
+                        }
+                        .onFailure(::fail)
+                }
+            }
+        }
+    }
+
+    /** Recarga el detalle tras imputar o devolver: esas respuestas no traen la tarea completa. */
+    private suspend fun reloadDetail(notice: UiText) {
+        getDetail(taskId)
+            .onSuccess { detail ->
+                _uiState.update {
+                    it.copy(busyAction = null, chargeForm = null, partEdit = null, detail = detail, notice = notice)
+                }
+            }
+            .onFailure { e ->
+                // La operación se hizo: se cierra el formulario y se avisa que falta refrescar.
+                _uiState.update {
+                    it.copy(busyAction = null, chargeForm = null, partEdit = null, notice = notice, error = e.toTaskUiText())
+                }
+            }
+    }
+
+    private fun run(action: TaskAction, call: suspend () -> Result<TaskDetail>) {
         _uiState.update { it.copy(busyAction = action, notice = null, error = null, invalidField = null) }
         viewModelScope.launch {
             call()
@@ -158,9 +317,13 @@ class TaskDetailViewModel @Inject constructor(
     }
 
     /** Acepta coma o punto decimal; null si no es un número. */
-    internal fun String.toAmount(): BigDecimal? = trim().replace(',', '.').toBigDecimalOrNull()
+    private fun String.toAmount(): BigDecimal? = trim().replace(',', '.').toBigDecimalOrNull()
 
-    internal fun fail(error: Throwable) = _uiState.update {
+    private fun fail(error: Throwable) = _uiState.update {
         it.copy(busyAction = null, error = error.toTaskUiText(), invalidField = error.invalidTaskField())
+    }
+
+    private companion object {
+        const val SEARCH_DEBOUNCE_MS = 300L
     }
 }
