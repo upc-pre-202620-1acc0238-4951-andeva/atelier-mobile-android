@@ -31,16 +31,21 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
-import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
+import com.andeva.atelier.mobile.features.tasks.domain.PartOption
+import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.Task
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
+import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.ChronometerTimer
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.ChargePartDialog
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.CompleteTaskDialog
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.PartEditDialog
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.PauseReasonDialog
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.TaskPartsSection
 import com.andeva.atelier.mobile.features.tasks.presentation.taskStatusChipKind
 import com.andeva.atelier.mobile.features.tasks.presentation.taskStatusLabelRes
 import java.math.BigDecimal
@@ -69,7 +74,18 @@ fun TaskDetailScreen(
             onCompleteDismiss = viewModel::onCompleteDismiss,
             onHoursChange = viewModel::onHoursChange,
             onNotesChange = viewModel::onNotesChange,
-            onCompleteConfirm = viewModel::onCompleteConfirm
+            onCompleteConfirm = viewModel::onCompleteConfirm,
+            onChargeClick = viewModel::onChargeClick,
+            onChargeDismiss = viewModel::onChargeDismiss,
+            onChargeQueryChange = viewModel::onChargeQueryChange,
+            onPartSelect = viewModel::onPartSelect,
+            onChargeQuantityChange = viewModel::onChargeQuantityChange,
+            onChargeConfirm = viewModel::onChargeConfirm,
+            onEditPartClick = viewModel::onEditPartClick,
+            onReturnPartClick = viewModel::onReturnPartClick,
+            onPartEditDismiss = viewModel::onPartEditDismiss,
+            onPartQuantityChange = viewModel::onPartQuantityChange,
+            onPartEditConfirm = viewModel::onPartEditConfirm
         ),
         modifier = modifier
     )
@@ -81,12 +97,23 @@ internal class TaskDetailActions(
     val onStart: () -> Unit,
     val onPauseClick: () -> Unit,
     val onPauseDismiss: () -> Unit,
-    val onPause: (com.andeva.atelier.mobile.features.tasks.domain.PauseReason) -> Unit,
+    val onPause: (PauseReason) -> Unit,
     val onCompleteClick: () -> Unit,
     val onCompleteDismiss: () -> Unit,
     val onHoursChange: (String) -> Unit,
     val onNotesChange: (String) -> Unit,
-    val onCompleteConfirm: () -> Unit
+    val onCompleteConfirm: () -> Unit,
+    val onChargeClick: () -> Unit,
+    val onChargeDismiss: () -> Unit,
+    val onChargeQueryChange: (String) -> Unit,
+    val onPartSelect: (PartOption) -> Unit,
+    val onChargeQuantityChange: (String) -> Unit,
+    val onChargeConfirm: () -> Unit,
+    val onEditPartClick: (TaskProduct) -> Unit,
+    val onReturnPartClick: (TaskProduct) -> Unit,
+    val onPartEditDismiss: () -> Unit,
+    val onPartQuantityChange: (String) -> Unit,
+    val onPartEditConfirm: () -> Unit
 )
 
 @Composable
@@ -118,7 +145,7 @@ internal fun TaskDetailContent(
             state.notice?.let {
                 AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
             }
-            if (state.completeForm == null) {
+            if (state.completeForm == null && state.chargeForm == null && state.partEdit == null) {
                 state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
             }
             if (state.isSuspended) {
@@ -136,6 +163,17 @@ internal fun TaskDetailContent(
                 )
             }
             TaskControls(state, actions)
+            if (state.detail != null || state.canChargeParts) {
+                TaskPartsSection(
+                    products = state.products,
+                    canCharge = state.canOpenCharge,
+                    canEdit = state.canEditParts,
+                    isBusy = state.isBusy,
+                    onCharge = actions.onChargeClick,
+                    onEdit = actions.onEditPartClick,
+                    onReturn = actions.onReturnPartClick
+                )
+            }
             if (state.task == null && state.error != null) {
                 AtelierButton(
                     text = stringResource(R.string.branch_retry),
@@ -149,6 +187,30 @@ internal fun TaskDetailContent(
 
     if (state.pauseForm != null) {
         PauseReasonDialog(onSelect = actions.onPause, onDismiss = actions.onPauseDismiss)
+    }
+    state.chargeForm?.let { form ->
+        ChargePartDialog(
+            form = form,
+            isSaving = state.busyAction == TaskAction.CHARGE,
+            invalidField = state.invalidField,
+            error = state.error,
+            onQueryChange = actions.onChargeQueryChange,
+            onSelect = actions.onPartSelect,
+            onQuantityChange = actions.onChargeQuantityChange,
+            onConfirm = actions.onChargeConfirm,
+            onDismiss = actions.onChargeDismiss
+        )
+    }
+    state.partEdit?.let { edit ->
+        PartEditDialog(
+            form = edit,
+            isSaving = state.busyAction == TaskAction.EDIT_PART || state.busyAction == TaskAction.REMOVE_PART,
+            invalidField = state.invalidField,
+            error = state.error,
+            onQuantityChange = actions.onPartQuantityChange,
+            onConfirm = actions.onPartEditConfirm,
+            onDismiss = actions.onPartEditDismiss
+        )
     }
     state.completeForm?.let { form ->
         CompleteTaskDialog(
@@ -235,7 +297,9 @@ private fun previewTask(status: TaskStatus, hold: HoldReason? = null) = Task(
     pendingSuspensionReason = null, startedAt = Instant.now().minusSeconds(3725), totalPausedSeconds = 300
 )
 
-private val previewActions = TaskDetailActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+private val previewActions = TaskDetailActions(
+    {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+)
 
 @Preview(name = "Tarea · en curso · oscuro", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
