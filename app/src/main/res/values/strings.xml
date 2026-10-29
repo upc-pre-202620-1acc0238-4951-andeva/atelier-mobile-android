@@ -385,4 +385,28 @@
     <string name="task_card_estimated">%1$s h estimadas</string>
     <string name="task_card_no_plate">Vehículo sin placa en caché</string>
 
+    <!-- Tasks presentation: US27 detalle, cronómetro, pausa y cierre -->
+    <string name="task_detail_title">Detalle de tarea</string>
+    <string name="task_invalid_input">Revisa los datos marcados.</string>
+    <string name="task_timer_label">Labor efectiva</string>
+    <string name="task_timer_paused_total">En pausa acumulada: %1$s</string>
+    <string name="task_start">Iniciar faena</string>
+    <string name="task_resume">Reanudar</string>
+    <string name="task_pause">Pausar</string>
+    <string name="task_complete">Terminar tarea</string>
+    <string name="task_started">Faena en curso.</string>
+    <string name="task_paused">Tarea en pausa.</string>
+    <string name="task_suspended_notice">Tarea suspendida: solo un supervisor puede levantarla.</string>
+    <string name="task_pause_title">Pausar tarea</string>
+    <string name="task_pause_body">Elige el motivo de la pausa.</string>
+    <string name="task_pause_break">Refrigerio</string>
+    <string name="task_pause_end_of_shift">Fin de turno</string>
+    <string name="task_complete_title">Terminar tarea</string>
+    <string name="task_complete_body">Confirma las horas efectivas trabajadas. Puedes corregir la sugerencia del cronómetro.</string>
+    <string name="task_complete_hours">Horas efectivas</string>
+    <string name="task_complete_notes">Notas (opcional)</string>
+    <string name="task_complete_confirm">Confirmar cierre</string>
+    <string name="task_field_hours">Escribe un número de horas mayor o igual a 0.</string>
+    <string name="task_field_notes">Máximo 1000 caracteres.</string>
+
 </resources>
