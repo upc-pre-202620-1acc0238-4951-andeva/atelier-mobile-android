@@ -12,8 +12,12 @@ import java.time.Instant
 object LaborTime {
     private const val SECONDS_PER_HOUR = 3600L
 
+    /** Segundos de labor efectiva: desde `startedAt` menos lo pausado, nunca negativo. */
+    fun effectiveSeconds(startedAt: Instant, totalPausedSeconds: Long, now: Instant): Long =
+        (Duration.between(startedAt, now).seconds - totalPausedSeconds).coerceAtLeast(0)
+
     fun suggestedHours(startedAt: Instant, totalPausedSeconds: Long, now: Instant): BigDecimal {
-        val worked = (Duration.between(startedAt, now).seconds - totalPausedSeconds).coerceAtLeast(0)
+        val worked = effectiveSeconds(startedAt, totalPausedSeconds, now)
         return BigDecimal.valueOf(worked).divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, RoundingMode.HALF_UP)
     }
 }

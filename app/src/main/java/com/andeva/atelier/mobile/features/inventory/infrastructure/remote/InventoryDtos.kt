@@ -13,7 +13,9 @@ data class PartDto(
     @SerializedName("totalStock") val totalStock: BigDecimal?,
     @SerializedName("minimumStock") val minimumStock: BigDecimal?,
     @SerializedName("unitOfMeasure") val unitOfMeasure: String?,
-    @SerializedName("status") val status: String?
+    @SerializedName("status") val status: String?,
+    /** No existe en `PartResource` todavía (H35); queda null y Gson lo toma si el backend lo añade. */
+    @SerializedName("brand") val brand: String? = null
 )
 
 /** `PartDetailResource`: el repuesto con todos sus lotes (también agotados, sin orden definido). */

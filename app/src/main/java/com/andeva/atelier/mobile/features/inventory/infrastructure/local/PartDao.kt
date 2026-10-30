@@ -34,15 +34,22 @@ abstract class PartDao {
     @Query("SELECT * FROM parts WHERE sku = :sku")
     abstract suspend fun findBySku(sku: String): PartEntity?
 
-    @Query("SELECT * FROM parts WHERE (:category IS NULL OR category = :category) ORDER BY name")
-    abstract fun observeAll(category: String?): Flow<List<PartEntity>>
+    @Query(
+        "SELECT * FROM parts WHERE (:category IS NULL OR category = :category) " +
+            "AND (:brand IS NULL OR brand = :brand) ORDER BY name"
+    )
+    abstract fun observeAll(category: String?, brand: String?): Flow<List<PartEntity>>
+
+    @Query("SELECT DISTINCT brand FROM parts WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
+    abstract fun observeBrands(): Flow<List<String>>
 
     /** Búsqueda sin red, como la del backend: nombre o SKU, sin distinguir mayúsculas. */
     @Query(
         "SELECT * FROM parts WHERE (name LIKE '%' || :query || '%' OR sku LIKE '%' || :query || '%') " +
-            "AND (:category IS NULL OR category = :category) ORDER BY name LIMIT 100"
+            "AND (:category IS NULL OR category = :category) AND (:brand IS NULL OR brand = :brand) " +
+            "ORDER BY name LIMIT 100"
     )
-    abstract suspend fun search(query: String, category: String?): List<PartEntity>
+    abstract suspend fun search(query: String, category: String?, brand: String?): List<PartEntity>
 
     /** La misma regla de `GET /inventory/alerts` (H13): stock en el mínimo o debajo. */
     @Query("SELECT * FROM parts WHERE CAST(total_stock AS REAL) <= CAST(minimum_stock AS REAL) ORDER BY name")

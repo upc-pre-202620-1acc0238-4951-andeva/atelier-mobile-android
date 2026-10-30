@@ -49,12 +49,20 @@ data class TaskDetailUiState(
     val invalidField: String? = null,
     /** La tarea se cerró: la pantalla vuelve a la bandeja. */
     val completed: Boolean = false,
+    /**
+     * D1: tiempo efectivo al pausar, guardado en este teléfono. null si la pausa no la hizo esta app (el backend no
+     * envía la hora de la pausa), y el cronómetro no inventa un valor.
+     */
+    val pausedElapsedSeconds: Long? = null,
     val canTrackTime: Boolean = false,
     val canComplete: Boolean = false,
     val canChargeParts: Boolean = false,
     val canEditParts: Boolean = false
 ) {
     val isBusy: Boolean get() = busyAction != null
+
+    /** D3: los productos solo vienen de `GET /tasks/{id}`; sin ese detalle no se sabe qué repuestos hay. */
+    val partsAvailable: Boolean get() = detail != null
 
     // El detalle en línea manda sobre la caché una vez que llega o tras una acción.
     val status: TaskStatus? get() = detail?.status ?: task?.status
@@ -77,6 +85,6 @@ data class TaskDetailUiState(
 
     /** Imputar repuestos solo con la tarea abierta. */
     val canOpenCharge: Boolean
-        get() = canChargeParts && !isBusy &&
+        get() = canChargeParts && partsAvailable && !isBusy &&
             (status == TaskStatus.IN_PROGRESS || status == TaskStatus.ASSIGNED || status == TaskStatus.ON_HOLD)
 }

@@ -2,8 +2,10 @@ package com.andeva.atelier.mobile.features.inventory.presentation.catalog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
+import com.andeva.atelier.mobile.features.inventory.application.ObservePartBrandsUseCase
 import com.andeva.atelier.mobile.features.inventory.application.ObservePartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.RefreshPartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.SearchPartsCatalogUseCase
@@ -30,27 +32,29 @@ class PartsCatalogViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
     private val observeCatalog: ObservePartsCatalogUseCase,
     private val refreshCatalog: RefreshPartsCatalogUseCase,
-    private val searchCatalog: SearchPartsCatalogUseCase
+    private val searchCatalog: SearchPartsCatalogUseCase,
+    observeBrands: ObservePartBrandsUseCase,
+    connectivity: ConnectivityObserver
 ) : ViewModel() {
 
-    private data class Filters(val query: String, val category: ItemCategory?)
+    private data class Filters(val query: String, val category: ItemCategory?, val brand: String?)
 
     private val _uiState = MutableStateFlow(PartsCatalogUiState())
     val uiState: StateFlow<PartsCatalogUiState> = _uiState.asStateFlow()
 
-    private val filters = MutableStateFlow(Filters("", null))
+    private val filters = MutableStateFlow(Filters("", null, null))
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     private fun observeFilters() = viewModelScope.launch {
         filters.debounce(SEARCH_DEBOUNCE_MS).collectLatest { filter ->
             if (filter.query.isBlank()) {
                 _uiState.update { it.copy(isSearching = false) }
-                observeCatalog(filter.category).collect { parts ->
+                observeCatalog(filter.category, filter.brand).collect { parts ->
                     _uiState.update { it.copy(parts = parts, isLoaded = true) }
                 }
             } else {
                 _uiState.update { it.copy(isSearching = true, error = null) }
-                searchCatalog(filter.query.trim(), filter.category)
+                searchCatalog(filter.query.trim(), filter.category, filter.brand)
                     .onSuccess { parts ->
                         _uiState.update { it.copy(parts = parts, isLoaded = true, isSearching = false) }
                     }
@@ -67,7 +71,18 @@ class PartsCatalogViewModel @Inject constructor(
                 _uiState.update { it.copy(canRead = session?.has(Permission.PARTS_READ) == true) }
             }
         }
+        viewModelScope.launch {
+            observeBrands().collect { brands ->
+                // Si la marca elegida ya no existe (recarga sin ella), se quita el filtro.
+                _uiState.update { it.copy(brands = brands, brand = it.brand?.takeIf { b -> b in brands }) }
+                filters.update { f -> if (f.brand != null && f.brand !in brands) f.copy(brand = null) else f }
+            }
+        }
         observeFilters()
+        // D2: al volver la red tras una recarga fallida, se actualiza sola y el aviso se quita.
+        viewModelScope.launch {
+            connectivity.isOnline.collect { online -> if (online && _uiState.value.showingCache) refresh() }
+        }
         refresh()
     }
 
@@ -96,9 +111,16 @@ class PartsCatalogViewModel @Inject constructor(
         filters.update { it.copy(category = next) }
     }
 
+    /** Tocar la marca activa la quita. */
+    fun onBrandClick(brand: String) {
+        val next = if (_uiState.value.brand == brand) null else brand
+        _uiState.update { it.copy(brand = next) }
+        filters.update { it.copy(brand = next) }
+    }
+
     fun onClearFilters() {
-        _uiState.update { it.copy(query = "", category = null) }
-        filters.value = Filters("", null)
+        _uiState.update { it.copy(query = "", category = null, brand = null) }
+        filters.value = Filters("", null, null)
     }
 
     private companion object {

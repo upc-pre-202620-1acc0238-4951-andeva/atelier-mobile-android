@@ -18,13 +18,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.features.tasks.domain.LaborTime
 import kotlinx.coroutines.delay
-import java.time.Duration
 import java.time.Instant
 
 /** Segundos de labor efectiva: desde `startedAt` menos lo pausado; nunca negativo (US27). */
 internal fun effectiveSeconds(startedAt: Instant, totalPausedSeconds: Long, now: Instant): Long =
-    (Duration.between(startedAt, now).seconds - totalPausedSeconds).coerceAtLeast(0)
+    LaborTime.effectiveSeconds(startedAt, totalPausedSeconds, now)
 
 /** `HH:MM:SS` con horas sin tope. */
 internal fun formatElapsed(totalSeconds: Long): String {
@@ -32,15 +32,42 @@ internal fun formatElapsed(totalSeconds: Long): String {
     return "%02d:%02d:%02d".format(seconds / 3600, (seconds % 3600) / 60, seconds % 60)
 }
 
+/** Texto del cronómetro y si el tiempo de una tarea pausada se desconoce (D1). */
+internal data class TimerDisplay(val text: String, val unknown: Boolean)
+
 /**
- * Cronómetro en vivo de la labor efectiva (US27 E1). Cuenta cada segundo mientras [running]; en pausa muestra el
- * tiempo acumulado hasta el momento de pausar y el total de pausas.
+ * Qué mostrar según el estado de la tarea. En marcha, cuenta desde `startedAt`. En pausa, el valor guardado al pausar
+ * ([pausedElapsedSeconds]); sin él (la pausa se hizo en otro dispositivo) no se inventa un número: el backend no envía
+ * la hora de la pausa y `now − startedAt` incluiría el tiempo pausado (D1).
+ */
+internal fun timerDisplay(
+    startedAt: Instant?,
+    totalPausedSeconds: Long,
+    running: Boolean,
+    paused: Boolean,
+    pausedElapsedSeconds: Long?,
+    now: Instant
+): TimerDisplay = when {
+    running && startedAt != null ->
+        TimerDisplay(formatElapsed(effectiveSeconds(startedAt, totalPausedSeconds, now)), unknown = false)
+    paused && pausedElapsedSeconds != null -> TimerDisplay(formatElapsed(pausedElapsedSeconds), unknown = false)
+    paused -> TimerDisplay(UNKNOWN_ELAPSED, unknown = true)
+    else -> TimerDisplay(formatElapsed(0), unknown = false)
+}
+
+internal const val UNKNOWN_ELAPSED = "--:--:--"
+
+/**
+ * Cronómetro de la labor efectiva (US27 E1). Cuenta cada segundo mientras [running]; en pausa muestra el tiempo
+ * guardado al pausar y el total de pausas.
  */
 @Composable
 internal fun ChronometerTimer(
     startedAt: Instant?,
     totalPausedSeconds: Long,
     running: Boolean,
+    paused: Boolean,
+    pausedElapsedSeconds: Long?,
     modifier: Modifier = Modifier,
     nowProvider: () -> Instant = Instant::now
 ) {
@@ -51,6 +78,7 @@ internal fun ChronometerTimer(
             delay(1000)
         }
     }
+    val display = timerDisplay(startedAt, totalPausedSeconds, running, paused, pausedElapsedSeconds, now)
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -62,11 +90,19 @@ internal fun ChronometerTimer(
             color = AtelierTheme.colors.inkSecondary
         )
         Text(
-            text = startedAt?.let { formatElapsed(effectiveSeconds(it, totalPausedSeconds, now)) } ?: formatElapsed(0),
+            text = display.text,
             style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (display.unknown) AtelierTheme.colors.muted else MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
+        if (display.unknown) {
+            Text(
+                text = stringResource(R.string.task_timer_unknown_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.inkSecondary,
+                textAlign = TextAlign.Center
+            )
+        }
         if (totalPausedSeconds > 0) {
             Text(
                 text = stringResource(R.string.task_timer_paused_total, formatElapsed(totalPausedSeconds)),

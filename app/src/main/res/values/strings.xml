@@ -431,6 +431,7 @@
     <string name="stock_low">Stock mínimo</string>
     <string name="stock_ok">Disponible</string>
     <string name="part_sku">SKU %1$s</string>
+    <string name="part_brand">Marca %1$s</string>
     <string name="part_stock">Stock: %1$s</string>
     <string name="part_price">%1$s sin IGV</string>
 
@@ -452,6 +453,8 @@
     <!-- Tasks presentation: US32 imputar repuesto y US33 devolución -->
     <string name="task_parts_title">Repuestos de la tarea</string>
     <string name="task_parts_empty">Todavía no hay repuestos imputados.</string>
+    <string name="task_parts_online_only">Los repuestos imputados se consultan con conexión.</string>
+    <string name="task_timer_unknown_hint">El tiempo al pausar no está disponible en este teléfono.</string>
     <string name="task_parts_charge">Imputar repuesto</string>
     <string name="task_part_unnamed">Repuesto sin nombre</string>
     <string name="task_part_quantity">Cantidad: %1$s</string>
@@ -476,5 +479,26 @@
     <!-- Acceso provisional (solo debug) hasta integrar main -->
     <string name="debug_open_tasks">Mis tareas</string>
     <string name="debug_open_catalog">Repuestos</string>
+    <string name="debug_open_orders">Órdenes</string>
+
+    <!-- Órdenes de la sede: acceso del supervisor a las tareas (US33) -->
+    <string name="orders_title">Órdenes de la sede</string>
+    <string name="orders_subtitle">Órdenes de trabajo abiertas. Entra a una para ver sus tareas.</string>
+    <string name="orders_empty">No hay órdenes abiertas.</string>
+    <string name="orders_no_permission">Tu perfil no tiene permiso para ver órdenes.</string>
+    <string name="orders_cache_notice">Sin conexión: mostrando las órdenes guardadas.</string>
+    <string name="orders_no_number">Orden sin número</string>
+    <string name="orders_total">Total: %1$s</string>
+    <string name="order_detail_title">Detalle de orden</string>
+    <string name="order_tasks_title">Tareas de la orden</string>
+    <string name="order_tasks_empty">Esta orden aún no tiene tareas.</string>
+    <string name="order_task_mechanic">Mecánico: %1$s</string>
+    <string name="order_task_parts">Repuestos imputados: %1$d</string>
+    <string name="order_status_draft">Borrador</string>
+    <string name="order_status_in_progress">En curso</string>
+    <string name="order_status_completed">Completada</string>
+    <string name="order_status_paid">Pagada</string>
+    <string name="order_status_canceled">Cancelada</string>
+    <string name="order_status_unknown">Sin estado</string>
 
 </resources>

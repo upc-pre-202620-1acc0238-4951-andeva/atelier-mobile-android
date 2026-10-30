@@ -16,5 +16,7 @@ data class PartEntity(
     @ColumnInfo(name = "minimum_stock") val minimumStock: String,
     @ColumnInfo(name = "unit_of_measure") val unitOfMeasure: String,
     val status: String,
-    @ColumnInfo(name = "synced_at") val syncedAt: Long
+    @ColumnInfo(name = "synced_at") val syncedAt: Long,
+    /** Añadida en la versión 2 de la base (H35). */
+    val brand: String? = null
 )

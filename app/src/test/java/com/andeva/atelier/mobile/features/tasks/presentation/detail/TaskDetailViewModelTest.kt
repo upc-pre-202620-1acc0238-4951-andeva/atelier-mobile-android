@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.tasks.presentation.detail
 
 import androidx.lifecycle.SavedStateHandle
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
@@ -20,6 +21,7 @@ import com.andeva.atelier.mobile.features.tasks.application.SuggestLaborHoursUse
 import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
+import com.andeva.atelier.mobile.features.tasks.domain.PausedElapsedStore
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.Task
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
@@ -56,6 +58,13 @@ class TaskDetailViewModelTest {
     private val now = Instant.parse("2026-10-28T15:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
     private val task = MutableStateFlow<Task?>(null)
+    private val online = MutableStateFlow(true)
+    private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
+    private val pausedStore = mockk<PausedElapsedStore>(relaxUnitFun = true)
+
+    init {
+        coEvery { pausedStore.get(id) } returns null
+    }
 
     private fun tarea(
         status: TaskStatus = TaskStatus.ASSIGNED,
@@ -118,6 +127,9 @@ class TaskDetailViewModelTest {
             AddPartToTaskUseCase(repository),
             UpdateTaskPartQuantityUseCase(repository),
             RemovePartFromTaskUseCase(repository),
+            pausedStore,
+            clock,
+            connectivity,
             SavedStateHandle(mapOf("workOrderId" to "wo1", "taskId" to "t1"))
         )
     }
@@ -472,5 +484,142 @@ class TaskDetailViewModelTest {
         assertEquals("No puedes retirar este repuesto.", (vm.uiState.value.error as UiText.Dynamic).value)
         assertNotNull(vm.uiState.value.partEdit)
         assertEquals(1, vm.uiState.value.products.size)
+    }
+
+    // --- D1: cronometro de una tarea pausada ---
+
+    @Test
+    fun `pausar guarda el tiempo efectivo que llevaba la tarea`() = runTest(mainRule.dispatcher) {
+        val started = now.minusSeconds(900)
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = started, paused = 300)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = started, paused = 300))
+        coEvery { repository.pause(id, PauseReason.BREAK) } returns
+            Result.success(detalle(TaskStatus.ON_HOLD, HoldReason.BREAK, started, 300))
+        val vm = viewModel()
+        settle()
+
+        vm.onPauseClick()
+        vm.onPause(PauseReason.BREAK)
+        settle()
+
+        // 900 s desde el inicio menos 300 s ya pausados = 600 s de labor efectiva.
+        coVerify(exactly = 1) { pausedStore.save(id, 600L) }
+        assertEquals(600L, vm.uiState.value.pausedElapsedSeconds)
+    }
+
+    @Test
+    fun `al abrir una tarea pausada usa el tiempo guardado al pausar`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.ON_HOLD, HoldReason.BREAK, startedAt = now.minusSeconds(5000))
+        conDetalle(detalle(TaskStatus.ON_HOLD, HoldReason.BREAK, now.minusSeconds(5000)))
+        coEvery { pausedStore.get(id) } returns 420L
+        val vm = viewModel()
+        settle()
+
+        assertEquals(420L, vm.uiState.value.pausedElapsedSeconds)
+    }
+
+    @Test
+    fun `una pausa hecha en otro dispositivo no inventa un tiempo`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.ON_HOLD, HoldReason.BREAK, startedAt = now.minusSeconds(5000))
+        conDetalle(detalle(TaskStatus.ON_HOLD, HoldReason.BREAK, now.minusSeconds(5000)))
+        val vm = viewModel()
+        settle()
+
+        assertNull(vm.uiState.value.pausedElapsedSeconds)
+    }
+
+    @Test
+    fun `reanudar descarta el tiempo guardado`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.ON_HOLD, HoldReason.BREAK, startedAt = now.minusSeconds(900))
+        conDetalle(detalle(TaskStatus.ON_HOLD, HoldReason.BREAK, now.minusSeconds(900)))
+        coEvery { pausedStore.get(id) } returns 600L
+        coEvery { repository.start(id) } returns Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(900), paused = 60))
+        val vm = viewModel()
+        settle()
+        assertEquals(600L, vm.uiState.value.pausedElapsedSeconds)
+
+        vm.onStart()
+        settle()
+
+        coVerify { pausedStore.clear(id) }
+        assertNull(vm.uiState.value.pausedElapsedSeconds)
+    }
+
+    @Test
+    fun `cerrar la tarea descarta el tiempo guardado`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600)))
+        coEvery { repository.complete(id, BigDecimal("1"), null) } returns Result.success(detalle(TaskStatus.COMPLETED))
+        val vm = viewModel()
+        settle()
+
+        vm.onCompleteClick()
+        vm.onCompleteConfirm()
+        settle()
+
+        coVerify { pausedStore.clear(id) }
+        assertTrue(vm.uiState.value.completed)
+    }
+
+    // --- D3: repuestos sin el detalle en linea ---
+
+    @Test
+    fun `sin detalle en linea no se dice que no hay repuestos y no se puede imputar`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        coEvery { repository.getDetail(id) } returns Result.failure(IOException())
+        val vm = viewModel(supervisor)
+        settle()
+
+        assertFalse(vm.uiState.value.partsAvailable)
+        assertFalse(vm.uiState.value.canOpenCharge)
+        vm.onChargeClick()
+        assertNull(vm.uiState.value.chargeForm)
+    }
+
+    @Test
+    fun `al volver la red carga el detalle y habilita los repuestos`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        coEvery { repository.getDetail(id) } returnsMany listOf(
+            Result.failure(IOException()),
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto())))
+        )
+        online.value = false
+        val vm = viewModel(supervisor)
+        settle()
+        assertFalse(vm.uiState.value.partsAvailable)
+
+        online.value = true
+        settle()
+
+        assertTrue(vm.uiState.value.partsAvailable)
+        assertEquals(1, vm.uiState.value.products.size)
+        assertTrue(vm.uiState.value.canOpenCharge)
+    }
+
+    // --- US33: el supervisor abre una tarea de otro mecanico ---
+
+    @Test
+    fun `una tarea ajena no esta en Room pero el supervisor puede devolver sus repuestos`() = runTest(mainRule.dispatcher) {
+        task.value = null
+        coEvery { repository.getDetail(id) } returnsMany listOf(
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now, products = listOf(producto()))),
+            Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        )
+        coEvery { repository.removePart(id, "p1") } returns Result.success(Unit)
+        val vm = viewModel(supervisor)
+        settle()
+
+        assertNull(vm.uiState.value.task)
+        assertNotNull(vm.uiState.value.detail)
+        assertTrue(vm.uiState.value.partsAvailable)
+        assertTrue(vm.uiState.value.canEditParts)
+        assertEquals(1, vm.uiState.value.products.size)
+
+        vm.onReturnPartClick(vm.uiState.value.products.first())
+        vm.onPartEditConfirm()
+        settle()
+
+        assertTrue(vm.uiState.value.products.isEmpty())
+        coVerify(exactly = 1) { repository.removePart(id, "p1") }
     }
 }

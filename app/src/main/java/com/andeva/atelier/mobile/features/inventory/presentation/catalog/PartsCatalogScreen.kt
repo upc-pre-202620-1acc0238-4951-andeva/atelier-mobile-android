@@ -39,6 +39,7 @@ import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.domain.Part
 import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
+import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.BrandFilterChips
 import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.CategoryFilterChips
 import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.PartCard
 import java.math.BigDecimal
@@ -58,6 +59,7 @@ fun PartsCatalogScreen(
             onBack = onBack,
             onQueryChange = viewModel::onQueryChange,
             onCategoryClick = viewModel::onCategoryClick,
+            onBrandClick = viewModel::onBrandClick,
             onClearFilters = viewModel::onClearFilters,
             onRefresh = { viewModel.refresh(force = true) },
             onOpenPart = onOpenPart
@@ -70,6 +72,7 @@ internal class PartsCatalogActions(
     val onBack: () -> Unit,
     val onQueryChange: (String) -> Unit,
     val onCategoryClick: (ItemCategory) -> Unit,
+    val onBrandClick: (String) -> Unit,
     val onClearFilters: () -> Unit,
     val onRefresh: () -> Unit,
     val onOpenPart: (String) -> Unit
@@ -112,6 +115,7 @@ internal fun PartsCatalogContent(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
             )
             CategoryFilterChips(selected = state.category, onClick = actions.onCategoryClick)
+            BrandFilterChips(brands = state.brands, selected = state.brand, onClick = actions.onBrandClick)
 
             if (state.showingCache) {
                 AtelierBanner(
@@ -169,7 +173,7 @@ private fun previewPart(id: String, name: String, stock: String, min: String = "
         minimumStock = BigDecimal(min), unitOfMeasure = "UNIT", status = PartStatus.ACTIVE
     )
 
-private val previewActions = PartsCatalogActions({}, {}, {}, {}, {}, {})
+private val previewActions = PartsCatalogActions({}, {}, {}, {}, {}, {}, {})
 
 @Preview(name = "Catálogo · oscuro", widthDp = 360, heightDp = 900, showBackground = true)
 @Composable

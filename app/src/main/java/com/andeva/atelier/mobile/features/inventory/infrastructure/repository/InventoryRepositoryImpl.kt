@@ -78,15 +78,19 @@ class InventoryRepositoryImpl @Inject constructor(
         return Result.success(Unit)
     }
 
-    override fun observeCatalog(category: ItemCategory?): Flow<List<Part>> =
-        partDao.observeAll(category?.name).map { rows -> rows.map { it.toDomain() } }
+    override fun observeCatalog(category: ItemCategory?, brand: String?): Flow<List<Part>> =
+        partDao.observeAll(category?.name, brand).map { rows -> rows.map { it.toDomain() } }
 
-    override suspend fun searchParts(query: String, category: ItemCategory?): Result<List<Part>> {
+    override fun observeBrands(): Flow<List<String>> = partDao.observeBrands()
+
+    override suspend fun searchParts(query: String, category: ItemCategory?, brand: String?): Result<List<Part>> {
         val text = query.trim()
         val result = apiCall(gson, { inventoryService.getItems(search = text.ifEmpty { null }, category = category?.name, size = SEARCH_SIZE) }) { it }
             .map { dtos -> savePartsFromServer(dtos) }
+            // El backend no filtra por marca (H35): se filtra aquí con lo que devuelve.
+            .map { parts -> if (brand == null) parts else parts.filter { it.brand == brand } }
         if (result.exceptionOrNull() !is IOException) return result
-        return Result.success(partDao.search(text, category?.name).map { it.toDomain() })
+        return Result.success(partDao.search(text, category?.name, brand).map { it.toDomain() })
     }
 
     override suspend fun findBySku(sku: String): Result<Part?> {

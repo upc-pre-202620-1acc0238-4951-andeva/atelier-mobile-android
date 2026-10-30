@@ -12,10 +12,13 @@ interface InventoryRepository {
     /** Recarga el catálogo completo (página por página); con [force] ignora la vigencia de 1 h. */
     suspend fun refreshCatalog(force: Boolean = false): Result<Unit>
 
-    fun observeCatalog(category: ItemCategory?): Flow<List<Part>>
+    fun observeCatalog(category: ItemCategory?, brand: String? = null): Flow<List<Part>>
 
-    /** Por nombre o SKU. Sin red busca en la caché. */
-    suspend fun searchParts(query: String, category: ItemCategory?): Result<List<Part>>
+    /** Marcas distintas del catálogo guardado, en orden alfabético. Vacío mientras el backend no envíe la marca (H35). */
+    fun observeBrands(): Flow<List<String>>
+
+    /** Por nombre o SKU, con categoría y marca opcionales. Sin red busca en la caché. */
+    suspend fun searchParts(query: String, category: ItemCategory?, brand: String? = null): Result<List<Part>>
 
     /** null = no existe (404). Sin red busca en la caché. */
     suspend fun findBySku(sku: String): Result<Part?>
