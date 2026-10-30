@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.tasks.presentation.mytasks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
@@ -23,7 +24,8 @@ import javax.inject.Inject
 class MyTasksViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
     observeMyTasks: ObserveMyTasksUseCase,
-    private val refreshMyTasks: RefreshMyTasksUseCase
+    private val refreshMyTasks: RefreshMyTasksUseCase,
+    connectivity: ConnectivityObserver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyTasksUiState())
@@ -37,6 +39,10 @@ class MyTasksViewModel @Inject constructor(
         }
         viewModelScope.launch {
             observeMyTasks().collect { tasks -> _uiState.update { it.copy(tasks = tasks, isLoaded = true) } }
+        }
+        // D2: si la recarga falló sin red, al volver la conexión se actualiza sola y el aviso se quita.
+        viewModelScope.launch {
+            connectivity.isOnline.collect { online -> if (online && _uiState.value.showingCache) refresh() }
         }
         refresh()
     }

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
@@ -18,11 +19,14 @@ import com.andeva.atelier.mobile.features.tasks.application.StartTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SuggestLaborHoursUseCase
 import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
 import com.andeva.atelier.mobile.features.tasks.domain.InvalidTaskInputException
+import com.andeva.atelier.mobile.features.tasks.domain.LaborTime
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
+import com.andeva.atelier.mobile.features.tasks.domain.PausedElapsedStore
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
+import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.presentation.invalidTaskField
 import com.andeva.atelier.mobile.features.tasks.presentation.toTaskUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.time.Clock
 import javax.inject.Inject
 
 /**
@@ -56,6 +61,9 @@ class TaskDetailViewModel @Inject constructor(
     private val addPart: AddPartToTaskUseCase,
     private val updatePartQuantity: UpdateTaskPartQuantityUseCase,
     private val removePart: RemovePartFromTaskUseCase,
+    private val pausedElapsed: PausedElapsedStore,
+    private val clock: Clock,
+    private val connectivity: ConnectivityObserver,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -81,6 +89,12 @@ class TaskDetailViewModel @Inject constructor(
         viewModelScope.launch {
             observeTask(taskId).collect { task -> _uiState.update { it.copy(task = task) } }
         }
+        // D3: si la pantalla se abrió sin red, al volver la conexión se carga el detalle (repuestos incluidos).
+        viewModelScope.launch {
+            connectivity.isOnline.collect { online ->
+                if (online && _uiState.value.detail == null && !_uiState.value.isLoading) load()
+            }
+        }
         load()
     }
 
@@ -91,7 +105,16 @@ class TaskDetailViewModel @Inject constructor(
             getDetail(taskId)
                 .onSuccess { detail -> _uiState.update { it.copy(isLoading = false, detail = detail) } }
                 .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = e.toTaskUiText()) } }
+            syncPausedElapsed()
         }
+    }
+
+    /** D1: recupera el tiempo guardado al pausar; fuera de una pausa no hay nada que mostrar y se limpia. */
+    private suspend fun syncPausedElapsed() {
+        val paused = _uiState.value.status == TaskStatus.ON_HOLD
+        val seconds = if (paused) pausedElapsed.get(taskId) else null
+        if (!paused) pausedElapsed.clear(taskId)
+        _uiState.update { it.copy(pausedElapsedSeconds = seconds) }
     }
 
     /** US27 E1 y E5: pasa a `IN_PROGRESS`; el cronómetro cuenta desde `startedAt` menos lo pausado. */
@@ -110,8 +133,11 @@ class TaskDetailViewModel @Inject constructor(
     /** US27 E2 y E3: el backend rechaza `END_OF_SHIFT` si el turno sigue vigente y su `message` se muestra. */
     fun onPause(reason: PauseReason) {
         if (!_uiState.value.canPause) return
+        // El tiempo efectivo se calcula antes de pausar: después el backend ya no lo permite deducir.
+        val state = _uiState.value
+        val elapsed = state.startedAt?.let { LaborTime.effectiveSeconds(it, state.totalPausedSeconds, clock.instant()) }
         _uiState.update { it.copy(pauseForm = null) }
-        run(TaskAction.PAUSE) { pauseTask(taskId, reason) }
+        run(TaskAction.PAUSE, frozenAtPause = elapsed) { pauseTask(taskId, reason) }
     }
 
     /** US30: abre el cierre con las horas sugeridas (`startedAt` menos lo pausado). */
@@ -147,8 +173,12 @@ class TaskDetailViewModel @Inject constructor(
         viewModelScope.launch {
             completeTask(taskId, hours, form.notes.trim().ifBlank { null })
                 .onSuccess { detail ->
+                    pausedElapsed.clear(taskId)
                     _uiState.update {
-                        it.copy(busyAction = null, completeForm = null, detail = detail, completed = true)
+                        it.copy(
+                            busyAction = null, completeForm = null, detail = detail, completed = true,
+                            pausedElapsedSeconds = null
+                        )
                     }
                 }
                 .onFailure(::fail)
@@ -299,12 +329,25 @@ class TaskDetailViewModel @Inject constructor(
             }
     }
 
-    private fun run(action: TaskAction, call: suspend () -> Result<TaskDetail>) {
+    private fun run(
+        action: TaskAction,
+        frozenAtPause: Long? = null,
+        call: suspend () -> Result<TaskDetail>
+    ) {
         _uiState.update { it.copy(busyAction = action, notice = null, error = null, invalidField = null) }
         viewModelScope.launch {
             call()
                 .onSuccess { detail ->
-                    _uiState.update { it.copy(busyAction = null, detail = detail, notice = noticeFor(action)) }
+                    // Al pausar se guarda el tiempo efectivo; al reanudar se descarta.
+                    val frozen = if (detail.status == TaskStatus.ON_HOLD) {
+                        frozenAtPause?.also { pausedElapsed.save(taskId, it) }
+                    } else {
+                        pausedElapsed.clear(taskId)
+                        null
+                    }
+                    _uiState.update {
+                        it.copy(busyAction = null, detail = detail, notice = noticeFor(action), pausedElapsedSeconds = frozen)
+                    }
                 }
                 .onFailure(::fail)
         }

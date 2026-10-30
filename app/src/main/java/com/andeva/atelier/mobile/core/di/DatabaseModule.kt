@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.core.di
 import android.content.Context
 import androidx.room3.Room
 import com.andeva.atelier.mobile.core.data.local.AppDatabase
+import com.andeva.atelier.mobile.core.data.local.AppMigrations
 import com.andeva.atelier.mobile.core.data.sync.CacheMaintenanceDao
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataDao
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
@@ -20,7 +21,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME).build()
+        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
+            .addMigrations(*AppMigrations)
+            .build()
 
     @Provides
     fun providePendingOperationDao(db: AppDatabase): PendingOperationDao = db.pendingOperationDao()

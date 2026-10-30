@@ -11,6 +11,9 @@ import com.andeva.atelier.mobile.features.inventory.domain.Part
 data class PartsCatalogUiState(
     val query: String = "",
     val category: ItemCategory? = null,
+    /** Marca elegida y marcas disponibles; sin marcas (H35) no se muestra el filtro. */
+    val brand: String? = null,
+    val brands: List<String> = emptyList(),
     val parts: List<Part> = emptyList(),
     val isLoaded: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -20,5 +23,5 @@ data class PartsCatalogUiState(
     val error: UiText? = null,
     val canRead: Boolean = true
 ) {
-    val hasFilters: Boolean get() = query.isNotBlank() || category != null
+    val hasFilters: Boolean get() = query.isNotBlank() || category != null || brand != null
 }

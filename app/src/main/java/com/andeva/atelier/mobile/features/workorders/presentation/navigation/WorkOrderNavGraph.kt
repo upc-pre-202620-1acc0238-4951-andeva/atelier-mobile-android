@@ -4,8 +4,11 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.WorkOrderDetailScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.finding.ReportFindingScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.intake.IntakeGalleryScreen
+import com.andeva.atelier.mobile.features.workorders.presentation.list.WorkOrdersScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.open.OpenWorkOrderScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.proposals.ProposalsPanelScreen
 import kotlinx.serialization.Serializable
@@ -20,6 +23,14 @@ data class OpenWorkOrderRoute(
     val customerId: String,
     val workOrderId: String? = null
 )
+
+/** Órdenes no cerradas de la sede (`operations:work_orders:read`). */
+@Serializable
+data object WorkOrdersRoute
+
+/** Detalle de una orden con sus tareas; desde aquí el supervisor abre una tarea (US33). */
+@Serializable
+data class WorkOrderDetailRoute(val workOrderId: String)
 
 /** US13: galería pericial de la orden. */
 @Serializable
@@ -47,6 +58,18 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
                     popUpTo<OpenWorkOrderRoute> { inclusive = true }
                 }
             }
+        )
+    }
+    composable<WorkOrdersRoute> {
+        WorkOrdersScreen(
+            onBack = { navController.popBackStack() },
+            onOpenOrder = { workOrderId -> navController.navigate(WorkOrderDetailRoute(workOrderId)) }
+        )
+    }
+    composable<WorkOrderDetailRoute> {
+        WorkOrderDetailScreen(
+            onBack = { navController.popBackStack() },
+            onOpenTask = { workOrderId, taskId -> navController.navigate(TaskDetailRoute(workOrderId, taskId)) }
         )
     }
     composable<IntakeGalleryRoute> {

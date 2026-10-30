@@ -27,7 +27,8 @@ fun PartDto.toEntity(syncedAt: Long) = PartEntity(
     minimumStock = (minimumStock ?: BigDecimal.ZERO).toPlainString(),
     unitOfMeasure = unitOfMeasure.orEmpty(),
     status = status.orEmpty(),
-    syncedAt = syncedAt
+    syncedAt = syncedAt,
+    brand = brand?.trim()?.ifEmpty { null }
 )
 
 /** Los precios del catálogo están en PEN (docs/api/README.md §6). */
@@ -40,7 +41,8 @@ fun PartEntity.toDomain() = Part(
     totalStock = totalStock.toBigDecimalOrNull() ?: BigDecimal.ZERO,
     minimumStock = minimumStock.toBigDecimalOrNull() ?: BigDecimal.ZERO,
     unitOfMeasure = unitOfMeasure.ifEmpty { null },
-    status = status.toEnum<PartStatus>()
+    status = status.toEnum<PartStatus>(),
+    brand = brand
 )
 
 /** Sin `itemId` en la respuesta se usa el repuesto consultado, para que caiga en su alcance `batches:{itemId}`. */

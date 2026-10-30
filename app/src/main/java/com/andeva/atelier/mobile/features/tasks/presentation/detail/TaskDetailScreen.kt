@@ -136,11 +136,13 @@ internal fun TaskDetailContent(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            state.task?.let { task -> TaskHeader(task, state) }
+            if (state.task != null || state.detail != null) TaskHeader(state.task, state)
             ChronometerTimer(
                 startedAt = state.startedAt,
                 totalPausedSeconds = state.totalPausedSeconds,
-                running = state.status == TaskStatus.IN_PROGRESS
+                running = state.status == TaskStatus.IN_PROGRESS,
+                paused = state.status == TaskStatus.ON_HOLD,
+                pausedElapsedSeconds = state.pausedElapsedSeconds
             )
             state.notice?.let {
                 AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
@@ -155,7 +157,8 @@ internal fun TaskDetailContent(
                     kind = BannerKind.Wait
                 )
             }
-            if (!state.canTrackTime && !state.canComplete) {
+            // Solo si no hay ninguna acción posible: un supervisor sin cronómetro sí puede imputar y devolver repuestos.
+            if (!state.canTrackTime && !state.canComplete && !state.canChargeParts && !state.canEditParts) {
                 AtelierBanner(
                     message = stringResource(R.string.reception_no_permission),
                     icon = Icons.Outlined.Info,
@@ -166,12 +169,21 @@ internal fun TaskDetailContent(
             if (state.detail != null || state.canChargeParts) {
                 TaskPartsSection(
                     products = state.products,
+                    available = state.partsAvailable,
                     canCharge = state.canOpenCharge,
                     canEdit = state.canEditParts,
                     isBusy = state.isBusy,
                     onCharge = actions.onChargeClick,
                     onEdit = actions.onEditPartClick,
                     onReturn = actions.onReturnPartClick
+                )
+            }
+            if (!state.partsAvailable && !state.isLoading) {
+                AtelierButton(
+                    text = stringResource(R.string.branch_retry),
+                    onClick = actions.onRetry,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = AtelierButtonStyle.Text
                 )
             }
             if (state.task == null && state.error != null) {
@@ -227,27 +239,39 @@ internal fun TaskDetailContent(
 }
 
 @Composable
-private fun TaskHeader(task: Task, state: TaskDetailUiState) {
+private fun TaskHeader(task: Task?, state: TaskDetailUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AtelierChip(
             text = stringResource(taskStatusLabelRes(state.status, state.holdReason)),
             kind = taskStatusChipKind(state.status, state.holdReason)
         )
+        // La tarea de otro mecánico (supervisor) no está en Room: sin placa, el título es el servicio.
+        val plate = task?.plate
         Text(
-            text = task.plate?.let { stringResource(R.string.task_card_plate, it) }
-                ?: stringResource(R.string.task_card_no_plate),
+            text = when {
+                plate != null -> stringResource(R.string.task_card_plate, plate)
+                task != null -> stringResource(R.string.task_card_no_plate)
+                else -> state.detail?.serviceName ?: stringResource(R.string.task_detail_title)
+            },
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
-        state.detail?.serviceName?.let {
+        state.detail?.serviceName?.takeIf { task != null }?.let {
             Text(text = it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+        state.detail?.mechanicName?.let {
+            Text(
+                text = stringResource(R.string.order_task_mechanic, it),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.inkSecondary
+            )
         }
         Text(
             text = state.description,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
-        task.bayName?.let {
+        task?.bayName?.let {
             Text(
                 text = stringResource(R.string.task_card_bay, it),
                 style = MaterialTheme.typography.bodyMedium,

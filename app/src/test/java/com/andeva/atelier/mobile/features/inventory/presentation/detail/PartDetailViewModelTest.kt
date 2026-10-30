@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.features.inventory.presentation.detail
 
 import androidx.lifecycle.SavedStateHandle
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.Money
@@ -19,6 +20,7 @@ import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -36,6 +38,8 @@ class PartDetailViewModelTest {
     @get:Rule val mainRule = MainDispatcherRule()
 
     private val repository = mockk<InventoryRepository>()
+    private val online = MutableStateFlow(true)
+    private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
 
     private val repuesto = Part(
         id = "p1", name = "Pastillas", sku = "BRK-001", category = ItemCategory.BRAKES,
@@ -66,6 +70,7 @@ class PartDetailViewModelTest {
             ObservePartUseCase(repository),
             ObservePartBatchesUseCase(repository),
             RefreshPartBatchesUseCase(repository),
+            connectivity,
             SavedStateHandle(mapOf("partId" to "p1"))
         )
     }
@@ -160,5 +165,19 @@ class PartDetailViewModelTest {
         settle()
 
         assertFalse(vm.uiState.value.canReadBatches)
+    }
+
+    @Test
+    fun `al volver la red recarga los lotes y quita el aviso`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.refreshBatches("p1", false) } returnsMany listOf(Result.failure(IOException()), Result.success(Unit))
+        online.value = false
+        val vm = viewModel(listOf(lote("a", "4", "2026-03-10T12:00:00Z")))
+        settle()
+        assertTrue(vm.uiState.value.showingCache)
+
+        online.value = true
+        settle()
+
+        assertFalse(vm.uiState.value.showingCache)
     }
 }

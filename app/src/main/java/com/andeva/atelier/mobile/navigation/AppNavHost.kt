@@ -29,6 +29,7 @@ import com.andeva.atelier.mobile.features.inventory.presentation.navigation.inve
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TasksNavGraphRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.tasksNavGraph
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrdersRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.workOrderNavGraph
 import kotlinx.serialization.Serializable
 
@@ -92,6 +93,7 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
             DebugEntryPoints(
                 onOpenTasks = { navController.navigate(TasksNavGraphRoute) },
                 onOpenCatalog = { navController.navigate(InventoryNavGraphRoute) },
+                onOpenOrders = { navController.navigate(WorkOrdersRoute) },
                 modifier = Modifier.align(Alignment.BottomEnd)
             )
         }

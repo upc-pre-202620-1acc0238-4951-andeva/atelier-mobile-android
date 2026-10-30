@@ -23,7 +23,9 @@ data class Part(
     val totalStock: BigDecimal,
     val minimumStock: BigDecimal,
     val unitOfMeasure: String?,
-    val status: PartStatus?
+    val status: PartStatus?,
+    /** Marca del repuesto. El backend aún no la envía (H35): null hasta entonces y el filtro por marca no se muestra. */
+    val brand: String? = null
 ) {
     /** Existencia agotada (US31 E2): la UI la resalta y bloquea su selección. */
     val isOutOfStock: Boolean get() = totalStock <= BigDecimal.ZERO

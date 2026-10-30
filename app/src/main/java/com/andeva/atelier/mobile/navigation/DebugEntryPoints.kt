@@ -20,6 +20,7 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 internal fun DebugEntryPoints(
     onOpenTasks: () -> Unit,
     onOpenCatalog: () -> Unit,
+    onOpenOrders: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -31,6 +32,11 @@ internal fun DebugEntryPoints(
         AtelierButton(
             text = stringResource(R.string.debug_open_tasks),
             onClick = onOpenTasks,
+            style = AtelierButtonStyle.Tonal
+        )
+        AtelierButton(
+            text = stringResource(R.string.debug_open_orders),
+            onClick = onOpenOrders,
             style = AtelierButtonStyle.Tonal
         )
         AtelierButton(

@@ -1,5 +1,6 @@
 package com.andeva.atelier.mobile.features.tasks.presentation.mytasks
 
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.Permission
@@ -33,6 +34,8 @@ class MyTasksViewModelTest {
 
     private val repository = mockk<TaskRepository>()
     private val tasks = MutableStateFlow<List<Task>>(emptyList())
+    private val online = MutableStateFlow(true)
+    private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
 
     private fun tarea(id: String, status: TaskStatus = TaskStatus.ASSIGNED) = Task(
         id = TaskId(id), workOrderId = "wo1", workOrderNumber = 10, workOrderStatus = null, vehicleId = "v1",
@@ -50,7 +53,7 @@ class MyTasksViewModelTest {
         val observeSession = mockk<ObserveSessionUseCase>()
         every { observeSession() } returns flowOf(session)
         every { repository.observeMyTasks() } returns tasks
-        return MyTasksViewModel(observeSession, ObserveMyTasksUseCase(repository), RefreshMyTasksUseCase(repository))
+        return MyTasksViewModel(observeSession, ObserveMyTasksUseCase(repository), RefreshMyTasksUseCase(repository), connectivity)
     }
 
     private fun settle() = mainRule.dispatcher.scheduler.advanceUntilIdle()
@@ -120,5 +123,32 @@ class MyTasksViewModelTest {
         settle()
         assertTrue(vm.uiState.value.isLoaded)
         assertTrue(vm.uiState.value.tasks.isEmpty())
+    }
+
+    @Test
+    fun `al volver la red recarga sola y quita el aviso de sin conexion`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.refreshMyTasks() } returnsMany listOf(Result.failure(IOException()), Result.success(Unit))
+        online.value = false
+        val vm = viewModel()
+        settle()
+        assertTrue(vm.uiState.value.showingCache)
+
+        online.value = true
+        settle()
+
+        assertFalse(vm.uiState.value.showingCache)
+        assertNull(vm.uiState.value.error)
+        coVerify(exactly = 2) { repository.refreshMyTasks() }
+    }
+
+    @Test
+    fun `con red desde el inicio no recarga una segunda vez`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.refreshMyTasks() } returns Result.success(Unit)
+        viewModel()
+        settle()
+        online.value = false
+        online.value = true
+        settle()
+        coVerify(exactly = 1) { repository.refreshMyTasks() }
     }
 }

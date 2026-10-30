@@ -56,6 +56,13 @@ internal fun PartCard(part: Part, onClick: () -> Unit, modifier: Modifier = Modi
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            part.brand?.let {
+                Text(
+                    text = stringResource(R.string.part_brand, it),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AtelierTheme.colors.inkSecondary
+                )
+            }
             Text(
                 text = stringResource(R.string.part_sku, part.sku),
                 style = MaterialTheme.typography.bodyMedium,

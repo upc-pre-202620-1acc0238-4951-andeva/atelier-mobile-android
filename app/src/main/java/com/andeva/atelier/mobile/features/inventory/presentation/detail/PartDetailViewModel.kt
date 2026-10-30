@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.inventory.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.inventory.application.ObservePartBatchesUseCase
@@ -28,6 +29,7 @@ class PartDetailViewModel @Inject constructor(
     observePart: ObservePartUseCase,
     observeBatches: ObservePartBatchesUseCase,
     private val refreshBatches: RefreshPartBatchesUseCase,
+    connectivity: ConnectivityObserver,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -51,6 +53,10 @@ class PartDetailViewModel @Inject constructor(
                 val fifo = batches.sortedBy { it.arrivalDate ?: Instant.MAX }
                 _uiState.update { it.copy(batches = fifo) }
             }
+        }
+        // D2: al volver la red tras una recarga fallida, se actualiza sola y el aviso se quita.
+        viewModelScope.launch {
+            connectivity.isOnline.collect { online -> if (online && _uiState.value.showingCache) refresh() }
         }
         refresh()
     }

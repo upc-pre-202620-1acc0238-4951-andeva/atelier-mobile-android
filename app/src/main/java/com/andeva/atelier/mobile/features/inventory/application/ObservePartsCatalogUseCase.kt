@@ -8,5 +8,6 @@ import javax.inject.Inject
 class ObservePartsCatalogUseCase @Inject constructor(
     private val inventoryRepository: InventoryRepository
 ) {
-    operator fun invoke(category: ItemCategory? = null) = inventoryRepository.observeCatalog(category)
+    operator fun invoke(category: ItemCategory? = null, brand: String? = null) =
+        inventoryRepository.observeCatalog(category, brand)
 }

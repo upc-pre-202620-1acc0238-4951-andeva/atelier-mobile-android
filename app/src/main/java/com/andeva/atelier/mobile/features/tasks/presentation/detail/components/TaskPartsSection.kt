@@ -29,6 +29,7 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 @Composable
 internal fun TaskPartsSection(
     products: List<TaskProduct>,
+    available: Boolean,
     canCharge: Boolean,
     canEdit: Boolean,
     isBusy: Boolean,
@@ -43,14 +44,21 @@ internal fun TaskPartsSection(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
-        if (products.isEmpty()) {
+        if (!available) {
+            // D3: sin el detalle en línea no se sabe qué repuestos hay; no se dice que no hay ninguno.
+            Text(
+                text = stringResource(R.string.task_parts_online_only),
+                style = MaterialTheme.typography.bodyLarge,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        } else if (products.isEmpty()) {
             Text(
                 text = stringResource(R.string.task_parts_empty),
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
         }
-        products.forEach { product ->
+        if (available) products.forEach { product ->
             ProductRow(product, canEdit, isBusy, onEdit = { onEdit(product) }, onReturn = { onReturn(product) })
         }
         if (canCharge) {
