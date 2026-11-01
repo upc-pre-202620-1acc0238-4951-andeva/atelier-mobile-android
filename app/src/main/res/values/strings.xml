@@ -501,4 +501,53 @@
     <string name="order_status_canceled">Cancelada</string>
     <string name="order_status_unknown">Sin estado</string>
 
+    <!-- EP05: US22 liquidación en cascada, US23 repuestos en proforma, US24 PDF y US25 resolución -->
+    <string name="order_code_format">OT-%1$04d</string>
+    <string name="order_status_waiting_customer">Esperando al cliente</string>
+    <string name="order_task_labor">Mano de obra</string>
+    <string name="order_task_hours">%1$d h</string>
+    <string name="order_task_minutes">%1$d min</string>
+    <string name="order_task_hours_minutes">%1$d h %2$d min</string>
+    <string name="order_part_line_detail">%1$s × %2$s</string>
+    <string name="order_add_part">+ Agregar repuesto</string>
+    <string name="order_add_task">+ Agregar tarea</string>
+    <string name="order_edit_labor">Editar mano de obra</string>
+    <string name="order_open_task_detail">Abrir cronómetro y tarea</string>
+    <string name="order_add_task_title">Agregar tarea</string>
+    <string name="order_add_task_service">Servicio</string>
+    <string name="order_add_task_description">Descripción de la tarea</string>
+    <string name="order_add_task_price">Mano de obra sin IGV</string>
+    <string name="order_add_task_confirm">Agregar a la orden</string>
+    <string name="order_edit_labor_title">Editar mano de obra</string>
+    <string name="order_edit_labor_confirm">Guardar precio</string>
+    <string name="order_field_service">Elige un servicio del catálogo.</string>
+    <string name="order_field_description">Escribe la descripción de la tarea.</string>
+    <string name="order_field_price">Escribe un monto mayor o igual a 0.</string>
+    <string name="order_task_added">Tarea agregada y totales recalculados.</string>
+    <string name="order_task_updated">Mano de obra actualizada y totales recalculados.</string>
+    <string name="quotation_subtotal">Subtotal</string>
+    <string name="quotation_igv">IGV 18 %%</string>
+    <string name="quotation_total">Total</string>
+    <string name="quotation_generate_pdf">Generar proforma</string>
+    <string name="quotation_share_pdf">Compartir proforma PDF</string>
+    <string name="quotation_send_email">Enviar proforma por correo</string>
+    <string name="quotation_pdf_ready">Proforma generada y lista para compartir.</string>
+    <string name="quotation_sent_notice">Proforma enviada a %1$s.</string>
+    <string name="quotation_share_chooser">Compartir proforma</string>
+    <string name="quotation_no_pdf_app">No hay una aplicación instalada para abrir o compartir el PDF.</string>
+    <string name="quotation_customer_question">¿Qué respondió el cliente?</string>
+    <string name="quotation_approve_action">Aceptó. Iniciar trabajos</string>
+    <string name="quotation_reject_action">Rechazó. Cancelar orden</string>
+    <string name="quotation_approved_notice">Orden en progreso. Los técnicos ya pueden empezar.</string>
+    <string name="quotation_rejected_notice">Orden cancelada. Los repuestos reservados volvieron al inventario.</string>
+    <string name="quotation_reject_title">Cancelar la orden</string>
+    <string name="quotation_reject_body">Los repuestos reservados volverán al inventario.</string>
+    <string name="quotation_reject_reason_label">Motivo del rechazo</string>
+    <string name="quotation_reject_reason_hint">Precio fuera de presupuesto</string>
+    <string name="quotation_reject_field_error">Escribe el motivo del rechazo (máximo 1000 caracteres).</string>
+    <string name="quotation_reject_confirm">Cancelar orden</string>
+    <string name="quotation_reject_back">Volver</string>
+    <string name="order_open_proposals">Ver propuestas de hallazgos</string>
+    <string name="order_open_gallery">Ver fotos de recepción</string>
+
 </resources>

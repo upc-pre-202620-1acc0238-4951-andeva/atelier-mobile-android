@@ -69,14 +69,21 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
     composable<WorkOrderDetailRoute> {
         WorkOrderDetailScreen(
             onBack = { navController.popBackStack() },
-            onOpenTask = { workOrderId, taskId -> navController.navigate(TaskDetailRoute(workOrderId, taskId)) }
+            onOpenTask = { workOrderId, taskId -> navController.navigate(TaskDetailRoute(workOrderId, taskId)) },
+            onOpenProposals = { workOrderId -> navController.navigate(ProposalsPanelRoute(workOrderId)) },
+            onOpenGallery = { workOrderId -> navController.navigate(IntakeGalleryRoute(workOrderId)) }
         )
     }
-    composable<IntakeGalleryRoute> {
+    composable<IntakeGalleryRoute> { entry ->
+        val workOrderId = entry.toRoute<IntakeGalleryRoute>().workOrderId
         IntakeGalleryScreen(
             onBack = { navController.popBackStack() },
-            onDone = { navController.popBackStack() },
-            onOpenProposals = { workOrderId -> navController.navigate(ProposalsPanelRoute(workOrderId)) }
+            onDone = {
+                navController.navigate(WorkOrderDetailRoute(workOrderId)) {
+                    popUpTo<IntakeGalleryRoute> { inclusive = true }
+                }
+            },
+            onOpenProposals = { id -> navController.navigate(ProposalsPanelRoute(id)) }
         )
     }
     composable<ProposalsPanelRoute> { entry ->
