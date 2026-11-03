@@ -154,6 +154,8 @@ Decisiones de flujo:
 
 Núcleo extendido: `BusinessTime` (día de Lima), `ClockModule` (`Clock` inyectable), `PendingOperationDao.findByDedupeKey` / `observeByDedupeKey`, y `EmployeeService` movido de `auth` a `core/data/remote/employee/` (lo usan `auth` y `attendance`).
 
+**Presentación de `main` (barra de pestañas):** `AppNavHost` envuelve el `NavHost` en un `Scaffold` y dibuja `MainNavigationBar` (lámpara deslizante, 80 dp) solo sobre la pantalla principal de cada pestaña; los detalles la ocultan. Las pestañas salen de `MainTab.tabsFor(session)` por permiso: con `operations:tasks:track_time` → Inicio · Tareas · (Órdenes si `work_orders:create`) · OBD-II (si `canUseTelemetry()`) · Perfil; sin él → Inicio · Órdenes · Recepción · Stock · Ajustes. Inicio muestra por ahora la asistencia (B1/B2 pendientes); OBD-II es un marcador hasta que `diagnostics` tenga presentación; Perfil/Ajustes muestra datos de la sesión, contador de pendientes y cerrar sesión (K1). Se retiró `DebugEntryPoints`. Pendiente: B1/B2, pantalla de "Pendientes de sincronizar" (*Reintentar*/*Descartar*), aviso de plan, `PushInbox`, apariencia/idioma, y mostrar tareas/inventario al técnico fuera de la barra.
+
 **Pendiente de este paso:** corregir y verificar cualquier error de compilación; ejecutar `./gradlew assembleDebug testDebugUnitTest`; probar contra el backend en un emulador el ingreso/salida, los permisos y la ubicación, el turno, el historial, los descargos y la sincronización offline. `status-today` sin jornada responde 404 (hueco H2, cerrado en [03](03-traceability.md#huecos-cerrados)).
 ## Paso 5 — `tasks` ✅
 
