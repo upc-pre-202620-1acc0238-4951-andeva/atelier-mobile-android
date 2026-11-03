@@ -476,10 +476,26 @@
     <string name="return_body">Las unidades vuelven al lote del que salieron y se rebaja el costo imputado en la orden.</string>
     <string name="return_confirm">Devolver repuesto</string>
 
-    <!-- Acceso provisional (solo debug) hasta integrar main -->
-    <string name="debug_open_tasks">Mis tareas</string>
-    <string name="debug_open_catalog">Repuestos</string>
-    <string name="debug_open_orders">Órdenes</string>
+    <!-- main: barra de pestañas, OBD-II y perfil -->
+    <string name="main_tab_home">Inicio</string>
+    <string name="main_tab_tasks">Tareas</string>
+    <string name="main_tab_orders">Órdenes</string>
+    <string name="main_tab_reception">Recepción</string>
+    <string name="main_tab_obd">OBD-II</string>
+    <string name="main_tab_stock">Stock</string>
+    <string name="main_tab_profile">Perfil</string>
+    <string name="main_tab_settings">Ajustes</string>
+    <string name="main_obd_title">Escáner no conectado</string>
+    <string name="main_obd_subtitle">Enciende tu escáner OBD-II y acércalo al teléfono.</string>
+    <string name="profile_sign_out">Cerrar sesión</string>
+    <string name="profile_sign_out_title">¿Cerrar sesión?</string>
+    <string name="profile_sign_out_message">Los registros pendientes de sincronizar se conservan cifrados en el teléfono.</string>
+    <string name="profile_version">Atelier Workshop Mobile · versión %1$s</string>
+    <string name="common_cancel">Cancelar</string>
+    <plurals name="profile_pending_count">
+        <item quantity="one">%1$d registro pendiente de sincronizar</item>
+        <item quantity="other">%1$d registros pendientes de sincronizar</item>
+    </plurals>
 
     <!-- Órdenes de la sede: acceso del supervisor a las tareas (US33) -->
     <string name="orders_title">Órdenes de la sede</string>
