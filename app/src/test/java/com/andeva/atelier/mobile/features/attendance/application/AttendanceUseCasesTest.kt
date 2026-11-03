@@ -5,6 +5,9 @@ import com.andeva.atelier.mobile.features.attendance.domain.AttendanceRepository
 import com.andeva.atelier.mobile.features.attendance.domain.Branch
 import com.andeva.atelier.mobile.features.attendance.domain.DeviceLocation
 import com.andeva.atelier.mobile.features.attendance.domain.InvalidJustificationException
+import com.andeva.atelier.mobile.features.attendance.domain.LocationOutsideGeofenceException
+import com.andeva.atelier.mobile.features.attendance.domain.MockLocationException
+import com.andeva.atelier.mobile.features.attendance.domain.BranchGeofenceUnavailableException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationPermissionDeniedException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationProvider
 import com.andeva.atelier.mobile.features.attendance.domain.LocationTooInaccurateException
@@ -31,27 +34,40 @@ class AttendanceUseCasesTest {
     private val branch = Branch("b1", "Sede Lima", -12.0464, -77.0428, 100.0, true)
 
     @Test
-    fun `fuera de la geocerca igual se envia y avisa la distancia`() = runTest {
+    fun `ubicacion dentro de geocerca permite registrar ingreso`() = runTest {
+        location = Result.success(DeviceLocation(-12.0464, -77.0428, 5f, isMock = false))
         coEvery { repository.findBranch("b1") } returns branch
         coEvery { repository.clockIn("b1", "s1", any()) } returns Result.success(SubmitOutcome.Queued)
 
         val result = clockIn("b1", "s1").getOrThrow()
 
         assertEquals(SubmitOutcome.Queued, result.outcome)
-        assertFalse(result.geofence!!.isInside)
-        assertTrue(result.geofence!!.distanceMeters > 300)
+        assertTrue(result.geofence!!.isInside)
         coVerify { repository.clockIn("b1", "s1", any()) }
     }
 
     @Test
-    fun `ubicacion simulada se marca y sin sede en cache no hay aviso`() = runTest {
+    fun `ubicacion fuera de geocerca bloquea registro`() = runTest {
+        location = Result.success(DeviceLocation(-12.0500, -77.0428, 12f, isMock = false))
+        coEvery { repository.findBranch("b1") } returns branch
+
+        val error = clockIn("b1", "s1").exceptionOrNull()
+
+        assertTrue(error is LocationOutsideGeofenceException)
+        assertTrue((error as LocationOutsideGeofenceException).distanceMeters > 100)
+        coVerify(exactly = 0) { repository.clockIn(any(), any(), any()) }
+    }
+
+    @Test
+    fun `ubicacion simulada y geocerca no cacheada bloquean registro`() = runTest {
         location = Result.success(DeviceLocation(-12.0464, -77.0428, 5f, isMock = true))
         coEvery { repository.findBranch("b1") } returns branch
-        coEvery { repository.clockIn(any(), any(), any()) } returns Result.success(SubmitOutcome.Queued)
-        assertTrue(clockIn("b1", "s1").getOrThrow().geofence!!.isMock)
+        assertTrue(clockIn("b1", "s1").exceptionOrNull() is MockLocationException)
 
+        location = Result.success(DeviceLocation(-12.0464, -77.0428, 5f, isMock = false))
         coEvery { repository.findBranch("b1") } returns null
-        assertNull(clockIn("b1", "s1").getOrThrow().geofence)
+        assertTrue(clockIn("b1", "s1").exceptionOrNull() is BranchGeofenceUnavailableException)
+        coVerify(exactly = 0) { repository.clockIn(any(), any(), any()) }
     }
 
     @Test

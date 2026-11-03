@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Lo que la app muestra de la geocerca. Es solo un aviso: la validación real la hace el backend (422). */
+/** Resultado local de Haversine. El backend repite la validación como autoridad final (422). */
 data class GeofenceCheck(
     val distanceMeters: Double,
     val isInside: Boolean,

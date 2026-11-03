@@ -22,6 +22,9 @@ import com.andeva.atelier.mobile.features.attendance.domain.LocationProvider
 import com.andeva.atelier.mobile.features.attendance.domain.AttendanceValidation
 import com.andeva.atelier.mobile.features.attendance.domain.LocationPermissionDeniedException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationTooInaccurateException
+import com.andeva.atelier.mobile.features.attendance.domain.LocationOutsideGeofenceException
+import com.andeva.atelier.mobile.features.attendance.domain.MockLocationException
+import com.andeva.atelier.mobile.features.attendance.domain.BranchGeofenceUnavailableException
 import com.andeva.atelier.mobile.features.attendance.domain.LocationUnavailableException
 import com.andeva.atelier.mobile.features.attendance.domain.MissingAssignmentException
 import com.andeva.atelier.mobile.features.attendance.domain.SubmitOutcome
@@ -121,10 +124,18 @@ class AttendanceViewModel @Inject constructor(
             _uiState.update { it.copy(isLocating = true, error = null, locationWarning = null) }
             locationProvider.currentLocation()
                 .onSuccess { location ->
+                    val assignedBranch = _uiState.value.schedule?.branch
+                    val geofence = assignedBranch?.let { com.andeva.atelier.mobile.features.attendance.domain.Geofence.check(it, location) }
                     val warning = when {
-                        location.isMock -> UiText.Resource(R.string.attendance_mock_location_warning)
+                        location.isMock -> UiText.Resource(R.string.attendance_mock_location_blocked)
                         !AttendanceValidation.isAccurate(location) ->
                             UiText.Resource(R.string.attendance_location_inaccurate, location.accuracyMeters.toInt())
+                        assignedBranch == null -> UiText.Resource(R.string.attendance_branch_geofence_unavailable)
+                        geofence != null && !geofence.isInside -> UiText.Resource(
+                            R.string.attendance_outside_geofence_blocked,
+                            geofence.distanceMeters.toInt(),
+                            assignedBranch.geofenceRadiusMeters.toInt()
+                        )
                         else -> null
                     }
                     _uiState.update { it.copy(deviceLocation = location, locationWarning = warning) }
@@ -205,6 +216,13 @@ class AttendanceViewModel @Inject constructor(
         is LocationUnavailableException -> UiText.Resource(R.string.attendance_location_unavailable)
         is LocationTooInaccurateException -> UiText.Resource(R.string.attendance_location_inaccurate, accuracyMeters.toInt())
         is MissingAssignmentException -> UiText.Resource(R.string.attendance_missing_assignment)
+        is LocationOutsideGeofenceException -> UiText.Resource(
+            R.string.attendance_outside_geofence_blocked,
+            distanceMeters.toInt(),
+            radiusMeters.toInt()
+        )
+        is MockLocationException -> UiText.Resource(R.string.attendance_mock_location_blocked)
+        is BranchGeofenceUnavailableException -> UiText.Resource(R.string.attendance_branch_geofence_unavailable)
         is InvalidJustificationException -> UiText.Resource(R.string.attendance_justification_invalid)
         else -> toUiText()
     }

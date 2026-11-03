@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +44,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +74,7 @@ import com.andeva.atelier.mobile.features.attendance.domain.Geofence
 import com.andeva.atelier.mobile.features.attendance.domain.JustificationStatus
 import com.andeva.atelier.mobile.features.attendance.domain.TodayAttendance
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -84,6 +90,8 @@ private val TimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.forLangu
 @Composable
 fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedDay by remember { mutableStateOf(DayOfWeek.from(LocalDate.now(LimaZone))) }
+    var showClockOutConfirmation by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val locationPermissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
     val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -106,7 +114,10 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
     val colors = AtelierTheme.colors
     val isQueued = state.today is TodayAttendance.ClockInQueued || state.today is TodayAttendance.ClockOutQueued
     val hasClockedIn = state.today is TodayAttendance.ClockedIn || state.today is TodayAttendance.ClockInQueued
-    val canMarkIn = state.session?.has(Permission.ATTENDANCE_CLOCK_IN) == true && state.canClockIn
+    val canMarkIn = state.session?.has(Permission.ATTENDANCE_CLOCK_IN) == true &&
+        state.canClockIn && (
+            location == null || (geofence?.isInside == true && !location.isMock && location.accuracyMeters <= 50f)
+        )
     val canMarkOut = state.session?.has(Permission.ATTENDANCE_CLOCK_OUT) == true && state.canClockOut
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
@@ -260,22 +271,36 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
                     Text(stringResource(R.string.attendance_weekly_schedule), style = MaterialTheme.typography.titleMedium)
                 }
                 item {
-                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            schedule.days.forEachIndexed { index, day ->
-                                Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(dayName(day.dayOfWeek), style = MaterialTheme.typography.bodyMedium)
-                                    StatusPill(
-                                        text = if (day.isWorkDay) stringResource(R.string.attendance_work_day) else stringResource(R.string.attendance_rest_day),
-                                        background = if (day.isWorkDay) colors.infoContainer else colors.idleContainer,
-                                        foreground = if (day.isWorkDay) colors.primaryText else colors.muted
-                                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(schedule.days) { day ->
+                                FilterChip(
+                                    selected = selectedDay == day.dayOfWeek,
+                                    onClick = { selectedDay = day.dayOfWeek },
+                                    label = { Text(dayName(day.dayOfWeek).take(3)) }
+                                )
+                            }
+                        }
+                        val day = schedule.days.first { it.dayOfWeek == selectedDay }
+                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(dayName(day.dayOfWeek), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                StatusPill(
+                                    text = if (day.isWorkDay) stringResource(R.string.attendance_work_day) else stringResource(R.string.attendance_rest_day),
+                                    background = if (day.isWorkDay) colors.infoContainer else colors.idleContainer,
+                                    foreground = if (day.isWorkDay) colors.primaryText else colors.muted
+                                )
+                                if (day.isWorkDay) {
+                                    Text(stringResource(
+                                        R.string.attendance_selected_day_hours,
+                                        schedule.shift.startTime.format(TimeFormatter),
+                                        schedule.shift.endTime.format(TimeFormatter)
+                                    ))
+                                    Text(stringResource(R.string.attendance_grace_period, schedule.shift.gracePeriodMinutes))
+                                    Text(schedule.branch?.name ?: stringResource(R.string.attendance_branch_unavailable))
+                                } else {
+                                    Text(stringResource(R.string.attendance_selected_day_rest))
                                 }
-                                if (index != schedule.days.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             }
                         }
                     }
@@ -330,7 +355,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
                         if (state.session?.has(Permission.ATTENDANCE_CLOCK_OUT) == true && (state.today is TodayAttendance.ClockedIn || state.today is TodayAttendance.ClockInQueued)) {
                             AtelierButton(
                                 text = stringResource(R.string.attendance_clock_out),
-                                onClick = viewModel::clockOut,
+                                onClick = { showClockOutConfirmation = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 style = AtelierButtonStyle.Tonal,
                                 enabled = canMarkOut,
@@ -386,6 +411,28 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
                 }
             },
             dismissButton = { TextButton(onClick = viewModel::cancelJustification) { Text(stringResource(R.string.attendance_cancel)) } }
+        )
+    }
+
+    if (showClockOutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClockOutConfirmation = false },
+            title = { Text(stringResource(R.string.attendance_clock_out_confirm_title)) },
+            text = { Text(stringResource(R.string.attendance_clock_out_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClockOutConfirmation = false
+                        viewModel.clockOut()
+                    },
+                    enabled = !state.isSubmitting
+                ) { Text(stringResource(R.string.attendance_clock_out_confirm_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClockOutConfirmation = false }) {
+                    Text(stringResource(R.string.attendance_cancel))
+                }
+            }
         )
     }
 }

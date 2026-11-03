@@ -550,4 +550,12 @@
     <string name="order_open_proposals">Ver propuestas de hallazgos</string>
     <string name="order_open_gallery">Ver fotos de recepción</string>
 
+    <string name="attendance_outside_geofence_blocked">No puedes marcar fuera de la geocerca: estás a %1$d m de la sede y el radio permitido es %2$d m.</string>
+    <string name="attendance_mock_location_blocked">No se permite marcar con una ubicación simulada. Desactiva la aplicación de ubicación ficticia e inténtalo de nuevo.</string>
+    <string name="attendance_branch_geofence_unavailable">No se pudo validar la geocerca de tu sede porque no está disponible sin conexión. Conéctate y actualiza la información antes de marcar.</string>
+    <string name="attendance_selected_day_hours">Horario asignado: %1$s – %2$s</string>
+    <string name="attendance_selected_day_rest">No tienes turno asignado para este día.</string>
+    <string name="attendance_clock_out_confirm_title">Confirmar salida</string>
+    <string name="attendance_clock_out_confirm_message">¿Deseas cerrar tu jornada laboral? El sistema registrará la hora de salida y calculará las horas regulares y el sobretiempo.</string>
+    <string name="attendance_clock_out_confirm_action">Confirmar salida</string>
 </resources>
