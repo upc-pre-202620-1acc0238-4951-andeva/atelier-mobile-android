@@ -280,7 +280,7 @@ private fun GoneStep(problem: InvitationProblem?) {
 
 /** Regla de contraseña: verde y rellena al cumplirse, gris y vacía mientras no. Lleva texto, no solo color. */
 @Composable
-private fun PasswordRule(text: String, met: Boolean) {
+internal fun PasswordRule(text: String, met: Boolean) {
     val atelier = AtelierTheme.colors
     val icon: ImageVector = if (met) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked
     val stateText = stringResource(if (met) R.string.auth_rule_met else R.string.auth_rule_pending)

@@ -23,7 +23,7 @@ Reglas para todas las sesiones:
 | --- | --- | --- | --- |
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
 | 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
-| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` con A5 login, A3 registro por invitación, A4 código y A5b elegir sede (falta A6 recuperar, Google y probar con backend) | `feature/auth` |
+| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` con A5 login, A3 registro por invitación, A4 código, A5b elegir sede y A6 recuperar contraseña (faltan Google y probar con backend) | `feature/auth`, `login` |
 | 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
 | 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
 | 5 | `tasks` — tareas del mecánico | ✅ Hecho; `presentation` de US26, US27 y US33 entregada (faltan fotos de desmontaje, suspensión y probar con backend) | `feature/tasks`, `feature/tasks-inventory-ui` |
@@ -82,7 +82,7 @@ Decisiones de flujo (contrato real, no el de la galería):
 - **A3 necesita el enlace:** no hay deep link (H1), así que A3 empieza pidiendo pegar el enlace o el token (paso añadido a la galería). `RegisterRoute(token)` queda listo para el deep link.
 - **A3 muestra el rol** de la invitación en lugar de la fecha de vencimiento: `GET /invitations/validate` no devuelve `expiresAt`.
 - **Contraseña:** además de 8–64 caracteres (backend), la UI exige una mayúscula y confirmación, como la galería.
-- **"¿Olvidaste tu contraseña?"** solo se dibuja si se pasa `onForgotPassword` (pendiente A6).
+- **"¿Olvidaste tu contraseña?"** solo se dibuja si se pasa `onForgotPassword`; `authNavGraph` ya lo conecta con A6.
 - **A5b Elegir sede (US03):** solo la ven las cuentas que entraron sin perfil laboral (H33 de [03](03-traceability.md#huecos-abiertos)). `AppNavHost` la muestra antes de `attendance` cuando `Session.needsBranchChoice`. La sede elegida va en `SessionManager.SELECTED_BRANCH_ID` (el perfil laboral no se toca, así un 404 posterior no la borra) y "Elegir después" entra sin sede como antes. Casos de uso: `GetSelectableBranchesUseCase`, `SelectBranchUseCase`, `SkipBranchChoiceUseCase`.
 
 | Pieza lista para la UI | Dónde | Para qué |
@@ -93,7 +93,9 @@ Decisiones de flujo (contrato real, no el de la galería):
 
 Con éxito, sign-in, Google y aceptar invitación ya dejan la sesión guardada: `AppNavHost` cambia de grafo solo.
 
-Pendiente de este paso: pantalla A6 (recuperar contraseña), cierre de sesión y pedido de `POST_NOTIFICATIONS`; probarlo contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
+Rama `login` (EP01): se añadieron **A6 Recuperar contraseña** (`forgot/` y `reset/`, rutas `ForgotPasswordRoute` y `ResetPasswordRoute`, aviso «Contraseña actualizada» en el login) y el pedido de `POST_NOTIFICATIONS` (`NotificationPermissionEffect`, API 33+, una vez con sesión). El cierre de sesión ya estaba cubierto por `AuthRepositoryImplTest`.
+
+Pendiente de este paso: probar A6 y el resto de EP01 contra el backend en un emulador; Google Sign-In cuando exista `GOOGLE_WEB_CLIENT_ID`.
 
 ## Paso 3 — `main` ✅
 
