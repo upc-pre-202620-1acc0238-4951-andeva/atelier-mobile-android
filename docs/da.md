@@ -1388,7 +1388,30 @@ Comandos de cierre:
 | 12 | — | `docs(auth): record EP01 flows and update roadmap` (este documento y `docs/07-roadmap.md`) |
 
 **Pendiente (honesto)**
-- **Prueba manual de §28.10 no ejecutada.** No se corrió en emulador contra el backend real. Los flujos 10–12 (correo real de recuperación) y 14 (diálogo de notificaciones en API 33+) están cubiertos solo por pruebas unitarias y compilación. Falta recorrerlos a mano antes de cerrar EP01.
+- **Prueba manual de §28.10 parcial** (ver §28.14). No se corrió en emulador contra el backend real. Los flujos 10–12 (correo real de recuperación) y 14 (diálogo de notificaciones en API 33+) están cubiertos solo por pruebas unitarias y compilación. Falta recorrerlos a mano antes de cerrar EP01.
 - La auditoría F1 se hizo por cobertura de pruebas existentes, no releyendo cada ViewModel línea a línea.
 - Google Sign-In y deep links siguen fuera de alcance.
 - Pendiente de backend (§27): B1 Supabase y B2 `notify`; no afectan a EP01.
+
+### 28.14. Prueba manual en emulador (parcial)
+
+> **Entorno:** *Medium Phone API 37.2*, build `debug` de la rama `login`, backend real `https://atelier-platform.onrender.com/`. Solo se usaron correos y tokens inexistentes: no se tocó ninguna cuenta real ni se envió ningún correo.
+
+| # | Flujo (§28.10) | Resultado | Evidencia |
+| :---: | :--- | :---: | :--- |
+| 2 | Login con credenciales malas | ✅ | «Se requieren credenciales de autenticación o han expirado.» (mensaje del backend); correo y contraseña se conservan; el botón se libera |
+| 6/8 | Registro con enlace basura | ✅ | `GET /invitations/validate` responde 404: «Esta invitación ya no es válida…»; botón «Volver a iniciar sesión» |
+| 8 | Botón «Continuar» con el campo vacío | ✅ | Deshabilitado hasta escribir |
+| 10 | «¿Olvidaste tu contraseña?» → correo inexistente | ✅ | Confirmación genérica «Si el correo pertenece a una cuenta…» con «Ya tengo el enlace» y «Pedir otro enlace» |
+| 12 | Reset con token falso | ✅ tras corregir | El backend responde **404** (`VerificationToken with identifier … was not found`), no 400 como dice `iam.md`. Antes se mostraba el texto en inglés; ahora «El enlace venció o no es válido. Pide uno nuevo.» con «Pedir un enlace nuevo» |
+| — | Reglas de contraseña en vivo (8 caracteres, mayúscula, coincidencia) | ✅ | Se marcan en verde al cumplirse |
+
+**Defecto encontrado y corregido:** `ResetPasswordViewModel` solo trataba el 400 como enlace inválido. Ahora acepta 400 y 404 (commit `fix(auth): treat 404 on reset password as invalid link`, con prueba nueva). **Hueco de documentación:** `docs/api/iam.md` debe reflejar que un token inexistente devuelve 404.
+
+**Observación:** con el backend dormido (Render, plan gratuito) el primer login tardó más de 60 s y la app mostró «Requiere conexión» (timeout). Es el arranque en frío ya anotado en §25.6; al reintentar con el servidor despierto respondió bien.
+
+**Sin probar (faltan datos):**
+- Login válido, entrada a la app y cierre de sesión: no hay contraseñas de las cuentas de prueba en el repositorio.
+- 403 `EMAIL_NOT_VERIFIED` → OTP (flujos 3–5): requiere una cuenta sin verificar.
+- Invitación válida, aceptar, vencida y ya aceptada (flujos 6–9): requiere enlaces reales.
+- Reset exitoso con correo real (flujo 11) y diálogo de notificaciones (flujo 14).
