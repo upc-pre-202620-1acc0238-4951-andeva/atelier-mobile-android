@@ -2,11 +2,13 @@ package com.andeva.atelier.mobile.features.workorders.presentation.detail
 
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Money
+import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.ChargeForm
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditForm
+import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderDetail
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
@@ -28,14 +30,17 @@ enum class WorkOrderDetailAction {
     DOWNLOAD_PDF,
     SEND_EMAIL,
     APPROVE_QUOTATION,
-    REJECT_QUOTATION
+    REJECT_QUOTATION,
+    ASSIGN_BAY,
+    ASSIGN_MECHANIC
 }
 
 /** US22 E1: formulario para agregar una nueva tarea con su servicio y mano de obra sin IGV. */
 data class AddTaskForm(
     val serviceId: String? = null,
     val description: String = "",
-    val price: String = ""
+    val price: String = "",
+    val mechanicId: String? = null
 )
 
 /** US22 E2: formulario para actualizar el precio de mano de obra sin IGV de una tarea. */
@@ -87,7 +92,13 @@ data class WorkOrderDetailUiState(
     val canReadParts: Boolean = false,
     val canReadQuotation: Boolean = false,
     val canSendQuotation: Boolean = false,
-    val canApproveQuotation: Boolean = false
+    val canApproveQuotation: Boolean = false,
+    val canAssignBay: Boolean = false,
+    val availableBays: List<WorkBay> = emptyList(),
+    val showAssignBayDialog: Boolean = false,
+    val canReassignMechanic: Boolean = false,
+    val availableMechanics: List<MechanicOption> = emptyList(),
+    val assigningMechanicTask: TaskDetail? = null
 ) {
     val isBusy: Boolean get() = busyAction != null
 
@@ -96,6 +107,7 @@ data class WorkOrderDetailUiState(
     val isEditableOrder: Boolean get() = status == WorkOrderStatus.DRAFT || status == WorkOrderStatus.IN_PROGRESS
 
     val canModifyTasks: Boolean get() = canUpdateWorkOrder && isEditableOrder && isOnline && !isBusy
+    val canChangeMechanic: Boolean get() = canReassignMechanic && isEditableOrder && isOnline && !isBusy
     val canAddPartToTask: Boolean get() = canChargeParts && isEditableOrder && isOnline && !isBusy
     val canEditTaskParts: Boolean get() = canUpdateWorkOrder && isEditableOrder && isOnline && !isBusy
     val canGeneratePdf: Boolean get() = canReadQuotation && detail != null && isOnline && !isBusy
@@ -114,6 +126,12 @@ data class WorkOrderDetailUiState(
     /** Minutos estimados del servicio en el catálogo para mostrar junto a «Mano de obra» (p. ej. `2 h`, `45 min`). */
     fun estimatedMinutesFor(task: TaskDetail): Int? =
         task.serviceId?.let { id -> services.firstOrNull { it.id == id }?.estimatedMinutes }
+
+    /** Resuelve el nombre del mecánico asignado a la tarea cruzando con los colaboradores de la sede (H11). */
+    fun mechanicNameFor(task: TaskDetail): String? {
+        val assigned = task.mechanicId?.let { id -> availableMechanics.firstOrNull { it.membershipId == id } }
+        return assigned?.displayName ?: task.mechanicName?.takeIf { it.isNotBlank() }
+    }
 
     /** Resuelve el nombre comercial del repuesto si el backend devolvió `Product <uuid>` (H11, H36). */
     fun productTitle(product: TaskProduct): String? {

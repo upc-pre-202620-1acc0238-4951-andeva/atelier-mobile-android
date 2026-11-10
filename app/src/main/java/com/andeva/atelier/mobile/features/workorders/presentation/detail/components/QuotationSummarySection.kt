@@ -7,11 +7,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +59,7 @@ internal fun TaskCascadeCard(
     onAddPart: () -> Unit,
     onEditPart: (TaskProduct) -> Unit,
     onReturnPart: (TaskProduct) -> Unit,
+    onAssignMechanic: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currency = state.breakdown?.currency ?: task.price?.currency ?: Money.PEN
@@ -99,7 +104,6 @@ internal fun TaskCascadeCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 val subtitleParts = listOfNotNull(
-                    task.mechanicName,
                     bayName,
                     task.description.takeIf { it.isNotBlank() && it != title }
                 )
@@ -116,6 +120,59 @@ internal fun TaskCascadeCard(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
+        }
+
+        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
+
+        // Fila de Mecánico asignado (US12 E2, US22 E2)
+        val assignedMechanicName = state.mechanicNameFor(task)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (state.canChangeMechanic) {
+                        Modifier.clickable(onClick = onAssignMechanic)
+                    } else Modifier
+                )
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (assignedMechanicName != null) MaterialTheme.colorScheme.primary else AtelierTheme.colors.inkSecondary
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(R.string.order_task_mechanic_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AtelierTheme.colors.inkSecondary
+                    )
+                    Text(
+                        text = assignedMechanicName ?: stringResource(R.string.order_mechanic_unassigned),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (assignedMechanicName != null) MaterialTheme.colorScheme.onSurface else AtelierTheme.colors.inkSecondary
+                    )
+                }
+            }
+            if (state.canChangeMechanic) {
+                Text(
+                    text = stringResource(
+                        if (assignedMechanicName != null) R.string.order_reassign_mechanic_btn
+                        else R.string.order_assign_mechanic_btn
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
@@ -255,6 +312,15 @@ internal fun QuotationCascadeFooter(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        SummaryLine(
+            label = stringResource(R.string.quotation_labor_subtotal),
+            value = breakdown.laborSubtotal.format()
+        )
+        SummaryLine(
+            label = stringResource(R.string.quotation_parts_subtotal),
+            value = breakdown.partsSubtotal.format()
+        )
+        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
         SummaryLine(
             label = stringResource(R.string.quotation_subtotal),
             value = breakdown.subtotal.format()
