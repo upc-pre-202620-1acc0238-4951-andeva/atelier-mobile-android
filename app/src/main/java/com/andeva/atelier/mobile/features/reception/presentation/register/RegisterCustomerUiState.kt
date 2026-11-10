@@ -19,19 +19,22 @@ data class RegisterCustomerUiState(
     val vin: String = "",
     val year: String = "",
     val isSaving: Boolean = false,
-    /** El cliente ya se creó pero el vehículo falló: al reintentar solo se repite el vehículo. */
+    /** El cliente ya se creó pero el vehículo falló, o se abrió desde un cliente existente: solo se registra el vehículo. */
     val registeredCustomerId: String? = null,
+    val presetCustomerName: String? = null,
+    val registeredVehicleId: String? = null,
     val error: UiText? = null,
     val invalidField: String? = null,
     val done: Boolean = false,
     val canRegister: Boolean = false
 ) {
     val customerLocked: Boolean get() = registeredCustomerId != null
+    val hasCustomerData: Boolean
+        get() = customerLocked || (taxId.isNotBlank() && when (kind) {
+            CustomerType.INDIVIDUAL -> firstName.isNotBlank() && lastName.isNotBlank()
+            CustomerType.COMPANY -> companyName.isNotBlank()
+        })
     val canSubmit: Boolean
-        get() = canRegister && !isSaving && !done && taxId.isNotBlank() && plate.isNotBlank() &&
-            brand.isNotBlank() && model.isNotBlank() &&
-            when (kind) {
-                CustomerType.INDIVIDUAL -> firstName.isNotBlank() && lastName.isNotBlank()
-                CustomerType.COMPANY -> companyName.isNotBlank()
-            }
+        get() = canRegister && !isSaving && !done && hasCustomerData &&
+            plate.isNotBlank() && brand.isNotBlank() && model.isNotBlank()
 }

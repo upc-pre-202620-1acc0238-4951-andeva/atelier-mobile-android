@@ -83,6 +83,42 @@ class ReceptionRepositoryImpl @Inject constructor(
 
     override fun observeCustomer(id: String): Flow<Customer?> = customerDao.observeById(id).map { it?.toDomain() }
 
+    override fun observeCustomers(): Flow<List<Customer>> =
+        customerDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeWorkshopVehicles(): Flow<List<VehicleWithOwner>> =
+        vehicleDao.observeAllWithOwners().map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun refreshCustomers(force: Boolean): Result<Unit> {
+        val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
+        if (!session.has(Permission.CUSTOMERS_READ)) return Result.success(Unit)
+        val now = clock.millis()
+        if (!force && !isStale(ReceptionCachePolicy.SCOPE_CUSTOMERS_PORTFOLIO, ReceptionCachePolicy.PORTFOLIO_TTL_MILLIS, now)) {
+            return Result.success(Unit)
+        }
+        val all = mutableListOf<CustomerDto>()
+        for (page in 0 until ReceptionCachePolicy.MAX_PAGES) {
+            val dtos = apiCall(
+                gson,
+                { customerService.search(search = null, page = page, size = ReceptionCachePolicy.PAGE_SIZE) }
+            ) { it }.getOrElse { return Result.failure(it) }
+            all += dtos
+            if (dtos.size < ReceptionCachePolicy.PAGE_SIZE) break
+        }
+        val rows = all.distinctBy { it.id }.map { it.toEntity(now) }
+        customerDao.upsertAll(rows)
+        rows.forEach { row ->
+            cacheMetadataDao.upsert(CacheMetadataEntity(ReceptionCachePolicy.customerScope(row.id), now, 1))
+        }
+        cacheMetadataDao.upsert(CacheMetadataEntity(ReceptionCachePolicy.SCOPE_CUSTOMERS_PORTFOLIO, now, rows.size))
+        return Result.success(Unit)
+    }
+
+    override suspend fun enrichReferences(vehicleIds: List<String>, customerIds: List<String>) {
+        val session = sessionManager.getSession() ?: return
+        enrich(vehicleIds, customerIds, session, clock.millis())
+    }
+
     override suspend fun getCustomer(id: String): Result<Customer> =
         apiCall(gson, { customerService.getCustomer(id) }) { it }.map { saveCustomer(it) }
 

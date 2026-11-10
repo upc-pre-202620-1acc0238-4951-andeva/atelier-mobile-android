@@ -10,7 +10,11 @@ import retrofit2.http.Query
 /** Clientes y afiliación de docs/api/crm.md. */
 interface CustomerService {
     @GET("api/v1/customers")
-    suspend fun search(@Query("search") search: String?): Response<List<CustomerDto>>
+    suspend fun search(
+        @Query("search") search: String? = null,
+        @Query("page") page: Int? = null,
+        @Query("size") size: Int? = null
+    ): Response<List<CustomerDto>>
 
     @GET("api/v1/customers/{id}")
     suspend fun getCustomer(@Path("id") id: String): Response<CustomerDto>
