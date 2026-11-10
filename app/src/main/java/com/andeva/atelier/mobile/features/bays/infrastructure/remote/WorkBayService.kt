@@ -5,6 +5,7 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkO
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -13,6 +14,9 @@ import retrofit2.http.Query
 interface WorkBayService {
     @GET("api/v1/work-bays")
     suspend fun getBays(@Query("branchId") branchId: String): Response<List<WorkBayDto>>
+
+    @POST("api/v1/work-bays")
+    suspend fun createBay(@Body body: CreateWorkBayRequestDto): Response<WorkBayDto>
 
     @PUT("api/v1/work-orders/{workOrderId}/bay")
     suspend fun assignBay(
