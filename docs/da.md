@@ -1439,3 +1439,14 @@ Siguen sin probar: cierre de sesión, OTP (cuenta sin verificar), invitaciones v
 - `SUPABASE_URL` sigue sin resolver en DNS (B1 de §27.4); `local.properties` ya tiene todas las claves, no hace falta cambiarlo.
 
 **Sigue sin probar:** OTP y 403 `EMAIL_NOT_VERIFIED`, e invitaciones válida / vencida / ya aceptada. El API no devuelve el token de invitación (solo llega por correo), así que hace falta un buzón al que se tenga acceso. El reset exitoso con correo real tiene la misma dependencia.
+
+**Mejoras aplicadas (10/11/2026):**
+
+| Mejora | Cambio | Verificación en emulador |
+| :--- | :--- | :--- |
+| Notificaciones | `NotificationPermissionViewModel` guarda en el DataStore de la sesión que ya se pidió `POST_NOTIFICATIONS`; `SessionManager.clear()` lo vacía, así que se pide una vez por inicio de sesión | El diálogo sale tras el login; al rechazarlo y reiniciar la app no vuelve a salir |
+| Cierre de sesión | `AuthRepositoryImpl.signOut` limita a 5 s la revocación del token FCM y del refresh token (`withTimeoutOrNull`) y limpia cachés y sesión igual. Prueba nueva con servidor que no responde | Cerrar sesión pasó de ~64 s a 7 s |
+
+**Pantalla negra al abrir la app (emulador):** ocurrió una vez; no era la app. `dumpsys window` mostraba `Application Not Responding: system` («Process system isn't responding») y la app no tenía ventana. Causa: el host tenía solo 0.8 GB libres de 15.6 GB (Android Studio, emulador y Gradle a la vez), igual que el caso de §22. Se resolvió reiniciando el emulador (`adb reboot`) y deteniendo los demonios de Gradle (`gradlew --stop`). Recomendación: cerrar otras aplicaciones, dar al AVD al menos 4 GB de RAM y usar *Cold Boot Now* si reaparece.
+
+**Invitación de prueba:** se envió una invitación (rol Técnico Mecánico) al correo del desarrollador. Quedan por probar, con ese enlace: invitación válida, aceptar (409 al repetir), OTP y reset de contraseña con correo real.
