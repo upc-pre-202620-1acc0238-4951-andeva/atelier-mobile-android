@@ -1424,3 +1424,18 @@ Comandos de cierre:
 | 14 | Diálogo de notificaciones tras el primer login (API 37) | ✅ | Aparece una sola vez; «Don't allow» no rompe nada y la app sigue en Asistencia |
 
 Siguen sin probar: cierre de sesión, OTP (cuenta sin verificar), invitaciones válidas y reset exitoso con correo real.
+
+**Tercera tanda (mecánico de pruebas, 10/11/2026 ~00:30 Lima):**
+
+| # | Flujo | Resultado | Evidencia |
+| :---: | :--- | :---: | :--- |
+| 13 | Cerrar sesión desde Perfil | ✅ | Diálogo «¿Cerrar sesión?» → vuelve al login; al forzar el cierre y reabrir la app pide credenciales |
+| 14 | Diálogo de notificaciones, ruta «Allow» | ✅ | Se concede y la app sigue normal |
+| — | Geocerca con GPS fijado en la sede (`-12.1976, -77.0083`) y permiso de ubicación concedido | ✅ | «0 m del centro del taller · Dentro del perímetro»; sin el permiso la pantalla muestra «Sin GPS». No se marcó entrada ni salida para no alterar la asistencia real |
+
+**Observaciones (no son fallos de EP01):**
+- El diálogo de notificaciones reaparece en cada arranque en frío mientras el usuario no lo acepte o lo niegue de forma permanente, porque el indicador `asked` de `NotificationPermissionEffect` vive solo en el proceso. Si se quiere pedir una sola vez, guardarlo en DataStore.
+- Cerrar sesión tardó ~1 min con el backend dormido: `signOut` espera la llamada de red antes de limpiar. Mejora posible: limpiar la sesión primero y revocar el refresh token en segundo plano.
+- `SUPABASE_URL` sigue sin resolver en DNS (B1 de §27.4); `local.properties` ya tiene todas las claves, no hace falta cambiarlo.
+
+**Sigue sin probar:** OTP y 403 `EMAIL_NOT_VERIFIED`, e invitaciones válida / vencida / ya aceptada. El API no devuelve el token de invitación (solo llega por correo), así que hace falta un buzón al que se tenga acceso. El reset exitoso con correo real tiene la misma dependencia.
