@@ -211,26 +211,26 @@ class AttendanceViewModel @Inject constructor(
 
     private fun showError(resourceId: Int) = _uiState.update { it.copy(error = UiText.Resource(resourceId), notice = null) }
 
-    private fun Throwable.toAttendanceUiText(): UiText = when (this) {
-        is LocationPermissionDeniedException -> UiText.Resource(R.string.attendance_location_permission_required)
-        is LocationUnavailableException -> UiText.Resource(R.string.attendance_location_unavailable)
-        is LocationTooInaccurateException -> UiText.Resource(R.string.attendance_location_inaccurate, accuracyMeters.toInt())
-        is MissingAssignmentException -> UiText.Resource(R.string.attendance_missing_assignment)
-        is LocationOutsideGeofenceException -> UiText.Resource(
-            R.string.attendance_outside_geofence_blocked,
-            distanceMeters.toInt(),
-            radiusMeters.toInt()
-        )
-        is MockLocationException -> UiText.Resource(R.string.attendance_mock_location_blocked)
-        is BranchGeofenceUnavailableException -> UiText.Resource(R.string.attendance_branch_geofence_unavailable)
-        is InvalidJustificationException -> UiText.Resource(R.string.attendance_justification_invalid)
-        else -> toUiText()
-    }
-
     private data class Snapshot(
         val session: Session?,
         val today: TodayAttendance,
         val schedule: com.andeva.atelier.mobile.features.attendance.domain.WeeklySchedule?,
         val history: List<Attendance>
     )
+}
+
+internal fun Throwable.toAttendanceUiText(): UiText = when (this) {
+    is LocationPermissionDeniedException -> UiText.Resource(R.string.attendance_location_permission_required)
+    is LocationUnavailableException -> UiText.Resource(R.string.attendance_location_unavailable)
+    is LocationTooInaccurateException -> UiText.Resource(R.string.attendance_location_inaccurate, accuracyMeters.toInt())
+    is MissingAssignmentException -> UiText.Resource(R.string.attendance_missing_assignment)
+    is LocationOutsideGeofenceException -> UiText.Resource(
+        R.string.attendance_outside_geofence_blocked,
+        distanceMeters.toInt(),
+        radiusMeters.toInt()
+    )
+    is MockLocationException -> UiText.Resource(R.string.attendance_mock_location_blocked)
+    is BranchGeofenceUnavailableException -> UiText.Resource(R.string.attendance_branch_geofence_unavailable)
+    is InvalidJustificationException -> UiText.Resource(R.string.attendance_justification_invalid)
+    else -> toUiText()
 }

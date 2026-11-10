@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.features.attendance.domain
 
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 /** Asistencia propia (US06–US10). Offline-first: red → Room → UI; marcaciones y descargos sin red van a la cola. */
 interface AttendanceRepository {
@@ -21,4 +22,10 @@ interface AttendanceRepository {
     suspend fun clockOut(): Result<SubmitOutcome>
 
     suspend fun submitJustification(id: AttendanceId, reason: String): Result<SubmitOutcome>
+
+    /** Asistencia diaria de la sede (`hr:attendance:audit_all`). */
+    suspend fun getBranchDailyAttendance(date: LocalDate? = null): Result<List<BranchAttendanceItem>>
+
+    /** Aprobar o rechazar justificación (`hr:justifications:approve`). */
+    suspend fun reviewJustification(id: AttendanceId, approve: Boolean): Result<Attendance>
 }
