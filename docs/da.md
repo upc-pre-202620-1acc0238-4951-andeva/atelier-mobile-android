@@ -1415,3 +1415,12 @@ Comandos de cierre:
 - 403 `EMAIL_NOT_VERIFIED` → OTP (flujos 3–5): requiere una cuenta sin verificar.
 - Invitación válida, aceptar, vencida y ya aceptada (flujos 6–9): requiere enlaces reales.
 - Reset exitoso con correo real (flujo 11) y diálogo de notificaciones (flujo 14).
+
+**Segunda tanda (con la cuenta de mecánico de pruebas):**
+
+| # | Flujo | Resultado | Evidencia |
+| :---: | :--- | :---: | :--- |
+| 1 | Login con credenciales válidas | ✅ | Entra a Asistencia («Taller Suárez Automotriz», Sede Principal, turno 08:00–17:00) |
+| 14 | Diálogo de notificaciones tras el primer login (API 37) | ✅ | Aparece una sola vez; «Don't allow» no rompe nada y la app sigue en Asistencia |
+
+Siguen sin probar: cierre de sesión, OTP (cuenta sin verificar), invitaciones válidas y reset exitoso con correo real.
