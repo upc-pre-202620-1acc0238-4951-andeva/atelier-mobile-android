@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import com.andeva.atelier.mobile.core.notifications.NotificationPermissionEffect
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.BranchSelectionRoute
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSelectionDestination
@@ -52,6 +53,8 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
 
     val signedIn = sessionState is SessionState.SignedIn
     val navController = rememberNavController()
+
+    NotificationPermissionEffect(signedIn)
 
     // La barra solo existe con sesión y sobre la pantalla principal de una pestaña; los detalles usan todo el alto.
     val currentEntry by navController.currentBackStackEntryAsState()
