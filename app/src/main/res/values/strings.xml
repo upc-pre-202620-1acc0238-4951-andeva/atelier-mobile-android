@@ -73,6 +73,23 @@
     <string name="auth_resend_in">Reenviar en %1$s</string>
     <string name="auth_verify_action">Verificar código</string>
 
+    <!-- Auth: A6 Recuperar contraseña -->
+    <string name="auth_forgot_title">Recupera tu contraseña</string>
+    <string name="auth_forgot_body">Escribe el correo de tu cuenta y te enviaremos un enlace para crear una contraseña nueva. El enlace vence en 2 horas.</string>
+    <string name="auth_forgot_action">Enviar enlace</string>
+    <string name="auth_forgot_sent_title">Revisa tu correo</string>
+    <string name="auth_forgot_sent">Si el correo pertenece a una cuenta, te enviamos un enlace para restablecer la contraseña.</string>
+    <string name="auth_have_token">Ya tengo el enlace</string>
+    <string name="auth_request_again">Pedir otro enlace</string>
+    <string name="auth_reset_title">Nueva contraseña</string>
+    <string name="auth_reset_body">Pega el enlace del correo, o solo el código que trae, y elige tu contraseña nueva.</string>
+    <string name="auth_reset_token_label">Enlace o código</string>
+    <string name="auth_reset_hint">El enlace vence 2 horas después de pedirlo y solo sirve una vez.</string>
+    <string name="auth_reset_action">Cambiar contraseña</string>
+    <string name="auth_reset_invalid">El enlace venció o no es válido. Pide uno nuevo.</string>
+    <string name="auth_reset_request_new">Pedir un enlace nuevo</string>
+    <string name="auth_password_updated">Contraseña actualizada. Ya puedes iniciar sesión.</string>
+
     <!-- Attendance -->
     <string name="attendance_title">Asistencia</string>
     <string name="attendance_today">Mi jornada de hoy</string>
