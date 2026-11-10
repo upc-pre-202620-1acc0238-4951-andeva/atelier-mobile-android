@@ -1341,17 +1341,54 @@ Comandos de cierre:
 
 ### 28.12. Definition of Done
 
-- [ ] Rama `feature/auth-login-register` con los commits de §28.8 (o los que apliquen tras la auditoría).
-- [ ] `./gradlew assembleDebug` y `./gradlew testDebugUnitTest` en verde.
-- [ ] Prueba manual de §28.10 ejecutada y volcada en §28.13.
-- [ ] `docs/07-roadmap.md` actualizado: paso 2 con A6 y `POST_NOTIFICATIONS` cerrados; Google marcado como pendiente si sigue sin `GOOGLE_WEB_CLIENT_ID`.
-- [ ] Sin secretos ni cuentas de prueba en git.
-- [ ] PR de `feature/auth-login-register` hacia `develop`.
+- [x] Rama `login` con los commits de §28.8 (o los que apliquen tras la auditoría).
+- [x] `./gradlew assembleDebug` y `./gradlew testDebugUnitTest` en verde.
+- [ ] Prueba manual de §28.10 ejecutada y volcada en §28.13 (pendiente, ver §28.13).
+- [x] `docs/07-roadmap.md` actualizado: paso 2 con A6 y `POST_NOTIFICATIONS` cerrados; Google marcado como pendiente si sigue sin `GOOGLE_WEB_CLIENT_ID`.
+- [x] Sin secretos ni cuentas de prueba en git.
+- [ ] PR de `login` hacia `develop`.
 
-### 28.13. Bitácora de ejecución (se completa al ejecutar)
+### 28.13. Bitácora de ejecución
 
-| Fecha | Fase | Resultado | Evidencia |
-| :--- | :---: | :--- | :--- |
-| — | F0 | — | — |
-| — | F1 | — | — |
-| — | F7 | — | — |
+> **Rama:** `login` (desde `develop`; el nombre difiere del `feature/auth-login-register` del plan por indicación del equipo). Los commits llevan solo la autoría del desarrollador, sin línea `Co-Authored-By`.
+> **Resultado:** `./gradlew assembleDebug testDebugUnitTest` en verde — **636 pruebas, 0 fallos** (15 son nuevas de esta rama: 6 de `ForgotPasswordViewModelTest`, 8 de `ResetPasswordViewModelTest` y 1 de `LoginViewModelTest`).
+> **Entorno:** `JAVA_HOME` debe apuntar a `C:\Program Files\Java\jdk-24`; con el JDK de la extensión de antigravity falla `jlink` (ver §22.7).
+
+| Fase | Resultado | Evidencia |
+| :--- | :--- | :--- |
+| F0 | Línea base en verde antes de tocar código | `assembleDebug testDebugUnitTest` sin fallos |
+| F1 | Auditoría por cobertura: `LoginViewModelTest` ya cubre 401, 403 `EMAIL_NOT_VERIFIED`, red y doble envío; `RegisterViewModelTest` cubre 404, 410, 409 y reglas de contraseña; `AuthRepositoryImplTest` cubre el orden de `sign-out`. No se encontraron desajustes con `iam.md` | Sin cambios de código |
+| F2 | Omitida: sin defectos no hay commits 02–03 ni 13 del plan | — |
+| F3 | `ForgotPasswordUseCase` y `ResetPasswordUseCase` cubren el contrato; no se crearon casos de uso | — |
+| F4 | A6 construida: `forgot/` y `reset/` (UiState, ViewModel, Screen), 15 strings nuevas | 14 pruebas nuevas |
+| F5 | Rutas `ForgotPasswordRoute` y `ResetPasswordRoute`; el reset vuelve al login con `LoginRoute(passwordReset = true)` y limpia la pila | Compila |
+| F6 | `NotificationPermissionEffect` pide `POST_NOTIFICATIONS` una vez con sesión (API 33+); rechazarlo no bloquea nada | Compila |
+| F7 | Suite completa en verde; roadmap actualizado | 636 pruebas, 0 fallos |
+
+**Qué se construyó (A6, US05)**
+- `ForgotPasswordViewModel`: valida el correo con `AuthValidation.isEmail`, llama a `POST /auth/forgot-password` y muestra siempre la misma confirmación (el backend no revela si el correo existe). «Pedir otro enlace» conserva el correo escrito.
+- `ResetPasswordViewModel`: recibe el enlace completo o el token (H1) y lo pasa tal cual; `ResetPasswordUseCase` extrae el `token` con `AuthValidation.tokenFrom()`. Un 400 marca `tokenInvalid` y la pantalla ofrece «Pedir un enlace nuevo»; otros errores muestran el `message` del backend. La contraseña exige 8–64 caracteres, una mayúscula y coincidir con la confirmación (mismas reglas visibles que el registro, con `PasswordRule`, que pasó de `private` a `internal`).
+- `LoginRoute` recibe `passwordReset`; `LoginViewModel` lo lee del `SavedStateHandle` y la pantalla muestra «Contraseña actualizada». El aviso desaparece al enviar el formulario.
+
+**Commits de la rama**
+
+| # | Commit | Mensaje |
+| :---: | :--- | :--- |
+| 01 | `274ded0` | `docs(auth): add EP01 login and registration plan` |
+| 02 | `59c8836` | `feat(auth): add forgot password state and view model` |
+| 03 | `e286ad2` | `feat(auth): add reset password state and view model` |
+| 04 | `7f9fcda` | `test(auth): cover forgot password success, 400 and network error` |
+| 05 | `7efc82e` | `test(auth): cover reset password token extraction and expired token` |
+| 06 | `46cbd62` | `feat(auth): add forgot password screen` |
+| 07 | `3d4a2aa` | `feat(auth): add reset password screen` |
+| 08 | `91f7a24` | `feat(auth): add forgot and reset password routes` |
+| 09 | `f7033f2` | `feat(auth): connect forgot password action on login` |
+| 10 | `38f20d9` | `feat(auth): request notification permission after sign-in` |
+| 11 | `e574705` | `test(auth): cover password reset notice on login` |
+| 12 | — | `docs(auth): record EP01 flows and update roadmap` (este documento y `docs/07-roadmap.md`) |
+
+**Pendiente (honesto)**
+- **Prueba manual de §28.10 no ejecutada.** No se corrió en emulador contra el backend real. Los flujos 10–12 (correo real de recuperación) y 14 (diálogo de notificaciones en API 33+) están cubiertos solo por pruebas unitarias y compilación. Falta recorrerlos a mano antes de cerrar EP01.
+- La auditoría F1 se hizo por cobertura de pruebas existentes, no releyendo cada ViewModel línea a línea.
+- Google Sign-In y deep links siguen fuera de alcance.
+- Pendiente de backend (§27): B1 Supabase y B2 `notify`; no afectan a EP01.
