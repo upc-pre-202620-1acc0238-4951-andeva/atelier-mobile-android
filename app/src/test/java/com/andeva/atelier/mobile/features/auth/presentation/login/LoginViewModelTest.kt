@@ -48,6 +48,19 @@ class LoginViewModelTest {
     }
 
     @Test
+    fun `llegar desde recuperar contrasena muestra el aviso y el aviso se va al enviar`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.signIn(any(), any()) } returns Result.success(Unit)
+        val vm = LoginViewModel(SignInUseCase(repository), SavedStateHandle(mapOf("passwordReset" to true)))
+        assertTrue(vm.uiState.value.passwordReset)
+        assertFalse(vm.uiState.value.emailVerified)
+        vm.onEmailChange("andres@taller.pe")
+        vm.onPasswordChange("Secreta123")
+        vm.onSubmit()
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.passwordReset)
+    }
+
+    @Test
     fun `inicio correcto libera el boton y no muestra error`() = runTest(mainRule.dispatcher) {
         coEvery { repository.signIn("andres@taller.pe", "Secreta123") } returns Result.success(Unit)
         val vm = viewModel()
