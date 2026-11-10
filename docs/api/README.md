@@ -140,9 +140,9 @@ Regla para la app: **decidir por el código HTTP + el endpoint**, y usar `code` 
 
 La app **sube las fotos directamente a Supabase Storage** y luego envía al backend solo la URL.
 
-1. Subir a `https://<proyecto>.supabase.co/storage/v1/object/<bucket>/<ruta>` (bucket `atelier`).
+1. Subir a `https://<proyecto>.supabase.co/storage/v1/object/<bucket>/<ruta>` (bucket `atelier-evidence`, `SUPABASE_BUCKET` en `local.properties`).
 2. Llamar al endpoint con la URL pública: `POST /work-orders/{id}/intake-images`, `POST /tasks/{id}/evidence-images`, `POST /work-orders/{id}/proposals`.
-3. El backend **rechaza** (400) cualquier URL que no sea `https`, del host Supabase configurado y del bucket `atelier`.
+3. El backend **rechaza** (400) cualquier URL que no sea `https`, del host Supabase configurado y del bucket configurado en el backend (`SUPABASE_STORAGE_BUCKET`, hoy `atelier-evidence`). App y backend deben usar el mismo bucket.
 
 Ruta sugerida: `{tenantId}/work-orders/{workOrderId}/{intake|tasks/{taskId}|proposals}/{uuid}.jpg`.
 

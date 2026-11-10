@@ -95,8 +95,8 @@ CameraX / Photo Picker → comprimir (JPEG, lado mayor 1600 px, calidad 80)
 | Propuesta adicional (US14) | `{tenantId}/work-orders/{workOrderId}/proposals/{uuid}.jpg` |
 | Comprobante de compra recibida (US34 E2) | `{tenantId}/purchase-orders/{purchaseOrderId}/receipt/{uuid}.jpg`. Se sube **en línea** justo antes de `PUT /inventory/purchase-orders/{id}/receive`, no por la cola |
 
-- El backend valida que la URL sea `https`, del host de Supabase configurado y que contenga `/storage/v1/object/` y `/atelier/`. Cualquier otra URL → 400.
-- El bucket debe permitir `INSERT` con la anon key (política de Storage) y lectura pública.
+- El backend valida que la URL sea `https`, del host de Supabase configurado y que contenga `/storage/v1/object/` y `/{bucket}/` (el bucket del backend, `SUPABASE_STORAGE_BUCKET`; hoy `atelier-evidence`). Cualquier otra URL → 400.
+- El bucket debe ser público y tener políticas de Storage para `INSERT`, `SELECT` y `UPDATE` con la anon key: la app sube con `x-upsert: true` y el upsert exige las tres. Sin `SELECT`, Supabase responde 400 `new row violates row-level security policy`.
 - Si no hay red, la foto se guarda en el almacenamiento interno y un `Worker` la sube después (ver sección 5).
 - Las fotos se muestran con Coil 3 a partir de la URL pública.
 
