@@ -122,9 +122,10 @@ class AuthRepositoryImpl @Inject constructor(
             apiCall(gson, { employeeService.getByMembership("Bearer ${user.token}", membershipId) }) { it }
         }
         val profile = profileResult?.getOrNull()
-        // Solo un 404 (o no tener membresía) significa "sin perfil laboral"; un corte de red no debe dejar elegir sede
+        // Sin membresía, 404 en perfil laboral o perfil sin sede asignada → ofrecer selección de sucursal; un corte de red no debe dejar elegir sede
         val withoutWorkProfile = user.membershipId == null ||
-            (profileResult?.exceptionOrNull() as? ApiException)?.httpStatus == 404
+            (profileResult?.exceptionOrNull() as? ApiException)?.httpStatus == 404 ||
+            (profileResult?.isSuccess == true && profile?.branchId == null)
         withContext(NonCancellable) {
             // La marca va antes de guardar: al guardar `AppNavHost` ya lee la sesión y debe ver "elegir sede"
             if (withoutWorkProfile) sessionManager.markBranchChoicePending()
