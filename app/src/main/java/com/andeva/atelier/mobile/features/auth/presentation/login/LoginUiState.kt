@@ -11,6 +11,8 @@ data class LoginUiState(
     val error: UiText? = null,
     /** Llegó desde la verificación del correo: se muestra el aviso de éxito. */
     val emailVerified: Boolean = false,
+    /** Llegó desde A6 tras cambiar la contraseña: se muestra el aviso de éxito. */
+    val passwordReset: Boolean = false,
     /** Un solo uso: el backend rechazó el acceso porque el correo no está verificado. */
     val unverifiedEmail: String? = null
 ) {

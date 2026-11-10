@@ -23,8 +23,15 @@ class LoginViewModel @Inject constructor(
     /** Argumento `verifiedEmail` de `LoginRoute`: correo recién verificado en A4. */
     private val verifiedEmail: String? = savedStateHandle["verifiedEmail"]
 
+    /** Argumento `passwordReset` de `LoginRoute`: la contraseña se acaba de cambiar en A6. */
+    private val passwordReset: Boolean = savedStateHandle["passwordReset"] ?: false
+
     private val _uiState = MutableStateFlow(
-        LoginUiState(email = verifiedEmail.orEmpty(), emailVerified = verifiedEmail != null)
+        LoginUiState(
+            email = verifiedEmail.orEmpty(),
+            emailVerified = verifiedEmail != null,
+            passwordReset = passwordReset
+        )
     )
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
@@ -37,7 +44,7 @@ class LoginViewModel @Inject constructor(
     fun onSubmit() {
         val current = _uiState.value
         if (!current.canSubmit) return
-        _uiState.update { it.copy(isLoading = true, error = null, emailVerified = false) }
+        _uiState.update { it.copy(isLoading = true, error = null, emailVerified = false, passwordReset = false) }
         viewModelScope.launch {
             signIn(current.email, current.password)
                 // Con la sesión guardada AppNavHost cambia de grafo: aquí solo se libera el botón.

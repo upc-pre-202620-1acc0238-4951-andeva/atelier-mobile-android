@@ -129,6 +129,13 @@ internal fun LoginContent(
                     kind = BannerKind.Ok
                 )
             }
+            if (state.passwordReset) {
+                AtelierBanner(
+                    message = stringResource(R.string.auth_password_updated),
+                    icon = Icons.Filled.CheckCircle,
+                    kind = BannerKind.Ok
+                )
+            }
             state.error?.let { error ->
                 AtelierBanner(message = error.asString(), icon = Icons.Filled.Error, kind = BannerKind.Bad)
             }
