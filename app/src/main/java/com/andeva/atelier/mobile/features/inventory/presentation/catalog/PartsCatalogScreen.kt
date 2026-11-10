@@ -30,6 +30,7 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
@@ -47,9 +48,12 @@ import java.math.BigDecimal
 /** US31: catálogo con buscador por nombre o SKU, chips de categoría y existencias. */
 @Composable
 fun PartsCatalogScreen(
-    onBack: () -> Unit,
     onOpenPart: (partId: String) -> Unit,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
+    onOpenMenu: (() -> Unit)? = null,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenSync: (() -> Unit)? = null,
     viewModel: PartsCatalogViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -57,6 +61,9 @@ fun PartsCatalogScreen(
         state = state,
         actions = PartsCatalogActions(
             onBack = onBack,
+            onOpenMenu = onOpenMenu,
+            onOpenNotifications = onOpenNotifications,
+            onOpenSync = onOpenSync,
             onQueryChange = viewModel::onQueryChange,
             onCategoryClick = viewModel::onCategoryClick,
             onBrandClick = viewModel::onBrandClick,
@@ -69,7 +76,10 @@ fun PartsCatalogScreen(
 }
 
 internal class PartsCatalogActions(
-    val onBack: () -> Unit,
+    val onBack: (() -> Unit)?,
+    val onOpenMenu: (() -> Unit)?,
+    val onOpenNotifications: (() -> Unit)?,
+    val onOpenSync: (() -> Unit)?,
     val onQueryChange: (String) -> Unit,
     val onCategoryClick: (ItemCategory) -> Unit,
     val onBrandClick: (String) -> Unit,
@@ -90,7 +100,16 @@ internal fun PartsCatalogContent(
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
-        AtelierTopBar(title = stringResource(R.string.catalog_title), onBack = actions.onBack)
+        if (actions.onBack != null) {
+            AtelierTopBar(title = stringResource(R.string.catalog_title), onBack = actions.onBack)
+        } else if (actions.onOpenMenu != null) {
+            AtelierMainTopBar(
+                title = stringResource(R.string.catalog_title),
+                onOpenMenu = actions.onOpenMenu,
+                onOpenNotifications = actions.onOpenNotifications,
+                onOpenSync = actions.onOpenSync
+            )
+        }
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -173,7 +192,18 @@ private fun previewPart(id: String, name: String, stock: String, min: String = "
         minimumStock = BigDecimal(min), unitOfMeasure = "UNIT", status = PartStatus.ACTIVE
     )
 
-private val previewActions = PartsCatalogActions({}, {}, {}, {}, {}, {}, {})
+private val previewActions = PartsCatalogActions(
+    onBack = {},
+    onOpenMenu = {},
+    onOpenNotifications = {},
+    onOpenSync = {},
+    onQueryChange = {},
+    onCategoryClick = {},
+    onBrandClick = {},
+    onClearFilters = {},
+    onRefresh = {},
+    onOpenPart = {}
+)
 
 @Preview(name = "Catálogo · oscuro", widthDp = 360, heightDp = 900, showBackground = true)
 @Composable

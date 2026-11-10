@@ -19,6 +19,7 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSelectionCard
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
@@ -29,6 +30,10 @@ import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.ChargeForm
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditForm
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditMode
+
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 /**
  * US32 E2: buscar el repuesto, elegirlo y fijar la cantidad. Los agotados no se pueden elegir (US31 E3); si pide más
@@ -48,35 +53,75 @@ internal fun ChargePartDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {},
-        title = { Text(stringResource(R.string.charge_title)) },
+        confirmButton = {
+            AtelierButton(
+                text = stringResource(R.string.charge_confirm),
+                onClick = onConfirm,
+                enabled = form.selected != null && form.quantity.isNotBlank() && !isSaving,
+                loading = isSaving
+            )
+        },
+        dismissButton = {
+            AtelierButton(
+                text = stringResource(R.string.proposals_cancel),
+                onClick = onDismiss,
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.charge_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                AtelierTextField(
-                    label = stringResource(R.string.catalog_search_label),
-                    value = form.query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSaving,
-                    placeholder = stringResource(R.string.catalog_search_hint),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
-                )
-                when {
-                    form.isSearching -> Text(
-                        text = stringResource(R.string.search_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    form.query.isNotBlank() && form.results.isEmpty() && form.selected == null -> Text(
-                        text = stringResource(R.string.catalog_empty_filtered),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                }
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 if (form.selected == null) {
-                    form.results.take(MAX_RESULTS).forEach { part -> PartOptionRow(part, onSelect, !isSaving) }
+                    AtelierTextField(
+                        label = stringResource(R.string.catalog_search_label),
+                        value = form.query,
+                        onValueChange = onQueryChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSaving,
+                        placeholder = stringResource(R.string.catalog_search_hint),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                    )
+                    Text(
+                        text = stringResource(R.string.charge_select_part_prompt),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    when {
+                        form.isSearching -> Text(
+                            text = stringResource(R.string.search_loading),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AtelierTheme.colors.inkSecondary
+                        )
+                        form.results.isEmpty() -> Text(
+                            text = stringResource(R.string.catalog_empty_filtered),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AtelierTheme.colors.inkSecondary
+                        )
+                        else -> form.results.take(MAX_RESULTS).forEach { part ->
+                            PartOptionRow(part, onSelect, !isSaving)
+                        }
+                    }
                 } else {
-                    PartOptionRow(form.selected, onSelect, enabled = false, selected = true)
+                    PartOptionRow(form.selected, onSelect = {}, enabled = false, selected = true)
+                    AtelierButton(
+                        text = stringResource(R.string.charge_change_part_btn),
+                        onClick = { onQueryChange(form.query) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Text,
+                        enabled = !isSaving
+                    )
                     AtelierTextField(
                         label = stringResource(R.string.charge_quantity),
                         value = form.quantity,
@@ -89,20 +134,6 @@ internal fun ChargePartDialog(
                     )
                 }
                 error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-                AtelierButton(
-                    text = stringResource(R.string.charge_confirm),
-                    onClick = onConfirm,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = form.selected != null && form.quantity.isNotBlank(),
-                    loading = isSaving
-                )
-                AtelierButton(
-                    text = stringResource(R.string.proposals_cancel),
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = AtelierButtonStyle.Text,
-                    enabled = !isSaving
-                )
             }
         }
     )
@@ -115,19 +146,24 @@ private fun PartOptionRow(
     enabled: Boolean,
     selected: Boolean = false
 ) {
-    val detail = buildString {
-        append(stringResource(R.string.part_stock, part.totalStock.formatQuantity()))
-        part.basePrice?.let {
-            append(" · ")
-            append(stringResource(R.string.part_price, Money(it, Money.PEN).format()))
-        }
+    val stockText = if (part.isAvailable) {
+        stringResource(R.string.part_stock, part.totalStock.formatQuantity())
+    } else {
+        stringResource(R.string.stock_out)
     }
-    AtelierButton(
-        text = if (part.isAvailable) "${part.name}\n$detail" else "${part.name}\n${stringResource(R.string.stock_out)}",
-        onClick = { onSelect(part) },
-        modifier = Modifier.fillMaxWidth(),
-        style = if (selected) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-        enabled = enabled && part.isAvailable
+    val priceFormatted = part.basePrice?.let {
+        stringResource(R.string.part_price, Money(it, Money.PEN).format())
+    }
+
+    AtelierSelectionCard(
+        title = part.name,
+        subtitle = stockText,
+        price = priceFormatted,
+        badgeText = if (!part.isAvailable) stringResource(R.string.stock_out) else null,
+        badgeColor = if (!part.isAvailable) AtelierTheme.colors.bad.copy(alpha = 0.15f) else null,
+        selected = selected,
+        enabled = enabled && part.isAvailable,
+        onClick = { onSelect(part) }
     )
 }
 

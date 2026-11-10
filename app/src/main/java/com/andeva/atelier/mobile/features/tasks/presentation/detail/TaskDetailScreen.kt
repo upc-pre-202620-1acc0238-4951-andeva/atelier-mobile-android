@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +57,7 @@ import java.time.Instant
 fun TaskDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onReportFinding: ((workOrderId: String) -> Unit)? = null,
     viewModel: TaskDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -85,7 +87,8 @@ fun TaskDetailScreen(
             onReturnPartClick = viewModel::onReturnPartClick,
             onPartEditDismiss = viewModel::onPartEditDismiss,
             onPartQuantityChange = viewModel::onPartQuantityChange,
-            onPartEditConfirm = viewModel::onPartEditConfirm
+            onPartEditConfirm = viewModel::onPartEditConfirm,
+            onReportFinding = onReportFinding
         ),
         modifier = modifier
     )
@@ -113,7 +116,8 @@ internal class TaskDetailActions(
     val onReturnPartClick: (TaskProduct) -> Unit,
     val onPartEditDismiss: () -> Unit,
     val onPartQuantityChange: (String) -> Unit,
-    val onPartEditConfirm: () -> Unit
+    val onPartEditConfirm: () -> Unit,
+    val onReportFinding: ((workOrderId: String) -> Unit)? = null
 )
 
 @Composable
@@ -166,6 +170,15 @@ internal fun TaskDetailContent(
                 )
             }
             TaskControls(state, actions)
+            if (actions.onReportFinding != null && state.task != null) {
+                AtelierButton(
+                    text = stringResource(R.string.employee_action_report_finding),
+                    onClick = { actions.onReportFinding.invoke(state.task.workOrderId) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = AtelierButtonStyle.Tonal,
+                    icon = Icons.Outlined.CameraAlt
+                )
+            }
             if (state.detail != null || state.canChargeParts) {
                 TaskPartsSection(
                     products = state.products,
