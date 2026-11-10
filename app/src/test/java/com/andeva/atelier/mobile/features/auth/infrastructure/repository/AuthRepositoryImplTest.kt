@@ -202,7 +202,7 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `cerrar sesion borra token FCM, revoca el refresh, borra caches y sesion sin tocar la cola`() = runTest {
+    fun `cerrar sesion borra token FCM, revoca el refresh, borra caches y sesion sin tocar la cola`() = runBlocking {
         sessionManager.save(user())
         responses["/api/v1/auth/sign-out"] = json(mapOf("message" to "ok"))
 
@@ -222,6 +222,21 @@ class AuthRepositoryImplTest {
     fun `cerrar sesion sin red igual limpia el dispositivo`() = runTest {
         sessionManager.save(user())
         server.shutdown()
+
+        repository.signOut()
+
+        coVerify { cacheMaintenanceDao.clearCaches() }
+        assertNull(sessionManager.getSession())
+    }
+
+    @Test
+    fun `cerrar sesion con el servidor sin responder igual limpia el dispositivo`() = runTest {
+        sessionManager.save(user())
+        // El servidor acepta la conexión pero no contesta (Render dormido): no debe bloquear la salida
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) =
+                MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+        }
 
         repository.signOut()
 

@@ -27,6 +27,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import javax.inject.Inject
 
@@ -95,12 +96,16 @@ class AuthRepositoryImpl @Inject constructor(
      */
     override suspend fun signOut() = withContext(NonCancellable) {
         val refreshToken = sessionManager.getRefreshToken()
-        deviceTokenRegistrar.clear()
-        if (refreshToken != null) {
-            try {
-                refreshService.signOut(RefreshTokenRequestDto(refreshToken))
-            } catch (_: IOException) {
-                // Sin red: el refresh token vence solo (30 días)
+        // Con el servidor dormido (arranque en frío de Render) estas llamadas pueden tardar más de un minuto: se
+        // les da un tope y, si no responden, se sale igual. El refresh token vence solo.
+        withTimeoutOrNull(REMOTE_SIGN_OUT_TIMEOUT_MS) {
+            deviceTokenRegistrar.clear()
+            if (refreshToken != null) {
+                try {
+                    refreshService.signOut(RefreshTokenRequestDto(refreshToken))
+                } catch (_: IOException) {
+                    // Sin red: el refresh token vence solo (30 días)
+                }
             }
         }
         cacheMaintenanceDao.clearCaches()
@@ -128,5 +133,10 @@ class AuthRepositoryImpl @Inject constructor(
             // Sin google-services.json no hay FCM: el login sigue igual
             deviceTokenRegistrar.registerCurrentToken()
         }
+    }
+
+    private companion object {
+        /** Tope para revocar el token FCM y el refresh token al cerrar sesión. */
+        const val REMOTE_SIGN_OUT_TIMEOUT_MS = 5_000L
     }
 }
