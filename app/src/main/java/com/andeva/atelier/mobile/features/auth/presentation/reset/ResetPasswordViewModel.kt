@@ -49,7 +49,7 @@ class ResetPasswordViewModel @Inject constructor(
                 .onSuccess { _uiState.update { it.copy(isLoading = false, done = true) } }
                 .onFailure { e ->
                     _uiState.update {
-                        if (e is ApiException && e.httpStatus == HTTP_BAD_REQUEST) {
+                        if (e is ApiException && e.httpStatus in INVALID_TOKEN_STATUSES) {
                             it.copy(isLoading = false, tokenInvalid = true)
                         } else {
                             it.copy(isLoading = false, error = e.toUiText())
@@ -60,6 +60,7 @@ class ResetPasswordViewModel @Inject constructor(
     }
 
     private companion object {
-        const val HTTP_BAD_REQUEST = 400
+        /** `iam.md` documenta 400, pero el backend real responde 404 («VerificationToken … was not found») si el token no existe. */
+        val INVALID_TOKEN_STATUSES = setOf(400, 404)
     }
 }

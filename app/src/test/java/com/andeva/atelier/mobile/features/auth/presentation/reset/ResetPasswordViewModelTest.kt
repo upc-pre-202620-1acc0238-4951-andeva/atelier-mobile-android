@@ -12,6 +12,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -99,6 +100,18 @@ class ResetPasswordViewModelTest {
         assertFalse(vm.uiState.value.done)
         vm.onTokenChange("otro")
         assertFalse(vm.uiState.value.tokenInvalid)
+    }
+
+    @Test
+    fun `404 por token inexistente tambien se muestra como enlace invalido`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.resetPassword(any(), any()) } returns
+            Result.failure(ApiException(404, "NOT_FOUND", "VerificationToken with identifier x was not found"))
+        val vm = viewModel()
+        vm.fill()
+        vm.onSubmit()
+        mainRule.dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tokenInvalid)
+        assertNull(vm.uiState.value.error)
     }
 
     @Test
