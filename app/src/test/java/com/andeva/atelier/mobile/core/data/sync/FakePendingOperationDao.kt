@@ -36,6 +36,7 @@ class FakePendingOperationDao : PendingOperationDao {
 
     override suspend fun nextAttemptAt(userId: String) = rows.value.values
         .filter { it.userId == userId && it.status == PendingOperationEntity.STATUS_PENDING }
+        .filter { op -> op.dependsOn == null || op.dependsOn !in rows.value }
         .minOfOrNull { it.nextAttemptAt }
 
     override suspend fun markSyncing(id: String) = update(id) { it.copy(status = PendingOperationEntity.STATUS_SYNCING) }

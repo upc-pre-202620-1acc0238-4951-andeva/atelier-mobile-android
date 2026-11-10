@@ -1,6 +1,8 @@
 package com.andeva.atelier.mobile.core.data.sync
 
 import com.andeva.atelier.mobile.core.domain.ApiException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -158,5 +160,28 @@ class SyncProcessorTest {
         processor(mapOf("CLOCK_IN" to throwing)).run("u1")
         assertEquals(1, dao.findById("a")!!.attempts)
         assertEquals(PendingOperationEntity.STATUS_PENDING, dao.findById("a")!!.status)
+    }
+
+    @Test
+    fun `dos ejecuciones a la vez no envian la misma operacion dos veces`() = runTest {
+        enqueue("a")
+        val release = CompletableDeferred<Unit>()
+        val slow = object : OperationHandler {
+            override suspend fun send(operation: PendingOperationEntity): OperationResult {
+                sent += operation.id
+                release.await()
+                return OperationResult.Applied
+            }
+        }
+        val handlers = mapOf("CLOCK_IN" to slow)
+        val first = async { processor(handlers).run("u1") }
+        val second = async { processor(handlers).run("u1") }
+        testScheduler.runCurrent()
+        release.complete(Unit)
+        first.await()
+        second.await()
+
+        assertEquals(listOf("a"), sent)
+        assertNull(dao.findById("a"))
     }
 }

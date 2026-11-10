@@ -1,5 +1,7 @@
 package com.andeva.atelier.mobile.core.data.sync
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.min
 
 /**
@@ -13,7 +15,13 @@ class SyncProcessor(
 ) {
     enum class Outcome { COMPLETED, STOPPED_UNAUTHORIZED }
 
-    suspend fun run(userId: String): Outcome {
+    /**
+     * Un solo envío a la vez en el proceso: `atelier-sync`, `atelier-sync-retry` y el periódico pueden arrancar juntos,
+     * y `resetSyncing` de uno devolvería a PENDING lo que el otro está enviando (doble POST).
+     */
+    suspend fun run(userId: String): Outcome = runLock.withLock { runLocked(userId) }
+
+    private suspend fun runLocked(userId: String): Outcome {
         dao.resetSyncing(userId)
         for (operation in dao.nextBatch(userId, now())) {
             val parentId = operation.dependsOn
@@ -60,6 +68,8 @@ class SyncProcessor(
 
     companion object {
         const val MAX_ATTEMPTS = 8
+
+        private val runLock = Mutex()
 
         /** `min(2^attempts, 60)` minutos. */
         fun backoffMillis(attempts: Int): Long = min(1L shl attempts.coerceAtMost(6), 60L) * 60_000L
