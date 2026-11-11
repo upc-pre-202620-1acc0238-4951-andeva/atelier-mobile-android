@@ -19,19 +19,24 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import com.andeva.atelier.mobile.core.notifications.NotificationPermissionEffect
+import com.andeva.atelier.mobile.core.notifications.PushDestination
+import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
+import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.BranchSelectionRoute
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSelectionDestination
-import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
-import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.PartDetailRoute
 import com.andeva.atelier.mobile.features.inventory.presentation.navigation.inventoryNavGraph
 import com.andeva.atelier.mobile.features.main.presentation.MainNavigationBar
-import com.andeva.atelier.mobile.features.main.presentation.isTabRoot
 import com.andeva.atelier.mobile.features.main.presentation.MainViewModel
+import com.andeva.atelier.mobile.features.main.presentation.isTabRoot
+import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminAttendanceRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminDashboardRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.mainTabsDestinations
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
+import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.tasksNavGraph
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrderDetailRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.workOrderNavGraph
 import kotlinx.serialization.Serializable
 
@@ -51,16 +56,32 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     if (sessionState == SessionState.Loading) return
 
-    val signedIn = sessionState is SessionState.SignedIn
+    val signedInState = sessionState as? SessionState.SignedIn
+    val signedIn = signedInState != null
     val navController = rememberNavController()
-
-    NotificationPermissionEffect(signedIn)
 
     // La barra solo existe con sesión y sobre la pantalla principal de una pestaña; los detalles usan todo el alto.
     val currentEntry by navController.currentBackStackEntryAsState()
     val mainViewModel: MainViewModel = hiltViewModel()
     val mainState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val showBar = signedIn && isTabRoot(currentEntry?.destination, mainState.tabs)
+
+    val pendingPush by viewModel.pendingPush.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingPush, signedIn) {
+        if (!signedIn || pendingPush == null) return@LaunchedEffect
+        val destination = viewModel.consumePush() ?: return@LaunchedEffect
+        val target: Any = when (destination) {
+            is PushDestination.TaskDetail -> TaskDetailRoute(destination.workOrderId, destination.taskId)
+            is PushDestination.TaskSuspensionReview -> WorkOrderDetailRoute(destination.workOrderId)
+            is PushDestination.TaskProducts -> TaskDetailRoute(destination.workOrderId, destination.taskId)
+            is PushDestination.WorkOrderDetail -> WorkOrderDetailRoute(destination.workOrderId)
+            is PushDestination.LowStockAlerts -> PartDetailRoute(destination.itemId)
+            is PushDestination.CollaboratorAttendance -> AdminAttendanceRoute
+            is PushDestination.MyAttendance -> AttendanceRoute
+            is PushDestination.ClockIn -> AttendanceRoute
+        }
+        navController.navigate(target) { launchSingleTop = true }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -76,13 +97,15 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
                 .consumeWindowInsets(innerPadding)
         ) {
             authNavGraph(navController)
-            navigation<MainNavGraphRoute>(startDestination = MainStartRoute) {
+            val mainStartDestination: Any = when {
+                signedInState?.needsBranchChoice == true -> BranchSelectionRoute
+                signedInState?.prefersDashboard == true -> AdminDashboardRoute
+                else -> AttendanceRoute
+            }
+            navigation<MainNavGraphRoute>(startDestination = mainStartDestination) {
                 composable<MainStartRoute> {
                     LaunchedEffect(Unit) {
-                        // Cuenta sin perfil laboral: primero elige sede (A5b); el resto entra directo
-                        val needsBranch = (sessionState as? SessionState.SignedIn)?.needsBranchChoice == true
-                        val destination: Any = if (needsBranch) BranchSelectionRoute else AttendanceRoute
-                        navController.navigate(destination) {
+                        navController.navigate(mainStartDestination) {
                             popUpTo<MainStartRoute> { inclusive = true }
                             launchSingleTop = true
                         }
@@ -90,19 +113,27 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
                 }
                 branchSelectionDestination(
                     onDone = {
-                        navController.navigate(AttendanceRoute) {
+                        val homeRoute: Any = if (signedInState?.prefersDashboard == true) {
+                            AdminDashboardRoute
+                        } else {
+                            AttendanceRoute
+                        }
+                        navController.navigate(homeRoute) {
                             popUpTo<BranchSelectionRoute> { inclusive = true }
                             launchSingleTop = true
                         }
                     }
                 )
-                // Inicio (por ahora la asistencia hasta que exista B1/B2), Tareas, Órdenes, Recepción, Stock…
                 attendanceNavGraph(navController)
                 receptionNavGraph(navController)
                 workOrderNavGraph(navController)
                 tasksNavGraph(navController)
                 inventoryNavGraph(navController)
-                mainTabsDestinations()
+                mainTabsDestinations(
+                    navController = navController,
+                    sessionFlow = viewModel.sessionFlow,
+                    pendingSyncCountFlow = viewModel.pendingSyncCountFlow
+                )
             }
         }
     }

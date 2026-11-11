@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +42,7 @@ import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.domain.Money
+import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
@@ -48,14 +50,18 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.ChargePartDialog
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.PartEditDialog
+import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderDetail
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.presentation.chipKind
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.AddTaskDialog
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.AssignBayDialog
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.AssignMechanicDialog
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.CustomerResolutionSection
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.EditLaborDialog
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.PdfPreviewDialog
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.QuotationCascadeFooter
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.RejectQuotationDialog
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.TaskCascadeCard
@@ -76,6 +82,7 @@ fun WorkOrderDetailScreen(
     onOpenTask: (workOrderId: String, taskId: String) -> Unit,
     onOpenProposals: (workOrderId: String) -> Unit = {},
     onOpenGallery: (workOrderId: String) -> Unit = {},
+    onCompleteOrder: (vehicleId: String, customerId: String, workOrderId: String) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel()
 ) {
@@ -90,17 +97,12 @@ fun WorkOrderDetailScreen(
         }
     }
 
-    LaunchedEffect(state.generatedPdf) {
-        val pdfFile = state.generatedPdf ?: return@LaunchedEffect
-        val shared = shareOrOpenPdf(context, pdfFile, shareTitle)
-        if (shared) viewModel.onPdfHandled() else viewModel.onPdfOpenFailed()
-    }
-
     WorkOrderDetailContent(
         state = state,
         actions = WorkOrderDetailActions(
             onBack = onBack,
             onRetry = viewModel::load,
+            onCompleteOrder = onCompleteOrder,
             onOpenTask = onOpenTask,
             onOpenProposals = { onOpenProposals(viewModel.workOrderId) },
             onOpenGallery = { onOpenGallery(viewModel.workOrderId) },
@@ -126,12 +128,24 @@ fun WorkOrderDetailScreen(
             onPartEditQuantityChange = viewModel::onPartEditQuantityChange,
             onConfirmPartEdit = viewModel::onConfirmPartEdit,
             onGenerateQuotationPdf = viewModel::onGenerateQuotationPdf,
+            onSharePdf = { pdfFile ->
+                val shared = shareOrOpenPdf(context, pdfFile, shareTitle)
+                if (shared) viewModel.onPdfHandled() else viewModel.onPdfOpenFailed()
+            },
+            onDismissPdfPreview = viewModel::onPdfHandled,
             onSendQuotationEmail = viewModel::onSendQuotationEmail,
             onApproveQuotation = viewModel::onApproveQuotation,
             onOpenRejectQuotation = viewModel::onOpenRejectQuotation,
             onDismissRejectQuotation = viewModel::onDismissRejectQuotation,
             onRejectReasonChange = viewModel::onRejectReasonChange,
-            onConfirmRejectQuotation = viewModel::onConfirmRejectQuotation
+            onConfirmRejectQuotation = viewModel::onConfirmRejectQuotation,
+            onOpenAssignBay = viewModel::onOpenAssignBay,
+            onDismissAssignBay = viewModel::onDismissAssignBay,
+            onAssignBay = viewModel::onAssignBay,
+            onOpenAssignMechanic = viewModel::onOpenAssignMechanic,
+            onDismissAssignMechanic = viewModel::onDismissAssignMechanic,
+            onConfirmAssignMechanic = viewModel::onConfirmAssignMechanic,
+            onSelectAddTaskMechanic = viewModel::onSelectAddTaskMechanic
         ),
         modifier = modifier
     )
@@ -140,6 +154,7 @@ fun WorkOrderDetailScreen(
 internal class WorkOrderDetailActions(
     val onBack: () -> Unit,
     val onRetry: () -> Unit,
+    val onCompleteOrder: (String, String, String) -> Unit = { _, _, _ -> },
     val onOpenTask: (String, String) -> Unit,
     val onOpenProposals: () -> Unit = {},
     val onOpenGallery: () -> Unit = {},
@@ -148,6 +163,7 @@ internal class WorkOrderDetailActions(
     val onSelectTaskService: (ServiceOption) -> Unit = {},
     val onAddTaskDescriptionChange: (String) -> Unit = {},
     val onAddTaskPriceChange: (String) -> Unit = {},
+    val onSelectAddTaskMechanic: (String?) -> Unit = {},
     val onConfirmAddTask: () -> Unit = {},
     val onOpenEditLabor: (TaskDetail) -> Unit = {},
     val onDismissEditLabor: () -> Unit = {},
@@ -165,12 +181,20 @@ internal class WorkOrderDetailActions(
     val onPartEditQuantityChange: (String) -> Unit = {},
     val onConfirmPartEdit: () -> Unit = {},
     val onGenerateQuotationPdf: () -> Unit = {},
+    val onSharePdf: (File) -> Unit = {},
+    val onDismissPdfPreview: () -> Unit = {},
     val onSendQuotationEmail: () -> Unit = {},
     val onApproveQuotation: () -> Unit = {},
     val onOpenRejectQuotation: () -> Unit = {},
     val onDismissRejectQuotation: () -> Unit = {},
     val onRejectReasonChange: (String) -> Unit = {},
-    val onConfirmRejectQuotation: () -> Unit = {}
+    val onConfirmRejectQuotation: () -> Unit = {},
+    val onOpenAssignBay: () -> Unit = {},
+    val onDismissAssignBay: () -> Unit = {},
+    val onAssignBay: (WorkBay) -> Unit = {},
+    val onOpenAssignMechanic: (TaskDetail) -> Unit = {},
+    val onDismissAssignMechanic: () -> Unit = {},
+    val onConfirmAssignMechanic: (MechanicOption) -> Unit = {}
 )
 
 @Composable
@@ -212,16 +236,38 @@ internal fun WorkOrderDetailContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (detail != null && order != null) {
-                OrderHeaderSection(order = order)
+                OrderHeaderSection(
+                    order = order,
+                    intakeImagesCount = detail.intakeImages.size,
+                    canAssignBay = state.canAssignBay && state.isEditableOrder,
+                    onOpenAssignBay = actions.onOpenAssignBay,
+                    onOpenGallery = actions.onOpenGallery
+                )
 
                 state.notice?.let {
                     AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
                 }
 
                 val hasOpenDialog = state.addTaskForm != null || state.editLaborForm != null ||
-                    state.chargeForm != null || state.partEdit != null || state.rejectForm != null
+                    state.chargeForm != null || state.partEdit != null || state.rejectForm != null ||
+                    state.showAssignBayDialog || state.assigningMechanicTask != null
                 if (!hasOpenDialog) {
                     state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
+                }
+
+                if (state.isDraft && (order.mileageIn == null || order.mileageIn == 0)) {
+                    AtelierBanner(
+                        title = stringResource(R.string.order_intake_incomplete_title),
+                        message = stringResource(R.string.order_intake_incomplete_body),
+                        icon = Icons.Outlined.Info,
+                        kind = BannerKind.Wait
+                    )
+                    AtelierButton(
+                        text = stringResource(R.string.order_complete_intake_btn),
+                        onClick = { actions.onCompleteOrder(order.vehicleId, order.customerId, order.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Tonal
+                    )
                 }
 
                 Text(
@@ -245,7 +291,8 @@ internal fun WorkOrderDetailContent(
                         onEditLabor = { actions.onOpenEditLabor(task) },
                         onAddPart = { actions.onOpenChargePart(task.id) },
                         onEditPart = { product -> actions.onOpenEditPart(task.id, product) },
-                        onReturnPart = { product -> actions.onOpenReturnPart(task.id, product) }
+                        onReturnPart = { product -> actions.onOpenReturnPart(task.id, product) },
+                        onAssignMechanic = { actions.onOpenAssignMechanic(task) }
                     )
                 }
 
@@ -314,12 +361,14 @@ internal fun WorkOrderDetailContent(
         AddTaskDialog(
             form = form,
             services = state.services,
+            mechanics = state.availableMechanics,
             isSaving = state.busyAction == WorkOrderDetailAction.ADD_TASK,
             invalidField = state.invalidField,
             error = state.error,
             onSelectService = actions.onSelectTaskService,
             onDescriptionChange = actions.onAddTaskDescriptionChange,
             onPriceChange = actions.onAddTaskPriceChange,
+            onSelectMechanic = actions.onSelectAddTaskMechanic,
             onConfirm = actions.onConfirmAddTask,
             onDismiss = actions.onDismissAddTask
         )
@@ -376,13 +425,63 @@ internal fun WorkOrderDetailContent(
             onDismiss = actions.onDismissRejectQuotation
         )
     }
+
+    state.generatedPdf?.let { pdfFile ->
+        PdfPreviewDialog(
+            pdfFile = pdfFile,
+            breakdown = state.breakdown,
+            onShare = { actions.onSharePdf(pdfFile) },
+            onDismiss = actions.onDismissPdfPreview
+        )
+    }
+
+    if (state.showAssignBayDialog) {
+        AssignBayDialog(
+            bays = state.availableBays,
+            currentBayId = order?.currentBayId,
+            isSaving = state.busyAction == WorkOrderDetailAction.ASSIGN_BAY,
+            error = state.error,
+            onSelectBay = actions.onAssignBay,
+            onDismiss = actions.onDismissAssignBay
+        )
+    }
+
+    state.assigningMechanicTask?.let { task ->
+        AssignMechanicDialog(
+            taskTitle = state.taskTitle(task),
+            currentMechanicId = task.mechanicId,
+            mechanics = state.availableMechanics,
+            isSaving = state.busyAction == WorkOrderDetailAction.ASSIGN_MECHANIC,
+            error = state.error,
+            onSelectMechanic = actions.onConfirmAssignMechanic,
+            onDismiss = actions.onDismissAssignMechanic
+        )
+    }
 }
 
 @Composable
-private fun OrderHeaderSection(order: WorkOrder) {
+private fun OrderHeaderSection(
+    order: WorkOrder,
+    intakeImagesCount: Int = 0,
+    canAssignBay: Boolean = false,
+    onOpenAssignBay: () -> Unit = {},
+    onOpenGallery: () -> Unit = {}
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AtelierChip(text = stringResource(order.status.labelRes()), kind = order.status.chipKind())
+            order.bayName?.let { bay ->
+                AtelierChip(
+                    text = bay,
+                    kind = com.andeva.atelier.mobile.core.designsystem.component.ChipKind.Info
+                )
+            }
+            if (intakeImagesCount > 0) {
+                AtelierChip(
+                    text = stringResource(R.string.order_intake_photos_badge, intakeImagesCount),
+                    kind = com.andeva.atelier.mobile.core.designsystem.component.ChipKind.Ok
+                )
+            }
         }
         val subtitle = listOfNotNull(order.customerName, order.plate).joinToString(" · ")
         if (subtitle.isNotBlank()) {
@@ -391,6 +490,34 @@ private fun OrderHeaderSection(order: WorkOrder) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
+        }
+        val meta = buildList {
+            order.mileageIn?.let { add(stringResource(R.string.reception_vehicle_mileage_km, it)) }
+            order.diagnosticSummary?.takeIf { it.isNotBlank() }?.let { add(it) }
+        }.joinToString(" · ")
+        if (meta.isNotBlank()) {
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodySmall,
+                color = AtelierTheme.colors.muted
+            )
+        }
+        if (canAssignBay) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                AtelierButton(
+                    text = if (order.bayName != null) stringResource(R.string.order_change_bay_btn, order.bayName)
+                    else stringResource(R.string.order_assign_bay_btn),
+                    onClick = onOpenAssignBay,
+                    modifier = Modifier.weight(1f),
+                    style = AtelierButtonStyle.Tonal
+                )
+                AtelierButton(
+                    text = stringResource(R.string.order_open_gallery),
+                    onClick = onOpenGallery,
+                    modifier = Modifier.weight(1f),
+                    style = AtelierButtonStyle.Outlined
+                )
+            }
         }
     }
 }

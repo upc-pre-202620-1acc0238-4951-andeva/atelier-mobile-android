@@ -9,6 +9,8 @@ import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
+import com.andeva.atelier.mobile.features.bays.application.ReassignTaskMechanicUseCase
+import com.andeva.atelier.mobile.features.bays.domain.BayRepository
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
@@ -23,11 +25,13 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.workorders.application.AddWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.application.ApproveQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.DownloadQuotationPdfUseCase
+import com.andeva.atelier.mobile.features.workorders.application.GetBranchMechanicsUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetServiceCatalogUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RejectQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.SendQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.UpdateWorkOrderTaskUseCase
+import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.NewWorkOrderTask
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
@@ -58,6 +62,7 @@ class WorkOrderDetailViewModelTest {
     @get:Rule val mainRule = MainDispatcherRule()
 
     private val repository = mockk<WorkOrderRepository>()
+    private val bayRepository = mockk<BayRepository>(relaxed = true)
     private val taskRepository = mockk<TaskRepository>()
     private val online = MutableStateFlow(true)
     private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
@@ -161,10 +166,14 @@ class WorkOrderDetailViewModelTest {
         updatedAt = null
     )
 
-    private fun viewModel(permissions: List<Permission> = allPermissions): WorkOrderDetailViewModel {
+    private fun viewModel(
+        permissions: List<Permission> = allPermissions,
+        mechanics: List<MechanicOption> = emptyList()
+    ): WorkOrderDetailViewModel {
         val observeSession = mockk<ObserveSessionUseCase>()
         every { observeSession() } returns flowOf(sessionWith(permissions))
         coEvery { repository.getServiceCatalog() } returns Result.success(listOf(servicioAfinamiento, servicioFrenos))
+        coEvery { repository.getBranchMechanics() } returns Result.success(mechanics)
         coEvery { taskRepository.searchParts("") } returns Result.success(emptyList())
         return WorkOrderDetailViewModel(
             observeSession = observeSession,
@@ -181,7 +190,9 @@ class WorkOrderDetailViewModelTest {
             approveQuotation = ApproveQuotationUseCase(repository),
             rejectQuotation = RejectQuotationUseCase(repository),
             connectivity = connectivity,
-            savedStateHandle = SavedStateHandle(mapOf("workOrderId" to "wo1"))
+            savedStateHandle = SavedStateHandle(mapOf("workOrderId" to "wo1")),
+            getBranchMechanics = GetBranchMechanicsUseCase(repository),
+            reassignTaskMechanic = ReassignTaskMechanicUseCase(bayRepository)
         )
     }
 
@@ -502,5 +513,71 @@ class WorkOrderDetailViewModelTest {
 
         coVerify(exactly = 0) { repository.downloadQuotationPdf(any()) }
         coVerify(exactly = 0) { repository.approveQuotation(any()) }
+    }
+
+    @Test
+    fun `US22 permite agregar una tarea con mecanico asignado`() = runTest(mainRule.dispatcher) {
+        val inicial = detalle(tarea("t1", price = "100.00"))
+        val mec = MechanicOption("m-123", "Técnico especialista", "ACTIVE")
+        val actualizado = detalle(
+            tarea("t1", price = "100.00"),
+            tarea("t2", serviceId = "s2", mechanic = "Técnico especialista", price = "60.00")
+        )
+        coEvery { repository.getDetail("wo1") } returns Result.success(inicial)
+        coEvery {
+            repository.addTask("wo1", NewWorkOrderTask("s2", "Diagnóstico de frenos", mechanicId = "m-123", price = BigDecimal("60")))
+        } returns Result.success(actualizado)
+
+        val vm = viewModel(mechanics = listOf(mec))
+        settle()
+
+        vm.onOpenAddTask()
+        vm.onSelectTaskService(servicioFrenos)
+        vm.onSelectAddTaskMechanic("m-123")
+        vm.onConfirmAddTask()
+        settle()
+
+        assertNull(vm.uiState.value.addTaskForm)
+        coVerify {
+            repository.addTask("wo1", NewWorkOrderTask("s2", "Diagnóstico de frenos", mechanicId = "m-123", price = BigDecimal("60")))
+        }
+    }
+
+    @Test
+    fun `US22 reasigna mecanico a una tarea existente usando reassignTaskMechanic`() = runTest(mainRule.dispatcher) {
+        val t1 = tarea("t1", mechanic = "Luis Mamani")
+        val inicial = detalle(t1)
+        val mec = MechanicOption("m-999", "Carlos Electricista", "ACTIVE")
+        val recargado = detalle(tarea("t1", mechanic = "Carlos Electricista"))
+
+        coEvery { repository.getDetail("wo1") } returnsMany listOf(
+            Result.success(inicial),
+            Result.success(recargado)
+        )
+        coEvery { bayRepository.reassignMechanic("t1", "m-999") } returns Result.success(Unit)
+
+        val vm = viewModel(mechanics = listOf(mec))
+        settle()
+
+        vm.onOpenAssignMechanic(t1)
+        assertEquals(t1, vm.uiState.value.assigningMechanicTask)
+
+        vm.onConfirmAssignMechanic(mec)
+        settle()
+
+        assertNull(vm.uiState.value.assigningMechanicTask)
+        coVerify { bayRepository.reassignMechanic("t1", "m-999") }
+        assertEquals("Carlos Electricista", vm.uiState.value.detail?.tasks?.first()?.mechanicName)
+    }
+
+    @Test
+    fun `mechanicNameFor resuelve el nombre de availableMechanics por membershipId`() {
+        val mec = MechanicOption("m-777", "Técnico mecánico", "ACTIVE", name = "Juan Pérez")
+        val state = WorkOrderDetailUiState(availableMechanics = listOf(mec))
+        val taskWithId = tarea("t1", mechanic = null).copy(mechanicId = "m-777")
+        val taskWithRawName = tarea("t2", mechanic = "Mecánico Original").copy(mechanicId = "m-unknown")
+
+        assertEquals("Juan Pérez", state.mechanicNameFor(taskWithId))
+        assertEquals("Mecánico Original", state.mechanicNameFor(taskWithRawName))
     }
 }

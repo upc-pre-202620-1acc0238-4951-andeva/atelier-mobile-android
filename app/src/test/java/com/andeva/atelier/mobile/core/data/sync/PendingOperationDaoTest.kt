@@ -64,6 +64,18 @@ class PendingOperationDaoTest {
     }
 
     @Test
+    fun `nextAttemptAt ignora a la dependiente mientras su padre sigue en cola`() = runTest {
+        // La subida espera su backoff; el ATTACH ya "venció" pero no se puede enviar antes que ella.
+        dao.enqueue(op("upload", dedupeKey = "UPLOAD_FILE:p1", nextAttemptAt = 5_000))
+        dao.enqueue(op("attach", dedupeKey = "ATTACH:p1", nextAttemptAt = 0, dependsOn = "upload"))
+        assertEquals(5_000L, dao.nextAttemptAt("u1"))
+
+        // Sin el padre (ya enviado), la dependiente vuelve a contar.
+        dao.delete("upload")
+        assertEquals(0L, dao.nextAttemptAt("u1"))
+    }
+
+    @Test
     fun `dependientes, reinicio de SYNCING y borrado por usuario`() = runTest {
         dao.enqueue(op("upload"))
         dao.enqueue(op("attach", dependsOn = "upload"))

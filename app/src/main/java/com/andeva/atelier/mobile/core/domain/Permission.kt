@@ -49,6 +49,8 @@ value class Permission(val value: String) {
         val TASKS_CHARGE_PARTS = Permission("operations:tasks:charge_parts")
         val BAYS_READ = Permission("operations:bays:read")
         val BAYS_REASSIGN = Permission("operations:bays:reassign")
+        val BAYS_ASSIGN = BAYS_REASSIGN
+        val BAYS_MANAGE = Permission("operations:bays:manage")
         val VEHICLE_HANDOVER_EXECUTE = Permission("operations:vehicle_handover:execute")
         val SERVICES_READ = Permission("operations:services:read")
 
@@ -59,10 +61,16 @@ value class Permission(val value: String) {
         val BATCHES_RECEIVE = Permission("inventory:batches:receive")
         val PURCHASE_ORDERS_READ = Permission("inventory:purchase_orders:read")
         val ALERTS_READ = Permission("inventory:alerts:read")
+        val INVENTORY_ALERTS_READ = ALERTS_READ
         val ALERTS_RESOLVE = Permission("inventory:alerts:resolve")
+        val VALUATION_READ = Permission("inventory:valuation:read")
+        val INVENTORY_VALUATION_READ = VALUATION_READ
 
         // IoT
         val DEVICES_READ = Permission("iot:devices:read")
+        val OBD_DEVICES_READ = DEVICES_READ
+        val DEVICES_REGISTER = Permission("iot:devices:register")
+        val OBD_DEVICES_REGISTER = DEVICES_REGISTER
         val INSTALLATIONS_MANAGE = Permission("iot:installations:manage")
         val TELEMETRY_INGEST = Permission("iot:telemetry:ingest")
         val FAULTS_READ = Permission("iot:faults:read")

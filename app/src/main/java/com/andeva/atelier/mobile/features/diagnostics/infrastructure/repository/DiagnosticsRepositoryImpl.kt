@@ -28,10 +28,12 @@ import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.toIte
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.AcknowledgeAlertRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.InstallDeviceRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.IotService
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.RegisterDeviceRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.RegisterFaultRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.ResolveFaultPayload
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.TelemetryBatchRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.UninstallDeviceRequestDto
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.UpdateDeviceStatusRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.RegisterFaultHandler
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.ResolveFaultHandler
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.TelemetryBatchHandler
@@ -63,6 +65,30 @@ class DiagnosticsRepositoryImpl @Inject constructor(
 
     override suspend fun getDevices(status: DeviceStatus?): Result<List<ObdDevice>> =
         apiCall(gson, { iotService.getDevices(status?.name) }) { dtos -> dtos.map { it.toDomain() } }
+
+    override suspend fun registerDevice(
+        deviceIdentifier: String,
+        connectionType: String,
+        hardwareModel: String?,
+        firmwareVersion: String?
+    ): Result<ObdDevice> = apiCall(
+        gson,
+        {
+            iotService.registerDevice(
+                RegisterDeviceRequestDto(
+                    deviceIdentifier = deviceIdentifier.trim(),
+                    connectionType = connectionType.trim(),
+                    hardwareModel = hardwareModel?.trim()?.takeIf { it.isNotEmpty() },
+                    firmwareVersion = firmwareVersion?.trim()?.takeIf { it.isNotEmpty() }
+                )
+            )
+        }
+    ) { it.toDomain() }
+
+    override suspend fun updateDeviceStatus(deviceId: String, status: DeviceStatus): Result<ObdDevice> =
+        apiCall(gson, { iotService.updateDeviceStatus(deviceId, UpdateDeviceStatusRequestDto(status.name)) }) {
+            it.toDomain()
+        }
 
     override suspend fun getActiveInstallation(vehicleId: String): Result<DeviceInstallation?> {
         val result = apiCall(gson, { iotService.getActiveInstallation(vehicleId) }) { it.toDomain() }

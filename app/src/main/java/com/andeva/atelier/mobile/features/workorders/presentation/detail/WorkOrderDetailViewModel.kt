@@ -7,6 +7,11 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
+import com.andeva.atelier.mobile.features.bays.application.ObserveBayBoardUseCase
+import com.andeva.atelier.mobile.features.bays.application.ReassignBayUseCase
+import com.andeva.atelier.mobile.features.bays.application.ReassignTaskMechanicUseCase
+import com.andeva.atelier.mobile.features.bays.application.RefreshBayBoardUseCase
+import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
@@ -25,12 +30,14 @@ import com.andeva.atelier.mobile.features.tasks.presentation.toTaskUiText
 import com.andeva.atelier.mobile.features.workorders.application.AddWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.application.ApproveQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.DownloadQuotationPdfUseCase
+import com.andeva.atelier.mobile.features.workorders.application.GetBranchMechanicsUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetServiceCatalogUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RejectQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.SendQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.UpdateWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.domain.InvalidWorkOrderInputException
+import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.NewWorkOrderTask
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderTaskChanges
@@ -71,8 +78,52 @@ class WorkOrderDetailViewModel @Inject constructor(
     private val approveQuotation: ApproveQuotationUseCase,
     private val rejectQuotation: RejectQuotationUseCase,
     connectivity: ConnectivityObserver,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val observeBayBoard: ObserveBayBoardUseCase? = null,
+    private val refreshBayBoard: RefreshBayBoardUseCase? = null,
+    private val reassignBay: ReassignBayUseCase? = null,
+    private val getBranchMechanics: GetBranchMechanicsUseCase? = null,
+    private val reassignTaskMechanic: ReassignTaskMechanicUseCase? = null
 ) : ViewModel() {
+
+    constructor(
+        observeSession: ObserveSessionUseCase,
+        getDetail: GetWorkOrderDetailUseCase,
+        getServices: GetServiceCatalogUseCase,
+        addTask: AddWorkOrderTaskUseCase,
+        updateTask: UpdateWorkOrderTaskUseCase,
+        searchParts: SearchPartsUseCase,
+        addPart: AddPartToTaskUseCase,
+        updatePartQuantity: UpdateTaskPartQuantityUseCase,
+        removePart: RemovePartFromTaskUseCase,
+        downloadQuotationPdf: DownloadQuotationPdfUseCase,
+        sendQuotation: SendQuotationUseCase,
+        approveQuotation: ApproveQuotationUseCase,
+        rejectQuotation: RejectQuotationUseCase,
+        connectivity: ConnectivityObserver,
+        savedStateHandle: SavedStateHandle
+    ) : this(
+        observeSession = observeSession,
+        getDetail = getDetail,
+        getServices = getServices,
+        addTask = addTask,
+        updateTask = updateTask,
+        searchParts = searchParts,
+        addPart = addPart,
+        updatePartQuantity = updatePartQuantity,
+        removePart = removePart,
+        downloadQuotationPdf = downloadQuotationPdf,
+        sendQuotation = sendQuotation,
+        approveQuotation = approveQuotation,
+        rejectQuotation = rejectQuotation,
+        connectivity = connectivity,
+        savedStateHandle = savedStateHandle,
+        observeBayBoard = null,
+        refreshBayBoard = null,
+        reassignBay = null,
+        getBranchMechanics = null,
+        reassignTaskMechanic = null
+    )
 
     val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
 
@@ -93,11 +144,22 @@ class WorkOrderDetailViewModel @Inject constructor(
                         canReadParts = canReadParts,
                         canReadQuotation = session?.has(Permission.QUOTATIONS_READ) == true,
                         canSendQuotation = session?.has(Permission.QUOTATIONS_SEND) == true,
-                        canApproveQuotation = session?.has(Permission.QUOTATIONS_APPROVE) == true
+                        canApproveQuotation = session?.has(Permission.QUOTATIONS_APPROVE) == true,
+                        canAssignBay = session?.has(Permission.BAYS_ASSIGN) == true &&
+                            session.has(Permission.WORK_ORDERS_UPDATE),
+                        canReassignMechanic = session?.has(Permission.BAYS_REASSIGN) == true ||
+                            session?.has(Permission.WORK_ORDERS_UPDATE) == true
                     )
                 }
                 if (canReadParts && _uiState.value.partNamesById.isEmpty()) {
                     preloadPartNames()
+                }
+            }
+        }
+        observeBayBoard?.let { observeBays ->
+            viewModelScope.launch {
+                observeBays().collect { board ->
+                    _uiState.update { it.copy(availableBays = board.map { item -> item.bay }) }
                 }
             }
         }
@@ -116,13 +178,15 @@ class WorkOrderDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val servicesResult = getServices()
             val detailResult = getDetail(workOrderId)
+            val mechanicsResult = getBranchMechanics?.invoke()
             val services = servicesResult.getOrDefault(_uiState.value.services)
+            val mechanics = mechanicsResult?.getOrDefault(_uiState.value.availableMechanics) ?: _uiState.value.availableMechanics
             detailResult
                 .onSuccess { detail ->
-                    _uiState.update { it.copy(isLoading = false, detail = detail, services = services) }
+                    _uiState.update { it.copy(isLoading = false, detail = detail, services = services, availableMechanics = mechanics) }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, services = services, error = e.toWorkOrderUiText()) }
+                    _uiState.update { it.copy(isLoading = false, services = services, availableMechanics = mechanics, error = e.toWorkOrderUiText()) }
                 }
         }
     }
@@ -144,6 +208,13 @@ class WorkOrderDetailViewModel @Inject constructor(
         _uiState.update {
             it.copy(addTaskForm = AddTaskForm(), notice = null, error = null, invalidField = null)
         }
+        if (_uiState.value.availableMechanics.isEmpty()) {
+            viewModelScope.launch {
+                getBranchMechanics?.invoke()?.onSuccess { list ->
+                    _uiState.update { it.copy(availableMechanics = list) }
+                }
+            }
+        }
     }
 
     fun onDismissAddTask() = _uiState.update {
@@ -162,6 +233,8 @@ class WorkOrderDetailViewModel @Inject constructor(
     fun onAddTaskDescriptionChange(value: String) = editAddTask { it.copy(description = value) }
 
     fun onAddTaskPriceChange(value: String) = editAddTask { it.copy(price = value) }
+
+    fun onSelectAddTaskMechanic(mechanicId: String?) = editAddTask { it.copy(mechanicId = mechanicId) }
 
     private fun editAddTask(change: (AddTaskForm) -> AddTaskForm) = _uiState.update {
         val form = it.addTaskForm
@@ -184,13 +257,32 @@ class WorkOrderDetailViewModel @Inject constructor(
         }
         _uiState.update { it.copy(busyAction = WorkOrderDetailAction.ADD_TASK, error = null, invalidField = null) }
         viewModelScope.launch {
-            addTask(workOrderId, NewWorkOrderTask(serviceId = serviceId, description = form.description.trim(), price = price))
+            addTask(
+                workOrderId,
+                NewWorkOrderTask(
+                    serviceId = serviceId,
+                    description = form.description.trim(),
+                    mechanicId = form.mechanicId,
+                    price = price
+                )
+            )
                 .onSuccess { updatedDetail ->
+                    val mechanicName = form.mechanicId?.let { id ->
+                        state.availableMechanics.firstOrNull { it.membershipId == id }?.displayName
+                    }
+                    val enrichedTasks = if (mechanicName != null) {
+                        updatedDetail.tasks.map { t ->
+                            if (t.mechanicId == form.mechanicId && t.mechanicName.isNullOrBlank()) {
+                                t.copy(mechanicName = mechanicName)
+                            } else t
+                        }
+                    } else updatedDetail.tasks
+                    val enrichedDetail = updatedDetail.copy(tasks = enrichedTasks)
                     _uiState.update {
                         it.copy(
                             busyAction = null,
                             addTaskForm = null,
-                            detail = updatedDetail,
+                            detail = enrichedDetail,
                             notice = UiText.Resource(R.string.order_task_added)
                         )
                     }
@@ -258,11 +350,26 @@ class WorkOrderDetailViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 chargeTaskId = taskId,
-                chargeForm = ChargeForm(),
+                chargeForm = ChargeForm(isSearching = true),
                 notice = null,
                 error = null,
                 invalidField = null
             )
+        }
+        viewModelScope.launch {
+            searchParts("").onSuccess { parts ->
+                val names = parts.associate { it.id to it.name }
+                _uiState.update { state ->
+                    state.copy(
+                        partNamesById = state.partNamesById + names,
+                        chargeForm = state.chargeForm?.copy(results = parts, isSearching = false)
+                    )
+                }
+            }.onFailure {
+                _uiState.update { state ->
+                    state.copy(chargeForm = state.chargeForm?.copy(isSearching = false))
+                }
+            }
         }
     }
 
@@ -281,7 +388,18 @@ class WorkOrderDetailViewModel @Inject constructor(
     fun onChargeQueryChange(value: String) {
         searchJob?.cancel()
         if (value.isBlank()) {
-            editCharge { it.copy(query = value, selected = null, results = emptyList(), isSearching = false) }
+            editCharge { it.copy(query = value, selected = null, isSearching = true) }
+            viewModelScope.launch {
+                searchParts("").onSuccess { parts ->
+                    val names = parts.associate { it.id to it.name }
+                    _uiState.update { state ->
+                        state.copy(
+                            partNamesById = state.partNamesById + names,
+                            chargeForm = state.chargeForm?.copy(results = parts, isSearching = false)
+                        )
+                    }
+                }
+            }
             return
         }
         editCharge { it.copy(query = value, selected = null) }
@@ -313,7 +431,7 @@ class WorkOrderDetailViewModel @Inject constructor(
             if (state.isBusy) state
             else state.copy(
                 partNamesById = state.partNamesById + (part.id to part.name),
-                chargeForm = form.copy(selected = part),
+                chargeForm = form.copy(selected = part, quantity = form.quantity.ifBlank { "1" }),
                 error = null,
                 invalidField = null
             )
@@ -536,6 +654,103 @@ class WorkOrderDetailViewModel @Inject constructor(
                             rejectForm = null,
                             detail = it.detail?.copy(workOrder = canceledOrder),
                             notice = UiText.Resource(R.string.quotation_rejected_notice)
+                        )
+                    }
+                }
+                .onFailure(::failWorkOrder)
+        }
+    }
+
+    // --- US16 / Tarea 5: asignar o reasignar bahía de trabajo ---
+
+    fun onOpenAssignBay() {
+        if (!_uiState.value.canAssignBay) return
+        _uiState.update { it.copy(showAssignBayDialog = true, notice = null, error = null) }
+        viewModelScope.launch {
+            refreshBayBoard?.invoke()
+        }
+    }
+
+    fun onDismissAssignBay() = _uiState.update {
+        if (it.isBusy) it else it.copy(showAssignBayDialog = false, error = null)
+    }
+
+    fun onAssignBay(bay: WorkBay) {
+        val assign = reassignBay ?: return
+        if (!_uiState.value.canAssignBay || _uiState.value.isBusy) return
+        _uiState.update { it.copy(busyAction = WorkOrderDetailAction.ASSIGN_BAY, error = null) }
+        viewModelScope.launch {
+            assign(workOrderId, bay)
+                .onSuccess {
+                    refreshBayBoard?.invoke()
+                    val updatedDetail = getDetail(workOrderId).getOrNull()
+                    _uiState.update { state ->
+                        val fallbackDetail = state.detail?.let { d ->
+                            d.copy(workOrder = d.workOrder.copy(currentBayId = bay.id, bayName = bay.name))
+                        }
+                        state.copy(
+                            busyAction = null,
+                            showAssignBayDialog = false,
+                            detail = updatedDetail ?: fallbackDetail,
+                            notice = UiText.Resource(R.string.order_bay_assigned_notice, bay.name)
+                        )
+                    }
+                }
+                .onFailure(::failWorkOrder)
+        }
+    }
+
+    // --- Asignar o reasignar mecánico para una tarea (US12 E2, US22 E2) ---
+
+    fun onOpenAssignMechanic(task: TaskDetail) {
+        if (!_uiState.value.canChangeMechanic) return
+        _uiState.update { it.copy(assigningMechanicTask = task, notice = null, error = null) }
+        if (_uiState.value.availableMechanics.isEmpty()) {
+            viewModelScope.launch {
+                getBranchMechanics?.invoke()?.onSuccess { list ->
+                    _uiState.update { it.copy(availableMechanics = list) }
+                }
+            }
+        }
+    }
+
+    fun onDismissAssignMechanic() = _uiState.update {
+        if (it.isBusy) it else it.copy(assigningMechanicTask = null, error = null)
+    }
+
+    fun onConfirmAssignMechanic(mechanic: MechanicOption) {
+        val task = _uiState.value.assigningMechanicTask ?: return
+        if (!_uiState.value.canChangeMechanic || _uiState.value.isBusy) return
+        _uiState.update { it.copy(busyAction = WorkOrderDetailAction.ASSIGN_MECHANIC, error = null) }
+        viewModelScope.launch {
+            // Intentamos primero reassignTaskMechanic (operations:bays:reassign); si falla o no está disponible,
+            // usamos updateTask (operations:work_orders:update) como fallback transparente (US12 E2, US22 E2).
+            val reassignResult = if (reassignTaskMechanic != null) {
+                reassignTaskMechanic(task.id.value, mechanic.membershipId)
+                    .mapCatching { getDetail(workOrderId).getOrThrow() }
+            } else null
+
+            val result = if (reassignResult != null && reassignResult.isSuccess) {
+                reassignResult
+            } else {
+                updateTask(workOrderId, task.id.value, WorkOrderTaskChanges(mechanicId = mechanic.membershipId))
+            }
+
+            result
+                .onSuccess { detail ->
+                    val mechanicName = mechanic.displayName
+                    val updatedTasks = detail.tasks.map { t ->
+                        if (t.id.value == task.id.value) {
+                            t.copy(mechanicId = mechanic.membershipId, mechanicName = mechanicName)
+                        } else t
+                    }
+                    val updatedDetail = detail.copy(tasks = updatedTasks)
+                    _uiState.update {
+                        it.copy(
+                            busyAction = null,
+                            assigningMechanicTask = null,
+                            detail = updatedDetail,
+                            notice = UiText.Resource(R.string.order_mechanic_assigned_notice, mechanicName)
                         )
                     }
                 }

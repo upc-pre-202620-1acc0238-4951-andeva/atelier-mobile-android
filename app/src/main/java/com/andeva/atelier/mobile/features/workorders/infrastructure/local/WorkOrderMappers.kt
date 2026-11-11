@@ -102,8 +102,8 @@ fun ServiceDto.toDomain() = ServiceOption(
 )
 
 /** Sin `membershipId` el colaborador no se puede asignar: se descarta. */
-fun EmployeeProfileDto.toMechanicOption(): MechanicOption? =
-    membershipId?.let { MechanicOption(it, jobTitle, employmentStatus) }
+fun EmployeeProfileDto.toMechanicOption(name: String? = null): MechanicOption? =
+    membershipId?.let { MechanicOption(it, jobTitle, employmentStatus, name) }
 
 fun PartMovementDto.toDomain() = PartMovement(
     allocationId = allocationId,

@@ -33,6 +33,18 @@ interface AttendanceService {
         @Body body: JustifyAttendanceRequestDto
     ): Response<AttendanceDto>
 
+    @GET("api/v1/hr/attendances/branch/{branchId}/daily")
+    suspend fun branchDaily(
+        @Path("branchId") branchId: String,
+        @Query("date") date: String? = null
+    ): Response<List<AttendanceDto>>
+
+    @POST("api/v1/hr/attendances/{attendanceId}/justification/approve")
+    suspend fun approveJustification(@Path("attendanceId") attendanceId: String): Response<AttendanceDto>
+
+    @POST("api/v1/hr/attendances/{attendanceId}/justification/reject")
+    suspend fun rejectJustification(@Path("attendanceId") attendanceId: String): Response<AttendanceDto>
+
     @GET("api/v1/hr/work-shifts/{shiftId}")
     suspend fun getWorkShift(@Path("shiftId") shiftId: String): Response<WorkShiftDto>
 }

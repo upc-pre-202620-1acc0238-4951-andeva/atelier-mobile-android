@@ -10,6 +10,15 @@ import kotlinx.coroutines.flow.Flow
 interface DiagnosticsRepository {
     suspend fun getDevices(status: DeviceStatus?): Result<List<ObdDevice>>
 
+    suspend fun registerDevice(
+        deviceIdentifier: String,
+        connectionType: String,
+        hardwareModel: String?,
+        firmwareVersion: String?
+    ): Result<ObdDevice>
+
+    suspend fun updateDeviceStatus(deviceId: String, status: DeviceStatus): Result<ObdDevice>
+
     /** null = el vehículo no tiene escáner instalado (404). */
     suspend fun getActiveInstallation(vehicleId: String): Result<DeviceInstallation?>
 

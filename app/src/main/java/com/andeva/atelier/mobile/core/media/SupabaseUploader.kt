@@ -8,6 +8,8 @@ import com.andeva.atelier.mobile.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.andeva.atelier.mobile.core.di.SupabaseClient
 import com.andeva.atelier.mobile.core.domain.ApiException
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -27,7 +29,8 @@ import kotlin.math.max
 @Singleton
 class SupabaseUploader @Inject constructor(
     @SupabaseClient private val client: OkHttpClient,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val gson: Gson
 ) {
     private val baseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val bucket = BuildConfig.SUPABASE_BUCKET
@@ -54,13 +57,19 @@ class SupabaseUploader @Inject constructor(
                 if (response.isSuccessful) {
                     Result.success(publicUrlFor(storagePath))
                 } else {
-                    Result.failure(ApiException(response.code, "HTTP_${response.code}", response.message.ifBlank { "Error ${response.code}" }))
+                    val message = errorMessage(response.body.string()) ?: response.message.ifBlank { "Error ${response.code}" }
+                    Result.failure(ApiException(response.code, "HTTP_${response.code}", message))
                 }
             }
         } catch (e: IOException) {
             Result.failure(e)
         }
     }
+
+    /** `message` del cuerpo de error de Storage (`{"statusCode","error","message"}`); con HTTP/2 la línea de estado no trae texto. */
+    internal fun errorMessage(body: String): String? = runCatching {
+        gson.fromJson(body, JsonObject::class.java)?.get("message")?.takeIf { it.isJsonPrimitive }?.asString
+    }.getOrNull()?.takeIf { it.isNotBlank() }
 
     /** JPEG con el lado mayor en 1600 px y calidad 80, antes de guardarlo en `filesDir/pending`. */
     suspend fun compress(source: File, target: File): File = withContext(Dispatchers.IO) {

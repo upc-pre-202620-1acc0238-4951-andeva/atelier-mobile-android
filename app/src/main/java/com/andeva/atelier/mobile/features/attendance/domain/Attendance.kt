@@ -19,3 +19,10 @@ data class Attendance(
 ) {
     val isOpen: Boolean get() = clockOut == null
 }
+
+/** Registro diario de asistencia de un colaborador de la sede (`GET /api/v1/hr/attendances/branch/{branchId}/daily`). */
+data class BranchAttendanceItem(
+    val attendance: Attendance,
+    val membershipId: String?,
+    val collaboratorLabel: String
+)

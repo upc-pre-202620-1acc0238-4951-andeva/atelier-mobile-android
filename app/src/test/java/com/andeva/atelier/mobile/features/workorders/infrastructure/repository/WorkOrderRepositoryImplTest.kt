@@ -214,7 +214,7 @@ class WorkOrderRepositoryImplTest {
     }
 
     @Test
-    fun `mecanicos de la sede con iam members read solo activos`() = runTest {
+    fun `mecanicos de la sede con iam members read solo activos y resuelve nombres`() = runTest {
         env.signIn(permissions = listOf(Permission.MEMBERS_READ))
         env.responses["GET /api/v1/hr/employees/branch/b1"] = env.json(
             listOf(
@@ -222,8 +222,16 @@ class WorkOrderRepositoryImplTest {
                 mapOf("id" to "e2", "branchId" to "b1", "membershipId" to "m8", "jobTitle" to "Mecánico", "employmentStatus" to "TERMINATED")
             )
         )
+        env.responses["GET /api/v1/memberships"] = env.json(
+            listOf(
+                mapOf("id" to "m9", "employeeName" to "Carlos Mecánico", "status" to "ACTIVE")
+            )
+        )
 
-        assertEquals(listOf("m9"), repository.getBranchMechanics().getOrThrow().map { it.membershipId })
+        val mechanics = repository.getBranchMechanics().getOrThrow()
+        assertEquals(listOf("m9"), mechanics.map { it.membershipId })
+        assertEquals("Carlos Mecánico", mechanics.single().name)
+        assertEquals("Carlos Mecánico", mechanics.single().displayName)
     }
 
     @Test

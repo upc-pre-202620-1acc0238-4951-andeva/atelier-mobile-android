@@ -127,41 +127,47 @@ internal fun RegisterCustomerContent(
             }
             if (state.customerLocked) {
                 AtelierBanner(
-                    message = stringResource(R.string.register_customer_saved_pending_vehicle),
+                    message = if (state.presetCustomerName != null) {
+                        stringResource(R.string.register_vehicle_for_existing_customer, state.presetCustomerName)
+                    } else {
+                        stringResource(R.string.register_customer_saved_pending_vehicle)
+                    },
                     icon = Icons.Outlined.Info,
                     kind = BannerKind.Info
                 )
             }
 
-            SectionTitle(R.string.register_customer_section_customer)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                KindButton(R.string.register_customer_individual, !company, customerEnabled, Modifier.weight(1f)) {
-                    actions.onKindChange(CustomerType.INDIVIDUAL)
+            if (state.presetCustomerName == null) {
+                SectionTitle(R.string.register_customer_section_customer)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    KindButton(R.string.register_customer_individual, !company, customerEnabled, Modifier.weight(1f)) {
+                        actions.onKindChange(CustomerType.INDIVIDUAL)
+                    }
+                    KindButton(R.string.register_customer_company, company, customerEnabled, Modifier.weight(1f)) {
+                        actions.onKindChange(CustomerType.COMPANY)
+                    }
                 }
-                KindButton(R.string.register_customer_company, company, customerEnabled, Modifier.weight(1f)) {
-                    actions.onKindChange(CustomerType.COMPANY)
+                if (company) {
+                    Field(R.string.register_customer_company_name, state.companyName, actions.onCompanyNameChange, customerEnabled,
+                        state.invalidField, "companyName", R.string.reception_field_company_name)
+                } else {
+                    Field(R.string.register_customer_first_name, state.firstName, actions.onFirstNameChange, customerEnabled,
+                        state.invalidField, "firstName", R.string.reception_field_first_name)
+                    Field(R.string.register_customer_last_name, state.lastName, actions.onLastNameChange, customerEnabled,
+                        state.invalidField, "lastName", R.string.reception_field_last_name)
                 }
+                Field(
+                    label = if (company) R.string.register_customer_tax_id_company else R.string.register_customer_tax_id_person,
+                    value = state.taxId, onChange = actions.onTaxIdChange, enabled = customerEnabled,
+                    invalidField = state.invalidField, field = "taxId",
+                    errorRes = if (company) R.string.reception_field_tax_id_company else R.string.reception_field_tax_id_person,
+                    keyboardType = KeyboardType.Number
+                )
+                Field(R.string.register_customer_email, state.email, actions.onEmailChange, customerEnabled,
+                    state.invalidField, "email", R.string.reception_field_email, KeyboardType.Email)
+                Field(R.string.register_customer_phone, state.phone, actions.onPhoneChange, customerEnabled,
+                    state.invalidField, "phone", R.string.reception_field_phone, KeyboardType.Phone)
             }
-            if (company) {
-                Field(R.string.register_customer_company_name, state.companyName, actions.onCompanyNameChange, customerEnabled,
-                    state.invalidField, "companyName", R.string.reception_field_company_name)
-            } else {
-                Field(R.string.register_customer_first_name, state.firstName, actions.onFirstNameChange, customerEnabled,
-                    state.invalidField, "firstName", R.string.reception_field_first_name)
-                Field(R.string.register_customer_last_name, state.lastName, actions.onLastNameChange, customerEnabled,
-                    state.invalidField, "lastName", R.string.reception_field_last_name)
-            }
-            Field(
-                label = if (company) R.string.register_customer_tax_id_company else R.string.register_customer_tax_id_person,
-                value = state.taxId, onChange = actions.onTaxIdChange, enabled = customerEnabled,
-                invalidField = state.invalidField, field = "taxId",
-                errorRes = if (company) R.string.reception_field_tax_id_company else R.string.reception_field_tax_id_person,
-                keyboardType = KeyboardType.Number
-            )
-            Field(R.string.register_customer_email, state.email, actions.onEmailChange, customerEnabled,
-                state.invalidField, "email", R.string.reception_field_email, KeyboardType.Email)
-            Field(R.string.register_customer_phone, state.phone, actions.onPhoneChange, customerEnabled,
-                state.invalidField, "phone", R.string.reception_field_phone, KeyboardType.Phone)
 
             SectionTitle(R.string.register_customer_section_vehicle)
             Field(R.string.register_vehicle_plate, state.plate, actions.onPlateChange, vehicleEnabled,

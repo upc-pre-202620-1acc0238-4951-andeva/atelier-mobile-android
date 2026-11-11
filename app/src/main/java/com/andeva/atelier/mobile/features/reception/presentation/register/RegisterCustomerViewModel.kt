@@ -35,14 +35,26 @@ class RegisterCustomerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(RegisterCustomerUiState(email = savedStateHandle["email"] ?: ""))
+    private val _uiState = MutableStateFlow(
+        RegisterCustomerUiState(
+            email = savedStateHandle["email"] ?: "",
+            plate = savedStateHandle["plate"] ?: "",
+            registeredCustomerId = savedStateHandle["customerId"],
+            presetCustomerName = savedStateHandle["customerName"]
+        )
+    )
     val uiState: StateFlow<RegisterCustomerUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             observeSession().collect { session ->
-                val allowed = session?.has(Permission.CUSTOMERS_CREATE) == true &&
-                    session.has(Permission.VEHICLES_CREATE)
+                val onlyVehicle = _uiState.value.registeredCustomerId != null
+                val allowed = if (onlyVehicle) {
+                    session?.has(Permission.VEHICLES_CREATE) == true
+                } else {
+                    session?.has(Permission.CUSTOMERS_CREATE) == true &&
+                        session.has(Permission.VEHICLES_CREATE)
+                }
                 _uiState.update { it.copy(canRegister = allowed) }
             }
         }
@@ -92,7 +104,9 @@ class RegisterCustomerViewModel @Inject constructor(
                     year = year
                 )
             )
-                .onSuccess { _uiState.update { it.copy(isSaving = false, done = true) } }
+                .onSuccess { vehicle ->
+                    _uiState.update { it.copy(isSaving = false, registeredVehicleId = vehicle.id, done = true) }
+                }
                 .onFailure(::fail)
         }
     }

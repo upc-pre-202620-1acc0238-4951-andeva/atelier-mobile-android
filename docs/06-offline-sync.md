@@ -114,7 +114,7 @@ Una sola tabla para todo lo que se captura sin red. Reemplaza `pending_sync_even
 | `CLOCK_IN` | `POST /hr/attendances/clock-in` | `{ branchId, shiftId, latitude, longitude, clockInTime }` | 409 = ya existe una jornada abierta → **se considera aplicada** |
 | `CLOCK_OUT` | `POST /hr/attendances/clock-out` | `{ attendanceId?, clockOutTime }` | 400 ("salida ya registrada" o reloj desajustado) y 404 ("sin jornada abierta" o salida sin ingreso) son ambiguos: se verifican con `history` del día. Si la jornada ya tiene salida → aplicada; si no → FAILED con el `message`. Sin red para verificar → se reintenta |
 | `SUBMIT_JUSTIFICATION` | `POST /hr/attendances/{attendanceId}/justification` | `{ attendanceId, reason }` (el id va en la ruta; el body es `{ reason }`) | 422 "ya justificada" → aplicada |
-| `UPLOAD_FILE` | `POST {SUPABASE_URL}/storage/v1/object/atelier/{ruta}` | archivo de `pending_uploads` | Misma ruta = mismo objeto (usar `x-upsert: true`) |
+| `UPLOAD_FILE` | `POST {SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{ruta}` | archivo de `pending_uploads` | Misma ruta = mismo objeto (usar `x-upsert: true`) |
 | `ATTACH_INTAKE_IMAGE` | `POST /work-orders/{id}/intake-images` | `{ imageUrl, description }` | ✅ Misma `imageUrl` en la orden → devuelve la imagen ya guardada (R4) |
 | `ATTACH_TASK_EVIDENCE` | `POST /tasks/{id}/evidence-images` | `{ imageUrl, description }` | ✅ Misma `imageUrl` en la tarea → devuelve la evidencia ya guardada (R4) |
 | `SUBMIT_PROPOSAL` | `POST /work-orders/{id}/proposals` | `{ mechanicId, description, severity, imageUrl, suggestedServiceId? }` | ✅ Misma `imageUrl` en la orden → devuelve la propuesta ya registrada (R4) |
