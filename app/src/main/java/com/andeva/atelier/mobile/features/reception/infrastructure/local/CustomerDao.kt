@@ -20,6 +20,9 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE id = :id")
     fun observeById(id: String): Flow<CustomerEntity?>
 
+    @Query("SELECT * FROM customers ORDER BY display_name COLLATE NOCASE")
+    fun observeAll(): Flow<List<CustomerEntity>>
+
     /** Búsqueda sin red: documento exacto al inicio o parte del nombre. */
     @Query(
         "SELECT * FROM customers WHERE tax_id LIKE :query || '%' OR display_name LIKE '%' || :query || '%' " +

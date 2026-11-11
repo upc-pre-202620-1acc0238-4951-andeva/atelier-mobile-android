@@ -1,14 +1,28 @@
 package com.andeva.atelier.mobile.features.reception.infrastructure.local
 
+import androidx.room3.ColumnInfo
 import androidx.room3.Dao
+import androidx.room3.Embedded
 import androidx.room3.Query
 import androidx.room3.Transaction
 import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
+/** Vehículo en caché unido a los datos de su propietario actual si también está en `customers`. */
+data class VehicleWithOwnerRow(
+    @Embedded val vehicle: VehicleEntity,
+    @ColumnInfo(name = "owner_id") val ownerId: String?,
+    @ColumnInfo(name = "owner_type") val ownerType: String?,
+    @ColumnInfo(name = "owner_name") val ownerName: String?,
+    @ColumnInfo(name = "owner_tax_id") val ownerTaxId: String?,
+    @ColumnInfo(name = "owner_email") val ownerEmail: String?,
+    @ColumnInfo(name = "owner_phone") val ownerPhone: String?,
+    @ColumnInfo(name = "owner_status") val ownerStatus: String?
+)
+
 /**
  * Caché `vehicles` (docs/06-offline-sync.md §4, vehículos vistos · 7 días). La llenan `reception` (búsqueda por
- * placa, altas, citas) y `tasks` (placa de mis tareas, US26).
+ * placa, altas, citas), `workorders` y `tasks` (placa de mis tareas, US26).
  */
 @Dao
 abstract class VehicleDao {
@@ -44,4 +58,12 @@ abstract class VehicleDao {
 
     @Query("SELECT * FROM vehicles WHERE current_owner_id = :ownerId ORDER BY plate")
     abstract fun observeByOwner(ownerId: String): Flow<List<VehicleEntity>>
+
+    @Query(
+        "SELECT v.*, c.id AS owner_id, c.type AS owner_type, c.display_name AS owner_name, " +
+            "c.tax_id AS owner_tax_id, c.email AS owner_email, c.phone AS owner_phone, c.status AS owner_status " +
+            "FROM vehicles v LEFT JOIN customers c ON c.id = v.current_owner_id " +
+            "ORDER BY v.synced_at DESC, v.plate ASC"
+    )
+    abstract fun observeAllWithOwners(): Flow<List<VehicleWithOwnerRow>>
 }

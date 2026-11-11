@@ -22,6 +22,7 @@ class AtelierMessagingService : FirebaseMessagingService() {
 
     @Inject lateinit var sessionManager: SessionManager
     @Inject lateinit var deviceTokenRegistrar: DeviceTokenRegistrar
+    @Inject lateinit var pushInbox: PushInbox
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -33,6 +34,7 @@ class AtelierMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val destination = PushRouter.route(message.data) ?: return          // tipo desconocido: se ignora
+        pushInbox.record(message.notification?.title, message.notification?.body, destination)
         val notificationManager = NotificationManagerCompat.from(this)
         if (!notificationManager.areNotificationsEnabled()) return
 

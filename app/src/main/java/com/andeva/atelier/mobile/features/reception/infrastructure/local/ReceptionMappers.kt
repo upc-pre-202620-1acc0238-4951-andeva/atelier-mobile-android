@@ -9,6 +9,7 @@ import com.andeva.atelier.mobile.features.reception.domain.CustomerType
 import com.andeva.atelier.mobile.features.reception.domain.EngineType
 import com.andeva.atelier.mobile.features.reception.domain.PlatformAccount
 import com.andeva.atelier.mobile.features.reception.domain.Vehicle
+import com.andeva.atelier.mobile.features.reception.domain.VehicleWithOwner
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.AffiliationLookupDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.AppointmentDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CustomerDto
@@ -64,6 +65,21 @@ fun VehicleEntity.toDomain() = Vehicle(
 )
 
 fun VehicleDto.toDomain(syncedAt: Long) = toEntity(syncedAt).toDomain()
+
+fun VehicleWithOwnerRow.toDomain() = VehicleWithOwner(
+    vehicle = vehicle.toDomain(),
+    owner = ownerId?.let { id ->
+        Customer(
+            id = id,
+            type = ownerType.toEnum<CustomerType>(),
+            displayName = ownerName.orEmpty(),
+            taxId = ownerTaxId,
+            email = ownerEmail,
+            phone = ownerPhone,
+            status = ownerStatus?.ifEmpty { null }
+        )
+    }
+)
 
 fun AppointmentDto.toEntity(syncedAt: Long) = AppointmentEntity(
     id = id,

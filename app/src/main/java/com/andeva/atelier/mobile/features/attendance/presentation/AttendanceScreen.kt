@@ -64,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.attendance.domain.Attendance
@@ -88,7 +89,11 @@ private val DateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm", L
 private val TimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("es-PE"))
 
 @Composable
-fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
+fun AttendanceScreen(
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    viewModel: AttendanceViewModel = hiltViewModel()
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedDay by remember { mutableStateOf(DayOfWeek.from(LocalDate.now(LimaZone))) }
     var showClockOutConfirmation by remember { mutableStateOf(false) }
@@ -120,7 +125,18 @@ fun AttendanceScreen(viewModel: AttendanceViewModel = hiltViewModel()) {
         )
     val canMarkOut = state.session?.has(Permission.ATTENDANCE_CLOCK_OUT) == true && state.canClockOut
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            if (onBack != null) {
+                AtelierTopBar(
+                    title = stringResource(R.string.attendance_title),
+                    onBack = onBack
+                )
+            }
+        }
+    ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)

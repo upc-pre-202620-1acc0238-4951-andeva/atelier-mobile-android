@@ -17,3 +17,10 @@ data class AssignWorkBayRequestDto(@SerializedName("bayId") val bayId: String)
 
 /** `AssignTaskMechanicRequest`. */
 data class AssignTaskMechanicRequestDto(@SerializedName("mechanicId") val mechanicId: String)
+
+/** `CreateWorkBayResource` de docs/api/operations.md. */
+data class CreateWorkBayRequestDto(
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("bayType") val bayType: String
+)

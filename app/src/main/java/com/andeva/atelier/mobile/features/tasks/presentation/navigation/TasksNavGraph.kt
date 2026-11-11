@@ -6,6 +6,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.TaskDetailScreen
 import com.andeva.atelier.mobile.features.tasks.presentation.mytasks.MyTasksScreen
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.ReportFindingRoute
 import kotlinx.serialization.Serializable
 
 /** Grafo de tareas del mecánico (EP06). */
@@ -29,7 +30,10 @@ fun NavGraphBuilder.tasksNavGraph(navController: NavController) {
             )
         }
         composable<TaskDetailRoute> {
-            TaskDetailScreen(onBack = { navController.popBackStack() })
+            TaskDetailScreen(
+                onBack = { navController.popBackStack() },
+                onReportFinding = { workOrderId -> navController.navigate(ReportFindingRoute(workOrderId)) }
+            )
         }
     }
 }

@@ -22,4 +22,8 @@ interface EmployeeService {
     /** Colaboradores de una sede, para asignar tareas (US12 E2). Exige `iam:members:read` (H11). */
     @GET("api/v1/hr/employees/branch/{branchId}")
     suspend fun getByBranch(@Path("branchId") branchId: String): Response<List<EmployeeProfileDto>>
+
+    /** Membresías del taller para obtener nombres (`employeeName`) de los colaboradores (docs/api/iam.md). Exige `iam:members:read`. */
+    @GET("api/v1/memberships")
+    suspend fun getMemberships(): Response<List<MembershipDto>>
 }

@@ -8,6 +8,8 @@ import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
 import com.andeva.atelier.mobile.features.bays.domain.BayOccupant
 import com.andeva.atelier.mobile.features.bays.domain.BayRepository
+import com.andeva.atelier.mobile.features.bays.domain.BayType
+import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.bays.domain.laborElapsed
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.toDomain
@@ -156,4 +158,20 @@ class BayRepositoryImpl @Inject constructor(
     override suspend fun reassignMechanic(taskId: String, mechanicId: String): Result<Unit> =
         apiCall(gson, { workBayService.assignMechanic(taskId, AssignTaskMechanicRequestDto(mechanicId)) }) { it }
             .map { mechanicChanges.update { value -> value + 1 } }
+
+    override suspend fun createBay(name: String, bayType: BayType): Result<WorkBay> {
+        val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
+        val branchId = session.branchId ?: return Result.failure(MissingBranchException())
+        val body = com.andeva.atelier.mobile.features.bays.infrastructure.remote.CreateWorkBayRequestDto(
+            branchId = branchId,
+            name = name.trim(),
+            bayType = bayType.name
+        )
+        return apiCall(gson, { workBayService.createBay(body) }) { it }.mapCatching { dto ->
+            val now = clock.millis()
+            val entity = dto.toEntity(branchId, now)
+            bayDao.upsert(entity)
+            entity.toDomain()
+        }.also { if (it.isSuccess) refreshBranchBays() }
+    }
 }

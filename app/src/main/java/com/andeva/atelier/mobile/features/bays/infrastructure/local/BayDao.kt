@@ -15,6 +15,9 @@ abstract class BayDao {
     @Upsert
     protected abstract suspend fun upsertAll(bays: List<BayEntity>)
 
+    @Upsert
+    abstract suspend fun upsert(bay: BayEntity)
+
     @Query("DELETE FROM bays WHERE branch_id = :branchId")
     protected abstract suspend fun deleteBranch(branchId: String)
 

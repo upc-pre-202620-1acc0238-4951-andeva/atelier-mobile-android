@@ -36,6 +36,7 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 
@@ -154,6 +155,22 @@ internal fun OpenWorkOrderContent(
                 isError = state.invalidField == "diagnosticSummary",
                 errorText = if (state.invalidField == "diagnosticSummary") stringResource(R.string.open_order_field_reason) else null
             )
+            if (!state.formLocked && state.reason.isBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    val quickReasons = listOf(
+                        stringResource(R.string.open_order_quick_reason_general),
+                        stringResource(R.string.open_order_quick_reason_preventive)
+                    )
+                    quickReasons.forEach { preset ->
+                        AtelierButton(
+                            text = preset,
+                            onClick = { onReasonChange(preset) },
+                            modifier = Modifier.weight(1f),
+                            style = AtelierButtonStyle.Outlined
+                        )
+                    }
+                }
+            }
 
             Catalog(state, onToggleService, onMechanicChange, onRetryCatalog)
 
@@ -201,8 +218,10 @@ private fun Catalog(
         }
         else -> state.services.forEach { service ->
             val added = service.id in state.addedServiceIds
+            val priceSuffix = service.basePrice?.let { " · ${it.format()}" }.orEmpty()
+            val label = "${service.name}$priceSuffix"
             AtelierButton(
-                text = if (added) stringResource(R.string.open_order_task_added, service.name) else service.name,
+                text = if (added) stringResource(R.string.open_order_task_added, label) else label,
                 onClick = { onToggleService(service.id) },
                 modifier = Modifier.fillMaxWidth(),
                 style = if (service.id in state.selectedServiceIds) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,

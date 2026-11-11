@@ -50,7 +50,9 @@ fun AtelierChip(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            color = content
+            color = content,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

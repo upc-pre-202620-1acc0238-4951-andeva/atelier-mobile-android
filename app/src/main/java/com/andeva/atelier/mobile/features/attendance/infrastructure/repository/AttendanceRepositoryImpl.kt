@@ -16,6 +16,7 @@ import com.andeva.atelier.mobile.features.attendance.domain.Attendance
 import com.andeva.atelier.mobile.features.attendance.domain.AttendanceId
 import com.andeva.atelier.mobile.features.attendance.domain.AttendanceRepository
 import com.andeva.atelier.mobile.features.attendance.domain.Branch
+import com.andeva.atelier.mobile.features.attendance.domain.BranchAttendanceItem
 import com.andeva.atelier.mobile.features.attendance.domain.DeviceLocation
 import com.andeva.atelier.mobile.features.attendance.domain.MissingAssignmentException
 import com.andeva.atelier.mobile.features.attendance.domain.SubmitOutcome
@@ -173,6 +174,54 @@ class AttendanceRepositoryImpl @Inject constructor(
             payload = JustificationPayload(id.value, body.reason),
             dedupeKey = AttendanceDedupeKeys.justification(id.value)
         )
+    }
+
+    override suspend fun getBranchDailyAttendance(date: LocalDate?): Result<List<BranchAttendanceItem>> {
+        val session = sessionManager.getSession() ?: return Result.failure(MissingAssignmentException())
+        val branchId = session.branchId ?: return Result.success(emptyList())
+        val now = clock.millis()
+        val queryDate = (date ?: today()).toString()
+        val employeesByMembership = if (session.has(Permission.MEMBERS_READ)) {
+            apiCall(gson, { employeeService.getByBranch(branchId) }) { dtos ->
+                dtos.mapNotNull { dto ->
+                    val mId = dto.membershipId ?: return@mapNotNull null
+                    mId to (dto.jobTitle?.takeIf { it.isNotBlank() } ?: "Colaborador · ${mId.takeLast(4)}")
+                }.toMap()
+            }.getOrDefault(emptyMap())
+        } else {
+            emptyMap()
+        }
+        return apiCall(gson, { attendanceService.branchDaily(branchId, queryDate) }) { dtos ->
+            dtos.mapNotNull { dto ->
+                val entity = dto.toEntity(dto.membershipId.orEmpty(), now) ?: return@mapNotNull null
+                val mId = dto.membershipId
+                val label = when {
+                    mId == session.membershipId -> session.fullName
+                    mId != null && mId in employeesByMembership -> employeesByMembership.getValue(mId)
+                    !mId.isNullOrBlank() -> "Colaborador · ${mId.takeLast(4)}"
+                    else -> "Colaborador"
+                }
+                BranchAttendanceItem(
+                    attendance = entity.toDomain(),
+                    membershipId = mId,
+                    collaboratorLabel = label
+                )
+            }
+        }
+    }
+
+    override suspend fun reviewJustification(id: AttendanceId, approve: Boolean): Result<Attendance> {
+        val now = clock.millis()
+        val call: suspend () -> Response<AttendanceDto> = if (approve) {
+            { attendanceService.approveJustification(id.value) }
+        } else {
+            { attendanceService.rejectJustification(id.value) }
+        }
+        return apiCall(gson, call) { dto ->
+            val entity = dto.toEntity(dto.membershipId.orEmpty(), now)
+                ?: error("AttendanceResource sin clockIn")
+            entity.toDomain()
+        }
     }
 
     /**

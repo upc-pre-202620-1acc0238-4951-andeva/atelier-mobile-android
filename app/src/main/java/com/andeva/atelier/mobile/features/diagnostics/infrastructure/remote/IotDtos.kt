@@ -15,6 +15,19 @@ data class ObdDeviceDto(
     @SerializedName("createdAt") val createdAt: String?
 )
 
+/** `RegisterDeviceRequest` de docs/api/iot.md. */
+data class RegisterDeviceRequestDto(
+    @SerializedName("deviceIdentifier") val deviceIdentifier: String,
+    @SerializedName("connectionType") val connectionType: String,
+    @SerializedName("hardwareModel") val hardwareModel: String? = null,
+    @SerializedName("firmwareVersion") val firmwareVersion: String? = null
+)
+
+/** `UpdateDeviceStatusRequest` de docs/api/iot.md. */
+data class UpdateDeviceStatusRequestDto(
+    @SerializedName("status") val status: String
+)
+
 /** `DeviceInstallationResponse`. */
 data class DeviceInstallationDto(
     @SerializedName("id") val id: String,

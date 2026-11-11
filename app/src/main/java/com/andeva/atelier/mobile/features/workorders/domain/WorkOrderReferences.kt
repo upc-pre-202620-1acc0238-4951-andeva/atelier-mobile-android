@@ -12,14 +12,21 @@ data class ServiceOption(
 )
 
 /**
- * Colaborador de la sede para asignar una tarea (`EmployeeProfileResource`). No hay endpoint con nombres (H11):
- * se identifica por [jobTitle]. [membershipId] es el `mechanicId` que espera el backend.
+ * Colaborador de la sede para asignar una tarea (`EmployeeProfileResource`). Se cruza con membresías
+ * (`MembershipResource`) para obtener [name] cuando el usuario tiene permiso `iam:members:read`.
+ * Si no está disponible el nombre, se identifica por [jobTitle]. [membershipId] es el `mechanicId` que espera el backend.
  */
 data class MechanicOption(
     val membershipId: String,
     val jobTitle: String?,
-    val employmentStatus: String?
-)
+    val employmentStatus: String?,
+    val name: String? = null
+) {
+    val displayName: String
+        get() = name?.takeIf { it.isNotBlank() }
+            ?: jobTitle?.takeIf { it.isNotBlank() }
+            ?: "Colaborador ${membershipId.takeLast(4)}"
+}
 
 /** Nueva tarea en la orden (US12 E2, US22 E1): `CreateWorkOrderTaskResource`. Precio sin IGV. */
 data class NewWorkOrderTask(

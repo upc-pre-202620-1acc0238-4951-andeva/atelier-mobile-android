@@ -6,10 +6,12 @@ import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.features.auth.application.GetSelectableBranchesUseCase
 import com.andeva.atelier.mobile.features.auth.application.SelectBranchUseCase
 import com.andeva.atelier.mobile.features.auth.application.SkipBranchChoiceUseCase
+import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -18,8 +20,15 @@ import javax.inject.Inject
 class BranchSelectionViewModel @Inject constructor(
     private val getBranches: GetSelectableBranchesUseCase,
     private val selectBranch: SelectBranchUseCase,
-    private val skipBranchChoice: SkipBranchChoiceUseCase
+    private val skipBranchChoice: SkipBranchChoiceUseCase,
+    private val observeSession: ObserveSessionUseCase? = null
 ) : ViewModel() {
+
+    constructor(
+        getBranches: GetSelectableBranchesUseCase,
+        selectBranch: SelectBranchUseCase,
+        skipBranchChoice: SkipBranchChoiceUseCase
+    ) : this(getBranches, selectBranch, skipBranchChoice, null)
 
     private val _uiState = MutableStateFlow(BranchSelectionUiState())
     val uiState: StateFlow<BranchSelectionUiState> = _uiState.asStateFlow()
@@ -28,15 +37,22 @@ class BranchSelectionViewModel @Inject constructor(
         load()
     }
 
-    /** `GET /branches`. Queda preseleccionada la primera sede, como en la galería. */
+    /** `GET /branches`. Preselecciona la sucursal asignada en la sesión o la primera sede disponible. */
     fun load() {
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
+            val sessionBranchId = observeSession?.invoke()?.firstOrNull()?.branchId
             getBranches()
                 .onSuccess { branches ->
                     _uiState.update { state ->
+                        val assigned = sessionBranchId?.takeIf { id -> branches.any { it.id == id } }
                         val keep = state.selectedId?.takeIf { id -> branches.any { it.id == id } }
-                        state.copy(isLoading = false, branches = branches, selectedId = keep ?: branches.firstOrNull()?.id)
+                        state.copy(
+                            isLoading = false,
+                            branches = branches,
+                            assignedBranchId = assigned,
+                            selectedId = keep ?: assigned ?: branches.firstOrNull()?.id
+                        )
                     }
                 }
                 .onFailure { e -> _uiState.update { it.copy(isLoading = false, error = e.toUiText()) } }

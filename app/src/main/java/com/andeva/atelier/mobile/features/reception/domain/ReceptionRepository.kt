@@ -16,6 +16,18 @@ interface ReceptionRepository {
 
     fun observeCustomer(id: String): Flow<Customer?>
 
+    /** Cartera de clientes sincronizada en la caché `customers`. */
+    fun observeCustomers(): Flow<List<Customer>>
+
+    /** Padrón de vehículos registrados en la caché `vehicles` junto a su titular si está en caché. */
+    fun observeWorkshopVehicles(): Flow<List<VehicleWithOwner>>
+
+    /** Recarga la cartera de clientes del taller (`GET /customers`) sin generar llamadas N+1 de vehículos. */
+    suspend fun refreshCustomers(force: Boolean = false): Result<Unit>
+
+    /** Hidrata en Room los vehículos y clientes faltantes o vencidos referenciados por órdenes o citas. */
+    suspend fun enrichReferences(vehicleIds: List<String>, customerIds: List<String>)
+
     /** `GET /customers/{id}` en línea (caja: puede no haberlo visto nunca); lo guarda en la caché `customers`. */
     suspend fun getCustomer(id: String): Result<Customer>
 

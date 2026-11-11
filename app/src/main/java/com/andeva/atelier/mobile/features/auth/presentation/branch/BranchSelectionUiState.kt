@@ -7,6 +7,7 @@ data class BranchSelectionUiState(
     val isLoading: Boolean = true,
     val branches: List<BranchOption> = emptyList(),
     val selectedId: String? = null,
+    val assignedBranchId: String? = null,
     val isSaving: Boolean = false,
     val error: UiText? = null,
     /** Un solo uso: la elección (o "después") quedó guardada y se puede entrar a la app. */

@@ -135,7 +135,12 @@ class OpenWorkOrderViewModel @Inject constructor(
                 _uiState.update { it.copy(workOrderId = orderId, orderSaved = true) }
             }
             for (service in state.pendingServices) {
-                val task = NewWorkOrderTask(service.id, service.name, state.selectedMechanicId)
+                val task = NewWorkOrderTask(
+                    serviceId = service.id,
+                    description = service.name,
+                    mechanicId = state.selectedMechanicId,
+                    price = service.basePrice?.amount
+                )
                 addTask(orderId!!, task)
                     .onSuccess { _uiState.update { it.copy(addedServiceIds = it.addedServiceIds + service.id) } }
                     .onFailure { return@launch fail(it) }

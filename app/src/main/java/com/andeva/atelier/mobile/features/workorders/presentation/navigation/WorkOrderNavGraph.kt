@@ -4,6 +4,10 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.MoreHubRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
+import com.andeva.atelier.mobile.features.reception.presentation.navigation.VehicleSearchRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.WorkOrderDetailScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.finding.ReportFindingScreen
@@ -62,8 +66,17 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
     }
     composable<WorkOrdersRoute> {
         WorkOrdersScreen(
-            onBack = { navController.popBackStack() },
-            onOpenOrder = { workOrderId -> navController.navigate(WorkOrderDetailRoute(workOrderId)) }
+            onBack = if (navController.previousBackStackEntry != null) { { navController.popBackStack() } } else null,
+            onOpenMenu = { navController.navigate(MoreHubRoute) },
+            onOpenNotifications = { navController.navigate(NotificationsRoute) },
+            onOpenSync = { navController.navigate(PendingOperationsRoute) },
+            onOpenOrder = { workOrderId -> navController.navigate(WorkOrderDetailRoute(workOrderId)) },
+            onOpenNewOrder = { vehicleId, customerId, workOrderId ->
+                navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId.ifBlank { null }))
+            },
+            onNavigateToReception = {
+                navController.navigate(VehicleSearchRoute)
+            }
         )
     }
     composable<WorkOrderDetailRoute> {
@@ -71,7 +84,10 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
             onBack = { navController.popBackStack() },
             onOpenTask = { workOrderId, taskId -> navController.navigate(TaskDetailRoute(workOrderId, taskId)) },
             onOpenProposals = { workOrderId -> navController.navigate(ProposalsPanelRoute(workOrderId)) },
-            onOpenGallery = { workOrderId -> navController.navigate(IntakeGalleryRoute(workOrderId)) }
+            onOpenGallery = { workOrderId -> navController.navigate(IntakeGalleryRoute(workOrderId)) },
+            onCompleteOrder = { vehicleId, customerId, workOrderId ->
+                navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId))
+            }
         )
     }
     composable<IntakeGalleryRoute> { entry ->

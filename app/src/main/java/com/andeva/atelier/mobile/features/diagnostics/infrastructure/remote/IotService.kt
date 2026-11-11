@@ -19,6 +19,15 @@ interface IotService {
     @GET("api/v1/iot/devices")
     suspend fun getDevices(@Query("status") status: String?): Response<List<ObdDeviceDto>>
 
+    @POST("api/v1/iot/devices")
+    suspend fun registerDevice(@Body body: RegisterDeviceRequestDto): Response<ObdDeviceDto>
+
+    @PATCH("api/v1/iot/devices/{id}/status")
+    suspend fun updateDeviceStatus(
+        @Path("id") id: String,
+        @Body body: UpdateDeviceStatusRequestDto
+    ): Response<ObdDeviceDto>
+
     /** 404 = el vehículo no tiene escáner instalado. */
     @GET("api/v1/iot/installations/vehicle/{vehicleId}/active")
     suspend fun getActiveInstallation(@Path("vehicleId") vehicleId: String): Response<DeviceInstallationDto>

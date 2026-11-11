@@ -154,9 +154,30 @@ class WorkOrderRepositoryImpl @Inject constructor(
         val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
         val branchId = session.branchId ?: return Result.failure(MissingBranchException())
         if (!session.has(Permission.MEMBERS_READ)) return Result.success(emptyList())
-        return apiCall(gson, { employeeService.getByBranch(branchId) }) { dtos ->
-            dtos.filter { it.employmentStatus == null || it.employmentStatus == ACTIVE }.mapNotNull { it.toMechanicOption() }
+
+        val branchEmployeesResult = apiCall(gson, { employeeService.getByBranch(branchId) }) { it }
+        val branchEmployees = branchEmployeesResult.getOrElse { return Result.failure(it) }
+
+        val namesByMembershipId = mutableMapOf<String, String>()
+        session.membershipId?.let { myId ->
+            session.fullName?.takeIf { it.isNotBlank() }?.let { myName ->
+                namesByMembershipId[myId] = myName
+            }
         }
+        val membershipsResult = apiCall(gson, { employeeService.getMemberships() }) { it }
+        membershipsResult.getOrNull()?.forEach { membership ->
+            membership.employeeName?.takeIf { it.isNotBlank() }?.let { name ->
+                namesByMembershipId[membership.id] = name
+            }
+        }
+
+        val mechanics = branchEmployees
+            .filter { it.employmentStatus == null || it.employmentStatus == ACTIVE }
+            .mapNotNull { employee ->
+                val name = employee.membershipId?.let { namesByMembershipId[it] }
+                employee.toMechanicOption(name)
+            }
+        return Result.success(mechanics)
     }
 
     override suspend fun attachIntakePhoto(id: String, photo: File, description: String?): Result<Unit> =

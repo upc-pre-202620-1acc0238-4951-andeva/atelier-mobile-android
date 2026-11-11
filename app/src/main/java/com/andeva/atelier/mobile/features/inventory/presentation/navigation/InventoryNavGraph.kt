@@ -6,6 +6,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navigation
 import com.andeva.atelier.mobile.features.inventory.presentation.catalog.PartsCatalogScreen
 import com.andeva.atelier.mobile.features.inventory.presentation.detail.PartDetailScreen
+import com.andeva.atelier.mobile.features.main.presentation.navigation.MoreHubRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
 import kotlinx.serialization.Serializable
 
 /** Grafo de inventario (EP07). */
@@ -23,8 +26,12 @@ data class PartDetailRoute(val partId: String)
 fun NavGraphBuilder.inventoryNavGraph(navController: NavController) {
     navigation<InventoryNavGraphRoute>(startDestination = PartsCatalogRoute) {
         composable<PartsCatalogRoute> {
+            val canPop = navController.previousBackStackEntry != null
             PartsCatalogScreen(
-                onBack = { navController.popBackStack() },
+                onBack = if (canPop) { { navController.popBackStack() } } else null,
+                onOpenMenu = { navController.navigate(MoreHubRoute) },
+                onOpenNotifications = { navController.navigate(NotificationsRoute) },
+                onOpenSync = { navController.navigate(PendingOperationsRoute) },
                 onOpenPart = { partId -> navController.navigate(PartDetailRoute(partId)) }
             )
         }

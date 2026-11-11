@@ -143,6 +143,7 @@ internal fun BranchSelectionContent(
                         BranchCard(
                             branch = branch,
                             selected = branch.id == state.selectedId,
+                            isAssigned = branch.id == state.assignedBranchId,
                             enabled = !state.isSaving,
                             onClick = { onSelect(branch.id) }
                         )
@@ -184,7 +185,8 @@ private fun BranchCard(
     branch: BranchOption,
     selected: Boolean,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isAssigned: Boolean = false
 ) {
     val scheme = MaterialTheme.colorScheme
     val atelier = AtelierTheme.colors
@@ -233,6 +235,13 @@ private fun BranchCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            if (isAssigned) {
+                Text(
+                    text = stringResource(R.string.branch_assigned_badge),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.primary
+                )
+            }
             branch.geofenceRadiusMeters?.let { radius ->
                 Text(
                     text = stringResource(R.string.branch_geofence, radius),

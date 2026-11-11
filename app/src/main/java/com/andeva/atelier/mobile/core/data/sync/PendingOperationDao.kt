@@ -34,8 +34,14 @@ interface PendingOperationDao {
     @Query("SELECT * FROM pending_operations WHERE type = :type AND dedupe_key LIKE :prefix || '%' ORDER BY created_at")
     fun observeByTypeAndDedupePrefix(type: String, prefix: String): Flow<List<PendingOperationEntity>>
 
-    /** Próximo `next_attempt_at` de lo que sigue PENDING, para reprogramar el worker tras el backoff. */
-    @Query("SELECT MIN(next_attempt_at) FROM pending_operations WHERE user_id = :userId AND status = 'PENDING'")
+    /**
+     * Próximo `next_attempt_at` de lo que sigue PENDING, para reprogramar el worker tras el backoff. No cuenta las que
+     * esperan a un padre aún en cola: su hora ya pasó y reprogramarían el worker sin pausa mientras el padre espera.
+     */
+    @Query(
+        "SELECT MIN(o.next_attempt_at) FROM pending_operations o WHERE o.user_id = :userId AND o.status = 'PENDING' " +
+            "AND (o.depends_on IS NULL OR NOT EXISTS (SELECT 1 FROM pending_operations p WHERE p.id = o.depends_on))"
+    )
     suspend fun nextAttemptAt(userId: String): Long?
 
     @Query("UPDATE pending_operations SET status = 'SYNCING' WHERE id = :id")

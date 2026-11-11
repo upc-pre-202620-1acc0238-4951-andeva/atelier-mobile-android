@@ -13,8 +13,11 @@
 
 # Secrets and per-developer config
 /app/google-services.json
+/app/release/
+*.apk
 *.jks
 *.keystore
 keystore.properties
 *.local.md
 .env*
+/.codegraph/
