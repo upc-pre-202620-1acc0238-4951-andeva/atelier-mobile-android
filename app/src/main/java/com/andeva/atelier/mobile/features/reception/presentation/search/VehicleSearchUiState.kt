@@ -38,6 +38,7 @@ data class VehicleSearchUiState(
     val arrivingId: String? = null,
     val arrival: ArrivalResult? = null,
     val error: UiText? = null,
+    val isOnline: Boolean = true,
     val canSearch: Boolean = false,
     val canReadCustomers: Boolean = false,
     val canViewAppointments: Boolean = false,

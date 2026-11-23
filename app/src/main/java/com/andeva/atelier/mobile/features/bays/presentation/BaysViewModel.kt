@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.bays.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
@@ -32,7 +33,8 @@ class BaysViewModel @Inject constructor(
     private val refreshBayBoard: RefreshBayBoardUseCase,
     private val refreshOrders: RefreshBranchWorkOrdersUseCase,
     private val reassignBay: ReassignBayUseCase,
-    private val createBayUseCase: CreateBayUseCase? = null
+    private val createBayUseCase: CreateBayUseCase,
+    connectivity: ConnectivityObserver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BaysUiState())
@@ -66,6 +68,7 @@ class BaysViewModel @Inject constructor(
                 _uiState.update { it.copy(activeOrders = orders) }
             }
         }
+        viewModelScope.launch { connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } } }
         refresh()
     }
 
@@ -75,15 +78,15 @@ class BaysViewModel @Inject constructor(
         viewModelScope.launch {
             refreshOrders()
             refreshBayBoard()
-                .onSuccess { _uiState.update { it.copy(isRefreshing = false) } }
-                .onFailure { e -> _uiState.update { it.copy(isRefreshing = false, error = e.toUiText()) } }
+                .onSuccess { _uiState.update { it.copy(isRefreshing = false, hasLoaded = true) } }
+                .onFailure { e -> _uiState.update { it.copy(isRefreshing = false, hasLoaded = true, error = e.toUiText()) } }
         }
     }
 
     fun onFilterChange(status: BayStatus?) = _uiState.update { it.copy(statusFilter = status) }
 
     fun onOpenAssignOrder(bay: WorkBay) {
-        if (!_uiState.value.canAssignBay || !bay.canReceive) return
+        if (!_uiState.value.canAssignBay || !_uiState.value.isOnline || !bay.canReceive) return
         _uiState.update { it.copy(targetBayForAssign = bay, error = null, notice = null) }
     }
 
@@ -92,7 +95,7 @@ class BaysViewModel @Inject constructor(
     }
 
     fun onOpenCreateBay() = _uiState.update {
-        if (it.canManageBays) it.copy(showCreateDialog = true, error = null, notice = null) else it
+        if (it.canManageBays && it.isOnline) it.copy(showCreateDialog = true, error = null, notice = null) else it
     }
 
     fun onDismissCreateBay() = _uiState.update {
@@ -100,8 +103,8 @@ class BaysViewModel @Inject constructor(
     }
 
     fun onCreateBay(name: String, bayType: BayType) {
-        val useCase = createBayUseCase ?: return
-        if (name.isBlank() || _uiState.value.isCreatingBay) return
+        val useCase = createBayUseCase
+        if (name.isBlank() || _uiState.value.isCreatingBay || !_uiState.value.isOnline) return
         _uiState.update { it.copy(isCreatingBay = true, error = null) }
         viewModelScope.launch {
             useCase(name.trim(), bayType)
@@ -123,7 +126,7 @@ class BaysViewModel @Inject constructor(
 
     fun onAssignOrderToBay(workOrderId: String) {
         val bay = _uiState.value.targetBayForAssign ?: return
-        if (_uiState.value.isAssigning) return
+        if (_uiState.value.isAssigning || !_uiState.value.isOnline) return
         _uiState.update { it.copy(isAssigning = true, error = null) }
         viewModelScope.launch {
             reassignBay(workOrderId, bay)

@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.FieldShape
-import com.andeva.atelier.mobile.core.designsystem.theme.JetBrainsMono
+import com.andeva.atelier.mobile.core.designsystem.theme.Satoshi
 
 /**
  * Código de [length] dígitos. Es un solo campo de texto (acepta pegar y el código del SMS/correo)
@@ -96,14 +96,14 @@ fun AtelierOtpField(
                             .height(64.dp)
                             .clip(FieldShape)
                             .background(scheme.surface)
-                            .border(1.5.dp, border, FieldShape),
+                            .border(if (active || isError) 2.dp else 1.dp, border, FieldShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = value.getOrNull(index)?.toString().orEmpty(),
                             style = TextStyle(
-                                fontFamily = JetBrainsMono,
-                                fontWeight = FontWeight.Medium,
+                                fontFamily = Satoshi,
+                                fontWeight = FontWeight.Bold,
                                 fontSize = 28.sp,
                                 lineHeight = 36.sp
                             ),

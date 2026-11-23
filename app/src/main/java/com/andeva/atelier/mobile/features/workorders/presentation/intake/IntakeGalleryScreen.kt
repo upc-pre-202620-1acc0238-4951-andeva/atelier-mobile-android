@@ -1,24 +1,26 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.intake
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,17 +42,23 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
-import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.bone
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
+import com.andeva.atelier.mobile.features.workorders.domain.IntakeImage
 import com.andeva.atelier.mobile.features.workorders.presentation.components.rememberPhotoCapture
 
-/** US13: galería pericial de la recepción. [onDone] cierra la galería cuando el asesor terminó de fotografiar. */
+/**
+ * US13: galería pericial de la recepción. Las fotos se encolan con o sin red: las que esperan señal llevan su marca
+ * "pendiente de sincronizar". [onDone] cierra la galería cuando el asesor terminó de fotografiar.
+ */
 @Composable
 fun IntakeGalleryScreen(
     onBack: () -> Unit,
@@ -92,40 +100,66 @@ internal fun IntakeGalleryContent(
     modifier: Modifier = Modifier
 ) {
     val panels = InspectionAngle.entries.filter { it != InspectionAngle.OTHER }
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        AtelierTopBar(title = stringResource(R.string.gallery_title), onBack = onBack)
+    // Sin nada que pintar: los paneles salen como huesos (la espera de 150 ms evita el parpadeo).
+    val loading = rememberDelayedLoading(state.isLoading && state.photos.isEmpty() && state.canRead)
+    val noAccess = !state.canUpload && !state.canRead && !state.isLoading
+    Scaffold(
+        modifier = modifier.imePadding(),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { AtelierTopBar(title = stringResource(R.string.gallery_title), onBack = onBack) },
+        bottomBar = {
+            if (!noAccess) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AtelierButton(
+                        text = stringResource(R.string.gallery_done),
+                        onClick = onDone,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    AtelierButton(
+                        text = stringResource(R.string.gallery_proposals),
+                        onClick = onOpenProposals,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Text
+                    )
+                }
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxSize()
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (noAccess) {
+                AtelierNoPermissionState(text = stringResource(R.string.reception_no_permission))
+                return@Column
+            }
             Text(
                 text = stringResource(R.string.gallery_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
             if (!state.canUpload) {
-                AtelierBanner(
-                    message = stringResource(R.string.reception_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
+                AtelierNoPermissionState(text = stringResource(R.string.reception_no_permission))
             }
             AtelierTextField(
                 label = stringResource(R.string.gallery_note),
                 value = state.note,
                 onValueChange = onNoteChange,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.isSaving
+                enabled = !state.isSaving && state.canUpload
             )
-            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
+            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
 
             panels.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -134,6 +168,7 @@ internal fun IntakeGalleryContent(
                             label = stringResource(angle.labelRes()),
                             photo = state.photosFor(angle).firstOrNull(),
                             enabled = state.canUpload && !state.isSaving,
+                            loading = loading,
                             onClick = { onCapture(angle) },
                             modifier = Modifier.weight(1f)
                         )
@@ -141,18 +176,16 @@ internal fun IntakeGalleryContent(
                 }
             }
 
-            Text(
-                text = stringResource(R.string.gallery_other),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            state.photosFor(InspectionAngle.OTHER).chunked(2).forEach { pair ->
+            val others = state.photosFor(InspectionAngle.OTHER)
+            AtelierSectionHeader(title = stringResource(R.string.gallery_other), count = others.size.takeIf { it > 0 })
+            others.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     pair.forEach { photo ->
                         PhotoSlot(
                             label = photo.description ?: stringResource(R.string.gallery_angle_other),
                             photo = photo,
                             enabled = false,
+                            loading = false,
                             onClick = {},
                             modifier = Modifier.weight(1f)
                         )
@@ -169,25 +202,6 @@ internal fun IntakeGalleryContent(
                 loading = state.isSaving
             )
         }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            AtelierButton(
-                text = stringResource(R.string.gallery_done),
-                onClick = onDone,
-                modifier = Modifier.fillMaxWidth()
-            )
-            AtelierButton(
-                text = stringResource(R.string.gallery_proposals),
-                onClick = onOpenProposals,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Text
-            )
-        }
     }
 }
 
@@ -197,6 +211,7 @@ private fun PhotoSlot(
     label: String,
     photo: GalleryPhoto?,
     enabled: Boolean,
+    loading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -206,12 +221,15 @@ private fun PhotoSlot(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(CardShape)
+                .clip(MaterialTheme.shapes.small)
                 .background(AtelierTheme.colors.card)
-                .clickable(enabled = enabled, onClick = onClick),
+                .bone(loading)
+                .clickable(enabled = enabled && !loading, onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            if (photo == null) {
+            if (loading) {
+                // Hueso: nada que dibujar encima.
+            } else if (photo == null) {
                 Icon(
                     imageVector = Icons.Outlined.PhotoCamera,
                     contentDescription = takeLabel,
@@ -263,22 +281,41 @@ private fun PhotoStatus.chipKind(): ChipKind = when (this) {
     PhotoStatus.FAILED -> ChipKind.Bad
 }
 
-@Preview(name = "Galería · vacía · oscuro", widthDp = 360, heightDp = 1000, showBackground = true)
+// region Previews
+
+private val previewPhotos = listOf(
+    IntakeImage("i1", "https://example.invalid/frente.jpg", "Frente", null),
+    IntakeImage("i2", "https://example.invalid/techo.jpg", "Techo: rayón en el capó", null)
+)
+
+@Preview(name = "Galería · claro", widthDp = 390, heightDp = 844)
 @Composable
-private fun IntakeGalleryPreviewEmpty() = AtelierWorkshopTheme(darkTheme = true) {
+private fun IntakeGalleryPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
     IntakeGalleryContent(
-        state = IntakeGalleryUiState(isLoading = false, canUpload = true, canRead = true),
+        state = IntakeGalleryUiState(isLoading = false, canUpload = true, canRead = true, uploaded = previewPhotos),
         onBack = {}, onDone = {}, onOpenProposals = {}, onNoteChange = {}, onCapture = {}
     )
 }
 
-@Preview(name = "Galería · sin permiso · claro", widthDp = 360, heightDp = 1000, showBackground = true)
+@Preview(name = "Galería · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun IntakeGalleryPreviewNoPermission() = AtelierWorkshopTheme(darkTheme = false) {
+private fun IntakeGalleryPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
     IntakeGalleryContent(
         state = IntakeGalleryUiState(
-            isLoading = false, error = UiText.Dynamic("La foto no se pudo guardar.")
+            isLoading = false, canUpload = true, canRead = true,
+            error = UiText.Dynamic("La foto no se pudo guardar.")
         ),
         onBack = {}, onDone = {}, onOpenProposals = {}, onNoteChange = {}, onCapture = {}
     )
 }
+
+@Preview(name = "Galería · sin permiso", widthDp = 390, heightDp = 844)
+@Composable
+private fun IntakeGalleryPreviewNoPermission() = AtelierWorkshopTheme(darkTheme = false) {
+    IntakeGalleryContent(
+        state = IntakeGalleryUiState(isLoading = false),
+        onBack = {}, onDone = {}, onOpenProposals = {}, onNoteChange = {}, onCapture = {}
+    )
+}
+
+// endregion

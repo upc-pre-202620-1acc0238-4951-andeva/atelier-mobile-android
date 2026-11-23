@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
@@ -29,6 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
+import com.andeva.atelier.mobile.core.designsystem.theme.ControlShape
+import com.andeva.atelier.mobile.core.designsystem.theme.PlateShape
 
 /**
  * Contenedor de tarjeta agrupada estilo Lemon Cash.
@@ -60,10 +61,9 @@ fun AtelierGroupedCard(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
+            shape = CardShape,
             color = atelier.card,
-            tonalElevation = 1.dp,
-            border = BorderStroke(1.dp, atelier.outlineSoft.copy(alpha = 0.5f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 content()
@@ -112,7 +112,7 @@ fun AtelierGroupedRow(
             if (icon != null) {
                 Surface(
                     modifier = Modifier.size(38.dp),
-                    shape = CircleShape,
+                    shape = ControlShape,
                     color = iconContainerColor ?: scheme.surfaceVariant.copy(alpha = 0.6f)
                 ) {
                     Box(
@@ -154,9 +154,9 @@ fun AtelierGroupedRow(
 
             if (!trailingBadgeText.isNullOrBlank()) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = PlateShape,
                     color = trailingBadgeColor ?: scheme.primaryContainer,
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.clip(PlateShape)
                 ) {
                     Text(
                         text = trailingBadgeText,

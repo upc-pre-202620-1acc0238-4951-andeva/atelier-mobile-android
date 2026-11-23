@@ -1,5 +1,28 @@
 package com.andeva.atelier.mobile.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.runtime.rememberUpdatedState
+import com.andeva.atelier.mobile.core.designsystem.component.EaseOutQuint
+import com.andeva.atelier.mobile.core.designsystem.component.rememberReducedMotion
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import com.andeva.atelier.mobile.core.designsystem.component.LocalFloatingBarInset
+import com.andeva.atelier.mobile.features.main.presentation.more.ModulesSheet
+import com.andeva.atelier.mobile.features.main.presentation.navigation.navigateToModule
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -33,7 +56,11 @@ import com.andeva.atelier.mobile.features.main.presentation.isTabRoot
 import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminAttendanceRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminDashboardRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.mainTabsDestinations
+import com.andeva.atelier.mobile.features.cashier.presentation.navigation.WorkOrderCheckoutRoute
+import com.andeva.atelier.mobile.features.cashier.presentation.navigation.cashierNavGraph
+import com.andeva.atelier.mobile.features.reception.presentation.navigation.ReceptionNavGraphRoute
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
+import com.andeva.atelier.mobile.features.reports.presentation.navigation.reportsNavGraph
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.tasksNavGraph
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrderDetailRoute
@@ -65,6 +92,8 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
     val mainViewModel: MainViewModel = hiltViewModel()
     val mainState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val showBar = signedIn && isTabRoot(currentEntry?.destination, mainState.tabs)
+    val tabs by rememberUpdatedState(mainState.tabs)
+    val reducedMotion = rememberReducedMotion()
 
     val pendingPush by viewModel.pendingPush.collectAsStateWithLifecycle()
     LaunchedEffect(pendingPush, signedIn) {
@@ -83,18 +112,41 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
         navController.navigate(target) { launchSingleTop = true }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = { if (showBar) MainNavigationBar(navController) }
-    ) { innerPadding ->
+    // La barra flota sobre el contenido: no reserva alto. Publica el que tapa (LocalFloatingBarInset) y las raíces de
+    // pestaña lo suman al final de su lista con Modifier.floatingBarPadding().
+    var modulesOpen by rememberSaveable { mutableStateOf(false) }
+    var barInset by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CompositionLocalProvider(LocalFloatingBarInset provides if (showBar) barInset else 0.dp) {
         NavHost(
             navController = navController,
             startDestination = if (signedIn) MainNavGraphRoute else AuthNavGraphRoute,
-            // El espacio de la barra ya lo reserva este padding: las pantallas no vuelven a descontar la inferior.
+            // Con la barra a la vista, el inset inferior del sistema ya lo cuenta ella.
             modifier = Modifier
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
+                .fillMaxSize()
+                .then(if (showBar) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier),
+            // Entre pestañas, un fundido corto (se ve decenas de veces al día). Hacia un detalle, eje compartido:
+            // la pantalla entra desde el lado al que el gesto Atrás la devuelve.
+            enterTransition = {
+                when {
+                    reducedMotion -> EnterTransition.None
+                    isTabRoot(initialState.destination, tabs) && isTabRoot(targetState.destination, tabs) ->
+                        fadeIn(tween(120))
+                    else -> fadeIn(tween(200, easing = EaseOutQuint)) +
+                        slideInHorizontally(tween(240, easing = EaseOutQuint)) { it / 12 }
+                }
+            },
+            exitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(90)) },
+            popEnterTransition = {
+                if (reducedMotion) EnterTransition.None
+                else fadeIn(tween(200, easing = EaseOutQuint)) +
+                    slideInHorizontally(tween(240, easing = EaseOutQuint)) { -it / 12 }
+            },
+            popExitTransition = {
+                if (reducedMotion) ExitTransition.None
+                else fadeOut(tween(120)) + slideOutHorizontally(tween(200, easing = EaseOutQuint)) { it / 12 }
+            }
         ) {
             authNavGraph(navController)
             val mainStartDestination: Any = when {
@@ -126,16 +178,39 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
                 )
                 attendanceNavGraph(navController)
                 receptionNavGraph(navController)
-                workOrderNavGraph(navController)
+                workOrderNavGraph(
+                    navController = navController,
+                    onOpenCheckout = { id -> navController.navigate(WorkOrderCheckoutRoute(id)) }
+                )
+                cashierNavGraph(navController)
+                reportsNavGraph(navController)
                 tasksNavGraph(navController)
                 inventoryNavGraph(navController)
-                mainTabsDestinations(
-                    navController = navController,
-                    sessionFlow = viewModel.sessionFlow,
-                    pendingSyncCountFlow = viewModel.pendingSyncCountFlow
-                )
+                mainTabsDestinations(navController)
             }
         }
+        }
+        if (showBar) {
+            MainNavigationBar(
+                navController = navController,
+                modulesOpen = modulesOpen,
+                onOpenModules = { modulesOpen = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onSizeChanged { barInset = with(density) { it.height.toDp() } + 8.dp }
+            )
+        }
+    }
+    if (modulesOpen) {
+        ModulesSheet(
+            sessionFlow = viewModel.sessionFlow,
+            pendingSyncCountFlow = viewModel.pendingSyncCountFlow,
+            onDismiss = { modulesOpen = false },
+            onOpen = { destination ->
+                modulesOpen = false
+                navController.navigateToModule(destination)
+            }
+        )
     }
 
     // Login, logout o sesión vencida: se cambia de grafo limpiando la pila.

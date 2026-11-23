@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
@@ -73,6 +74,7 @@ internal fun MyTasksContent(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
+                .floatingBarPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

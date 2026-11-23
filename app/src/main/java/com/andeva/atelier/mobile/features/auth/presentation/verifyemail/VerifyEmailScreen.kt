@@ -44,7 +44,6 @@ import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.rise
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.JetBrainsMono
 import java.util.Locale
 
 /** A4 Verificar correo · código de 6 dígitos. */
@@ -210,7 +209,7 @@ private fun ExpiryLabel(secondsLeft: Int?) {
             val start = text.indexOf(clock)
             if (start >= 0) {
                 addStyle(
-                    SpanStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, color = onBackground),
+                    SpanStyle(fontWeight = FontWeight.Bold, color = onBackground),
                     start,
                     start + clock.length
                 )

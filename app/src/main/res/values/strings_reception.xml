@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reception_search_title">Recibir vehículo</string>
+    <string name="reception_search_plate_placeholder">ABC-123</string>
+    <string name="reception_search_by_document">Buscar por DNI o RUC</string>
+    <string name="reception_search_by_plate">Buscar por placa</string>
+    <string name="reception_search_offline_cache">Sin conexión. Buscas entre los datos guardados en este teléfono.</string>
+    <string name="reception_search_no_access">Tu perfil no tiene acceso a Recepción.</string>
+    <string name="reception_search_no_search_permission">Tu perfil no puede buscar vehículos ni clientes.</string>
+    <string name="reception_plate_not_found">No hay un vehículo con la placa %1$s.</string>
+    <string name="reception_open_order">Abrir orden</string>
+    <string name="reception_add_vehicle">Agregar vehículo</string>
+    <string name="reception_selected">Elegido</string>
+    <string name="reception_appointment_no_customer">Cliente sin cargar</string>
+    <string name="reception_arrive_title">Registrar llegada</string>
+    <string name="reception_arrive_confirm">Registrar llegada</string>
+    <string name="reception_arrive_time">Hora de la cita: %1$s</string>
+    <string name="reception_form_vehicle_title">Agregar vehículo</string>
+</resources>

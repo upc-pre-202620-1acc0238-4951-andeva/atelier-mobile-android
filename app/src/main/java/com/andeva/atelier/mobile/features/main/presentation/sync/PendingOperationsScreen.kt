@@ -1,47 +1,58 @@
 package com.andeva.atelier.mobile.features.main.presentation.sync
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.features.main.domain.PendingOperation
 import com.andeva.atelier.mobile.features.main.domain.PendingOperationStatus
+import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 private val SyncTimeFormat = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(BusinessTime.ZONE)
 
+/**
+ * Cola de sincronización: lo que se guardó en el teléfono y aún no llegó al servidor (solo fotos de recepción
+ * y propuestas se encolan, docs/06-offline-sync.md). Tocar una fila abre su detalle con reintentar o descartar.
+ */
 @Composable
 fun PendingOperationsScreen(
     onBack: () -> Unit,
@@ -68,139 +79,158 @@ internal fun PendingOperationsContent(
     onDiscard: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        AtelierTopBar(title = stringResource(R.string.sync_queue_title), onBack = onBack)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val selected = state.operations.firstOrNull { it.id == selectedId }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { AtelierTopBar(title = stringResource(R.string.sync_queue_title), onBack = onBack) }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            Text(
-                text = stringResource(R.string.sync_queue_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
-            )
-
-            AtelierBanner(
-                message = stringResource(
-                    if (state.isOnline) R.string.sync_status_online else R.string.sync_status_offline
-                ),
-                icon = if (state.isOnline) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
-                kind = if (state.isOnline) BannerKind.Ok else BannerKind.Wait
-            )
-
-            state.notice?.let {
-                AtelierBanner(message = it.asString(), icon = Icons.Outlined.Sync, kind = BannerKind.Info)
+            item(key = "summary") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.sync_queue_subtitle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AtelierTheme.colors.inkSecondary
+                    )
+                    if (!state.isOnline) {
+                        AtelierBanner(
+                            message = stringResource(R.string.sync_status_offline),
+                            icon = Icons.Outlined.Info,
+                            kind = BannerKind.Wait
+                        )
+                    }
+                    if (state.isSyncingNow) {
+                        state.notice?.let {
+                            AtelierBanner(message = it.asString(), icon = Icons.Outlined.Sync, kind = BannerKind.Info)
+                        }
+                    }
+                    if (state.operations.isNotEmpty()) {
+                        AtelierButton(
+                            text = stringResource(R.string.sync_now_btn, state.operations.size),
+                            onClick = onSyncNow,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = state.isOnline,
+                            loading = state.isSyncingNow,
+                            icon = Icons.Outlined.Sync
+                        )
+                        if (!state.isOnline) AtelierRequiresConnection()
+                    }
+                }
             }
-
-            if (state.operations.isNotEmpty()) {
-                AtelierButton(
-                    text = stringResource(R.string.sync_now_btn, state.operations.size),
-                    onClick = onSyncNow,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = state.isOnline,
-                    loading = state.isSyncingNow,
-                    icon = Icons.Outlined.Sync
-                )
-            }
-
-            if (state.operations.isEmpty()) {
-                AtelierBanner(
-                    title = stringResource(R.string.sync_empty_title),
-                    message = stringResource(R.string.sync_empty_body),
-                    icon = Icons.Outlined.CheckCircle,
-                    kind = BannerKind.Ok
-                )
-            } else {
-                state.operations.forEach { op ->
-                    PendingOperationCard(
-                        operation = op,
-                        onRetry = { onRetry(op.id) },
-                        onDiscard = { onDiscard(op.id) }
+            when {
+                !state.hasLoaded -> items(3, key = { "bone-$it" }) {
+                    AtelierListRow(title = "Marcación de ingreso", subtitle = "Creado 16/11 08:02", loading = true)
+                }
+                state.operations.isEmpty() -> item(key = "empty") {
+                    AtelierEmptyState(
+                        text = stringResource(R.string.sync_empty_line),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                else -> items(state.operations, key = { it.id }) { op ->
+                    AtelierListRow(
+                        title = operationTypeLabel(op.type),
+                        subtitle = op.rowSubtitle(),
+                        onClick = { selectedId = op.id },
+                        trailing = { OperationChip(op.status) }
                     )
                 }
             }
         }
     }
+
+    selected?.let { op ->
+        OperationSheet(
+            operation = op,
+            isOnline = state.isOnline,
+            onDismiss = { selectedId = null },
+            onRetry = {
+                onRetry(op.id)
+                selectedId = null
+            },
+            onDiscard = {
+                onDiscard(op.id)
+                selectedId = null
+            }
+        )
+    }
 }
 
 @Composable
-private fun PendingOperationCard(
+private fun OperationChip(status: PendingOperationStatus) {
+    when (status) {
+        PendingOperationStatus.PENDING -> AtelierChip(stringResource(R.string.sync_op_pending), kind = ChipKind.Idle)
+        PendingOperationStatus.SYNCING -> AtelierChip(stringResource(R.string.sync_op_syncing), kind = ChipKind.Info)
+        PendingOperationStatus.FAILED -> AtelierChip(stringResource(R.string.sync_op_failed), kind = ChipKind.Bad)
+    }
+}
+
+/** Lo que hay que saber de un vistazo: cuándo se guardó y cuántas veces se intentó. */
+@Composable
+private fun PendingOperation.rowSubtitle(): String =
+    stringResource(R.string.sync_op_meta, SyncTimeFormat.format(createdAt), attempts)
+
+/**
+ * Detalle de una operación. Reintentar solo existe si falló; descartar pierde el registro del teléfono y por
+ * eso vive aquí, no en la fila. Ambas son acciones sobre la cola local: reintentar necesita red para llegar.
+ */
+@Composable
+private fun OperationSheet(
     operation: PendingOperation,
+    isOnline: Boolean,
+    onDismiss: () -> Unit,
     onRetry: () -> Unit,
     onDiscard: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = operationTypeLabel(operation.type),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            AtelierChip(
-                text = when (operation.status) {
-                    PendingOperationStatus.PENDING -> stringResource(R.string.sync_op_pending)
-                    PendingOperationStatus.SYNCING -> stringResource(R.string.sync_op_syncing)
-                    PendingOperationStatus.FAILED -> stringResource(R.string.sync_op_failed)
-                },
-                kind = when (operation.status) {
-                    PendingOperationStatus.PENDING -> ChipKind.Wait
-                    PendingOperationStatus.SYNCING -> ChipKind.Info
-                    PendingOperationStatus.FAILED -> ChipKind.Bad
-                }
-            )
-        }
-        Text(
-            text = stringResource(
-                R.string.sync_op_meta,
-                SyncTimeFormat.format(operation.createdAt),
-                operation.attempts
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = AtelierTheme.colors.muted
-        )
-        operation.lastErrorMessage?.let { msg ->
-            Text(
-                text = msg,
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.bad
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+    AtelierBottomSheet(
+        title = operationTypeLabel(operation.type),
+        onDismiss = onDismiss,
+        actions = {
             if (operation.status == PendingOperationStatus.FAILED) {
+                if (!isOnline) AtelierRequiresConnection()
                 AtelierButton(
                     text = stringResource(R.string.sync_retry_btn),
                     onClick = onRetry,
-                    modifier = Modifier.weight(1f),
-                    style = AtelierButtonStyle.Tonal
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = isOnline,
+                    icon = Icons.Outlined.Sync
                 )
             }
             if (operation.status != PendingOperationStatus.SYNCING) {
                 AtelierButton(
                     text = stringResource(R.string.sync_discard_btn),
                     onClick = onDiscard,
-                    modifier = Modifier.weight(1f),
-                    style = AtelierButtonStyle.Outlined
+                    modifier = Modifier.fillMaxWidth(),
+                    style = AtelierButtonStyle.Destructive
                 )
             }
+        }
+    ) {
+        OperationChip(operation.status)
+        Text(
+            text = operation.rowSubtitle(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        operation.lastErrorMessage?.takeIf { it.isNotBlank() }?.let {
+            AtelierBanner(message = it, icon = Icons.Outlined.ErrorOutline)
+        }
+        if (operation.status != PendingOperationStatus.SYNCING) {
+            Text(
+                text = stringResource(R.string.sync_discard_warning),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -222,3 +252,41 @@ private fun operationTypeLabel(type: String): String = when (type) {
     "RESOLVE_FAULT" -> stringResource(R.string.sync_type_resolve_fault)
     else -> type
 }
+
+// region Previews
+
+private fun previewOp(id: String, type: String, status: PendingOperationStatus, attempts: Int, error: String? = null) =
+    PendingOperation(
+        id = id, type = type, status = status, attempts = attempts, lastErrorMessage = error,
+        createdAt = Instant.parse("2026-11-16T13:02:00Z"), dependsOn = null
+    )
+
+private val previewState = PendingOperationsUiState(
+    operations = listOf(
+        previewOp("1", "ATTACH_INTAKE_IMAGE", PendingOperationStatus.FAILED, 3, "La foto ya no está en el teléfono"),
+        previewOp("2", "ATTACH_INTAKE_IMAGE", PendingOperationStatus.PENDING, 0),
+        previewOp("3", "UPLOAD_FILE", PendingOperationStatus.SYNCING, 1)
+    ),
+    hasLoaded = true,
+    isOnline = false
+)
+
+@Preview(name = "Cola · claro", widthDp = 390, heightDp = 844)
+@Composable
+private fun PendingOperationsPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
+    PendingOperationsContent(previewState, {}, {}, {}, {})
+}
+
+@Preview(name = "Cola · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PendingOperationsPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
+    PendingOperationsContent(previewState.copy(isOnline = true), {}, {}, {}, {})
+}
+
+@Preview(name = "Cola · vacía", widthDp = 390, heightDp = 844)
+@Composable
+private fun PendingOperationsPreviewEmpty() = AtelierWorkshopTheme(darkTheme = false) {
+    PendingOperationsContent(PendingOperationsUiState(hasLoaded = true), {}, {}, {}, {})
+}
+
+// endregion

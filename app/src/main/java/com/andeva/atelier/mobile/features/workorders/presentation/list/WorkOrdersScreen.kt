@@ -1,554 +1,327 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.list
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import android.content.res.Configuration
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.Assignment
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.WifiOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.LocalFloatingBarInset
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
-import com.andeva.atelier.mobile.core.designsystem.theme.PillShape
-import com.andeva.atelier.mobile.core.domain.BusinessTime
+import com.andeva.atelier.mobile.core.designsystem.theme.ChipShape
 import com.andeva.atelier.mobile.core.domain.Money
-import com.andeva.atelier.mobile.core.presentation.format
-import com.andeva.atelier.mobile.features.reception.domain.Appointment
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.presentation.chipKind
 import com.andeva.atelier.mobile.features.workorders.presentation.labelRes
-import java.math.BigDecimal
-import java.time.format.DateTimeFormatter
+import java.time.Duration
+import java.time.Instant
 
-private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(BusinessTime.ZONE)
+/** Estados que se pueden filtrar: la lista de la sede solo trae órdenes sin cerrar. */
+private val FilterStatuses = listOf(WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.COMPLETED)
 
-/** Órdenes de la sede. [onOpenOrder] abre el detalle; [onOpenNewOrder] abre el formulario de ingreso. */
+/**
+ * Raíz de la pestaña "Órdenes": las órdenes sin cerrar de la sede, con filtro por estado y búsqueda por placa.
+ * "Recibir vehículo" vive en el botón de acción de la barra flotante, no aquí.
+ */
 @Composable
 fun WorkOrdersScreen(
     onOpenOrder: (workOrderId: String) -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenSync: () -> Unit,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
-    onOpenMenu: (() -> Unit)? = null,
-    onOpenNotifications: (() -> Unit)? = null,
-    onOpenSync: (() -> Unit)? = null,
-    onOpenNewOrder: (vehicleId: String, customerId: String, workOrderId: String) -> Unit = { _, _, _ -> },
-    onNavigateToReception: () -> Unit = {},
     viewModel: WorkOrdersViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     WorkOrdersContent(
         state = state,
-        onBack = onBack,
-        onOpenMenu = onOpenMenu,
-        onOpenNotifications = onOpenNotifications,
-        onOpenSync = onOpenSync,
         onRefresh = viewModel::refresh,
         onOpenOrder = onOpenOrder,
-        onOpenNewOrder = onOpenNewOrder,
-        onNavigateToReception = onNavigateToReception,
-        onOpenNewOrderSheet = viewModel::onOpenNewOrderSheet,
-        onDismissNewOrderSheet = viewModel::onDismissNewOrderSheet,
-        onSelectAppointmentForArrival = { appt ->
-            viewModel.onSelectAppointmentForArrival(appt, onOpenNewOrder)
-        },
+        onOpenNotifications = onOpenNotifications,
+        onOpenSync = onOpenSync,
+        onStatusFilterChange = viewModel::onStatusFilterChange,
+        onQueryChange = viewModel::onQueryChange,
         modifier = modifier
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorkOrdersContent(
     state: WorkOrdersUiState,
     onRefresh: () -> Unit,
     onOpenOrder: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
-    onOpenMenu: (() -> Unit)? = null,
-    onOpenNotifications: (() -> Unit)? = null,
-    onOpenSync: (() -> Unit)? = null,
-    onOpenNewOrder: (String, String, String) -> Unit = { _, _, _ -> },
-    onNavigateToReception: () -> Unit = {},
-    onOpenNewOrderSheet: () -> Unit = {},
-    onDismissNewOrderSheet: () -> Unit = {},
-    onSelectAppointmentForArrival: (Appointment) -> Unit = {}
+    onOpenNotifications: () -> Unit,
+    onOpenSync: () -> Unit,
+    onStatusFilterChange: (WorkOrderStatus?) -> Unit,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        if (onBack != null) {
-            AtelierTopBar(title = stringResource(R.string.orders_title), onBack = onBack)
-        } else if (onOpenMenu != null) {
+    val showSkeleton = rememberDelayedLoading(state.showSkeleton && state.canRead)
+    val visible = state.visibleOrders
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
             AtelierMainTopBar(
-                title = stringResource(R.string.orders_title),
-                onOpenMenu = onOpenMenu,
+                title = stringResource(R.string.orders_list_title),
                 onOpenNotifications = onOpenNotifications,
-                onOpenSync = onOpenSync
+                unreadNotificationsCount = state.unreadNotificationsCount,
+                onOpenSync = onOpenSync,
+                pendingSyncCount = state.pendingSyncCount
             )
         }
-        Column(
+    ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing && state.isLoaded && state.orders.isNotEmpty(),
+            onRefresh = onRefresh,
             modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            Text(
-                text = stringResource(R.string.orders_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
-            )
-
-            if (state.canCreate) {
-                AtelierButton(
-                    text = stringResource(R.string.orders_new_btn),
-                    onClick = onOpenNewOrderSheet,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Outlined.Add
-                )
-            }
-
-            if (!state.canRead) {
-                AtelierBanner(
-                    message = stringResource(R.string.orders_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-            }
-            if (state.showingCache) {
-                AtelierBanner(
-                    message = state.error?.asString() ?: stringResource(R.string.orders_cache_notice),
-                    icon = Icons.Outlined.WifiOff,
-                    kind = BannerKind.Wait
-                )
-            }
-            when {
-                !state.isLoaded -> Text(
-                    text = stringResource(R.string.search_loading),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                state.orders.isEmpty() -> Text(
-                    text = stringResource(R.string.orders_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                else -> state.orders.forEach { order ->
-                    OrderCard(
-                        order = order,
-                        onClick = { onOpenOrder(order.id) },
-                        onCompleteIntake = {
-                            onOpenNewOrder(order.vehicleId, order.customerId, order.id)
-                        }
-                    )
-                }
-            }
-            AtelierButton(
-                text = stringResource(R.string.tasks_refresh),
-                onClick = onRefresh,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Outlined,
-                loading = state.isRefreshing
-            )
-        }
-    }
-
-    if (state.showNewOrderSheet) {
-        NewOrderChoiceDialog(
-            appointments = state.appointmentsToday,
-            arrivingId = state.arrivingAppointmentId,
-            onSelectAppointment = onSelectAppointmentForArrival,
-            onNavigateToReception = {
-                onDismissNewOrderSheet()
-                onNavigateToReception()
-            },
-            onDismiss = onDismissNewOrderSheet
-        )
-    }
-}
-
-@Composable
-private fun NewOrderChoiceDialog(
-    appointments: List<Appointment>,
-    arrivingId: String?,
-    onSelectAppointment: (Appointment) -> Unit,
-    onNavigateToReception: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text
-            )
-        },
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Assignment,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = stringResource(R.string.orders_new_sheet_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.orders_new_sheet_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                // La barra flotante tapa el final de la lista: se suma su alto.
+                contentPadding = PaddingValues(bottom = 16.dp + LocalFloatingBarInset.current)
             ) {
-                Text(
-                    text = stringResource(R.string.orders_new_by_appointment_section),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                if (appointments.isEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = stringResource(R.string.orders_new_no_appointments),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AtelierTheme.colors.muted,
-                            modifier = Modifier.padding(12.dp)
+                item(key = "refresh") {
+                    AtelierRefreshBar(visible = state.isRefreshing && state.orders.isNotEmpty())
+                }
+                if (!state.canRead) {
+                    item(key = "no-permission") {
+                        AtelierNoPermissionState(
+                            text = stringResource(R.string.orders_no_permission),
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-                } else {
-                    appointments.forEach { appt ->
-                        val isArriving = arrivingId == appt.id
-                        AppointmentOptionCard(
-                            appointment = appt,
-                            isArriving = isArriving,
-                            enabled = arrivingId == null,
-                            onClick = { onSelectAppointment(appt) }
+                    return@LazyColumn
+                }
+                item(key = "filters") {
+                    Filters(state, onStatusFilterChange, onQueryChange)
+                }
+                if (state.showingCache && state.orders.isNotEmpty()) {
+                    item(key = "cache") {
+                        AtelierBanner(
+                            message = if (state.isOnline) state.error?.asString() ?: stringResource(R.string.orders_cache_notice)
+                            else stringResource(R.string.orders_cache_notice),
+                            icon = Icons.Outlined.Info,
+                            kind = BannerKind.Info,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
                 }
-
-                Text(
-                    text = stringResource(R.string.orders_new_walk_in_section),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-
-                Surface(
-                    onClick = onNavigateToReception,
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Surface(
-                            shape = PillShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DirectionsCar,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = stringResource(R.string.orders_new_walk_in_title),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = stringResource(R.string.orders_new_walk_in_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AtelierTheme.colors.inkSecondary
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                state.lastRefreshedAt?.let { refreshedAt ->
+                    item(key = "updated") { UpdatedLine(refreshedAt) }
+                }
+                when {
+                    showSkeleton -> items(6, key = { "bone-$it" }) {
+                        AtelierListRow(title = "Orden", subtitle = "Cliente", plate = "ABC123", loading = true)
+                    }
+                    state.showSkeleton -> Unit
+                    state.orders.isEmpty() && state.error != null && !state.isOnline -> item(key = "offline") {
+                        AtelierOfflineState(onRetry = onRefresh, modifier = Modifier.padding(horizontal = 16.dp))
+                    }
+                    state.orders.isEmpty() && state.error != null -> item(key = "error") {
+                        AtelierErrorState(
+                            message = state.error.asString(),
+                            onRetry = onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-                }
-            }
-        }
-    )
-}
-
-@Composable
-private fun AppointmentOptionCard(
-    appointment: Appointment,
-    isArriving: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val timeStr = TimeFormat.format(appointment.scheduledAt)
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = PillShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.height(26.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = timeStr,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                    state.orders.isEmpty() -> item(key = "empty") {
+                        AtelierEmptyState(
+                            text = stringResource(R.string.orders_empty),
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-                }
-                appointment.plate?.let { plate ->
-                    Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier.height(24.dp)
-                    ) {
-                        Box(modifier = Modifier.padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = plate,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    visible.isEmpty() -> item(key = "empty-filtered") {
+                        AtelierEmptyState(
+                            text = stringResource(R.string.orders_empty_filtered),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    else -> items(visible, key = { it.id }) { order ->
+                        OrderRow(order = order, onClick = { onOpenOrder(order.id) })
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                if (isArriving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            appointment.customerName?.let { customer ->
-                Text(
-                    text = customer,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            appointment.reason?.takeIf { it.isNotBlank() }?.let { reason ->
-                Text(
-                    text = reason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AtelierTheme.colors.inkSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(top = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = null,
-                    tint = AtelierTheme.colors.ok,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = stringResource(R.string.orders_new_appointment_arrive_cta),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AtelierTheme.colors.ok
-                )
             }
         }
     }
 }
 
 @Composable
-private fun OrderCard(
-    order: WorkOrder,
-    onClick: () -> Unit,
-    onCompleteIntake: () -> Unit = {}
+private fun Filters(
+    state: WorkOrdersUiState,
+    onStatusFilterChange: (WorkOrderStatus?) -> Unit,
+    onQueryChange: (String) -> Unit
 ) {
-    val isDraft = order.status == WorkOrderStatus.DRAFT
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .clickable(onClick = onClick)
-            .heightIn(min = 72.dp)
-            .padding(16.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
+        AtelierTextField(
+            label = stringResource(R.string.orders_search_label),
+            value = state.query,
+            onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            leadingIcon = Icons.Outlined.Search,
+            trailing = if (state.query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Outlined.Clear, contentDescription = stringResource(R.string.orders_search_clear))
+                    }
+                }
+            } else null
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AtelierChip(text = stringResource(order.status.labelRes()), kind = order.status.chipKind())
-            order.plate?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+            StatusChip(
+                label = stringResource(R.string.orders_filter_all),
+                selected = state.statusFilter == null,
+                onClick = { onStatusFilterChange(null) }
+            )
+            FilterStatuses.forEach { status ->
+                StatusChip(
+                    label = stringResource(status.labelRes()),
+                    selected = state.statusFilter == status,
+                    onClick = { onStatusFilterChange(status) }
                 )
             }
-        }
-        Text(
-            text = order.internalNumber?.let { stringResource(R.string.task_card_work_order, it) }
-                ?: stringResource(R.string.orders_no_number),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        order.customerName?.let {
-            Text(text = it, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
-        }
-        order.totalAmount?.let {
-            Text(
-                text = stringResource(R.string.orders_total, it.format()),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
-            )
-        }
-        if (isDraft) {
-            AtelierButton(
-                text = stringResource(R.string.orders_complete_draft_cta),
-                onClick = onCompleteIntake,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Tonal
-            )
         }
     }
 }
 
-private fun previewOrder(id: String, number: Int, status: WorkOrderStatus) = WorkOrder(
-    id = id, internalNumber = number, branchId = "b1", vehicleId = "v1", customerId = "c1", currentBayId = null,
-    bayName = null, status = status, diagnosticSummary = null, mileageIn = null, subtotal = null, taxAmount = null,
-    totalAmount = Money(BigDecimal("1250.00"), Money.PEN), plate = "ABC-123", customerName = "Ana Torres"
-)
-
-@Preview(name = "Órdenes · oscuro", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
-private fun WorkOrdersPreview() = AtelierWorkshopTheme(darkTheme = true) {
-    WorkOrdersContent(
-        state = WorkOrdersUiState(
-            isLoaded = true,
-            canCreate = true,
-            orders = listOf(previewOrder("1", 1, WorkOrderStatus.IN_PROGRESS), previewOrder("2", 2, WorkOrderStatus.DRAFT))
-        ),
-        onBack = {}, onRefresh = {}, onOpenOrder = {}
+private fun StatusChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+        shape = ChipShape,
+        // La selección no depende solo del color: lleva una marca.
+        leadingIcon = if (selected) {
+            { Icon(Icons.Outlined.Check, contentDescription = null) }
+        } else null
     )
 }
+
+@Composable
+private fun UpdatedLine(refreshedAt: Instant) {
+    val minutes = remember(refreshedAt) { Duration.between(refreshedAt, Instant.now()).toMinutes().toInt().coerceAtLeast(0) }
+    Text(
+        text = if (minutes == 0) stringResource(R.string.orders_updated_now)
+        else pluralStringResource(R.plurals.orders_updated_ago, minutes, minutes),
+        style = MaterialTheme.typography.bodyMedium,
+        color = AtelierTheme.colors.inkSecondary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun OrderRow(order: WorkOrder, onClick: () -> Unit) {
+    val number = order.internalNumber?.let { stringResource(R.string.orders_order_number, it) }
+        ?: stringResource(R.string.orders_no_number)
+    AtelierListRow(
+        title = order.customerName ?: number,
+        subtitle = listOfNotNull(number.takeIf { order.customerName != null }, order.bayName)
+            .joinToString(" · ")
+            .ifEmpty { null },
+        plate = order.plate,
+        onClick = onClick,
+        trailing = { AtelierChip(text = stringResource(order.status.labelRes()), kind = order.status.chipKind()) }
+    )
+}
+
+// region Previews
+
+private fun previewOrder(
+    id: String, number: Int, plate: String, customer: String, status: WorkOrderStatus, bay: String?
+) = WorkOrder(
+    id = id, internalNumber = number, branchId = "b1", vehicleId = "v$id", customerId = "c$id",
+    currentBayId = bay?.let { "bay" }, bayName = bay, status = status, diagnosticSummary = null, mileageIn = null,
+    subtotal = null, taxAmount = null, totalAmount = Money.of("480.00", Money.PEN), plate = plate, customerName = customer
+)
+
+private val previewState = WorkOrdersUiState(
+    isLoaded = true,
+    canCreate = true,
+    lastRefreshedAt = Instant.now().minusSeconds(240),
+    pendingSyncCount = 2,
+    unreadNotificationsCount = 3,
+    orders = listOf(
+        previewOrder("1", 1042, "BKR418", "Rosa Quispe Mamani", WorkOrderStatus.DRAFT, null),
+        previewOrder("2", 1041, "F5U731", "Transportes Huamán S.A.C.", WorkOrderStatus.IN_PROGRESS, "Bahía 2"),
+        previewOrder("3", 1040, "AXT209", "Luis Alberto Paredes", WorkOrderStatus.IN_PROGRESS, "Bahía 1"),
+        previewOrder("4", 1038, "D2C604", "Carmen Flores", WorkOrderStatus.COMPLETED, null)
+    )
+)
+
+@Composable
+private fun PreviewContent(state: WorkOrdersUiState) {
+    WorkOrdersContent(state, {}, {}, {}, {}, {}, {})
+}
+
+@Preview(name = "Órdenes · claro", widthDp = 390, heightDp = 844)
+@Composable
+private fun WorkOrdersPreviewLight() = AtelierWorkshopTheme(darkTheme = false) { PreviewContent(previewState) }
+
+@Preview(name = "Órdenes · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WorkOrdersPreviewDark() = AtelierWorkshopTheme(darkTheme = true) { PreviewContent(previewState) }
+
+@Preview(name = "Órdenes · cargando sin caché", widthDp = 390, heightDp = 844)
+@Composable
+private fun WorkOrdersPreviewLoading() = AtelierWorkshopTheme(darkTheme = false) {
+    PreviewContent(WorkOrdersUiState(isRefreshing = true, canCreate = true))
+}
+
+// endregion

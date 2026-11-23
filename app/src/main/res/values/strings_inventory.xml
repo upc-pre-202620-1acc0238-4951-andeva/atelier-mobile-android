@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Repuestos: catálogo y ficha -->
+    <string name="inventory_part_subtitle">SKU %1$s · Stock: %2$s</string>
+    <string name="inventory_detail_stock_section">Existencias</string>
+    <string name="inventory_detail_stock">Stock</string>
+    <string name="inventory_detail_minimum">Stock mínimo</string>
+    <string name="inventory_detail_price">Precio de venta sin IGV</string>
+    <string name="inventory_detail_category">Categoría</string>
+
+    <!-- Alertas de stock -->
+    <string name="inventory_alerts_title">Alertas de stock</string>
+    <string name="inventory_alerts_header">Por reponer</string>
+    <string name="inventory_alerts_empty">Ningún repuesto está en su mínimo.</string>
+    <string name="inventory_alerts_no_permission">Tu perfil no tiene permiso para ver las alertas de stock.</string>
+    <string name="inventory_alerts_offline">Sin conexión: alertas calculadas con el catálogo guardado.</string>
+    <string name="inventory_alert_subtitle">SKU %1$s · Stock %2$s de %3$s</string>
+    <string name="inventory_alert_missing">Faltan %1$s</string>
+
+    <!-- Compras -->
+    <string name="inventory_po_title">Compras</string>
+    <string name="inventory_po_detail_title">Orden de compra</string>
+    <string name="inventory_po_no_permission">Tu perfil no tiene permiso para ver las órdenes de compra.</string>
+    <string name="inventory_po_empty">No hay órdenes de compra en este estado.</string>
+    <string name="inventory_po_filter_issued">Por recibir</string>
+    <string name="inventory_po_filter_received">Recibidas</string>
+    <string name="inventory_po_filter_all">Todas</string>
+    <string name="inventory_po_number">Orden %1$s</string>
+    <string name="inventory_po_no_number">Orden sin número</string>
+    <string name="inventory_po_received_on">Recibida el %1$s</string>
+    <string name="inventory_po_status_draft">Borrador</string>
+    <string name="inventory_po_status_issued">Por recibir</string>
+    <string name="inventory_po_status_received">Recibida</string>
+    <string name="inventory_po_status_canceled">Anulada</string>
+    <string name="inventory_po_status_unknown">Sin estado</string>
+    <string name="inventory_po_lines_header">Repuestos pedidos</string>
+    <string name="inventory_po_line_unknown">Repuesto</string>
+    <string name="inventory_po_line_subtitle">%1$s × %2$s</string>
+    <string name="inventory_po_line_quantity">Cantidad: %1$s</string>
+    <string name="inventory_po_receipt_header">Comprobante</string>
+    <string name="inventory_po_receipt_number">Número de comprobante</string>
+    <string name="inventory_po_receipt_date">Fecha de recepción</string>
+    <string name="inventory_po_receive">Recibir orden</string>
+    <string name="inventory_po_receive_title">Recibir la orden</string>
+    <string name="inventory_po_receive_body">Cada línea entra al stock como un lote nuevo. Anota el número del comprobante y toma una foto.</string>
+    <string name="inventory_po_receive_confirm">Confirmar recepción</string>
+    <string name="inventory_po_photo_take">Tomar foto del comprobante</string>
+    <string name="inventory_po_photo_retake">Volver a tomar la foto</string>
+    <string name="inventory_po_photo_attached">Foto del comprobante lista</string>
+    <string name="inventory_po_received_ok">Orden recibida. El stock ya subió.</string>
+    <plurals name="inventory_po_lines">
+        <item quantity="one">%d línea</item>
+        <item quantity="other">%d líneas</item>
+    </plurals>
+
+    <!-- Valorización -->
+    <string name="inventory_valuation_title">Valorización</string>
+    <string name="inventory_valuation_context">Inventario</string>
+    <string name="inventory_valuation_caption">Valor de los lotes con saldo, al costo</string>
+    <string name="inventory_valuation_no_permission">Tu perfil no tiene permiso para ver la valorización.</string>
+    <string name="inventory_valuation_with_stock">con stock</string>
+    <string name="inventory_valuation_low">en el mínimo</string>
+    <string name="inventory_valuation_out">agotados</string>
+    <string name="inventory_valuation_by_category">Existencias por categoría</string>
+    <string name="inventory_valuation_empty">No hay repuestos con stock.</string>
+    <string name="inventory_valuation_uncategorized">Sin categoría</string>
+    <string name="inventory_valuation_units">%1$s u.</string>
+    <plurals name="inventory_valuation_parts">
+        <item quantity="one">%d repuesto</item>
+        <item quantity="other">%d repuestos</item>
+    </plurals>
+</resources>

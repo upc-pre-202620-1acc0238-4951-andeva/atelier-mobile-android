@@ -33,14 +33,15 @@ data class OpenWorkOrderUiState(
     /** Id de la orden lista, para seguir con las fotos de recepción. */
     val doneWorkOrderId: String? = null,
     val canCreate: Boolean = false,
-    val canUpdate: Boolean = false
+    val canUpdate: Boolean = false,
+    val isOnline: Boolean = true
 ) {
     /** Completar un borrador existente es una actualización; abrir una nueva es un alta. */
     val isCompletingDraft: Boolean get() = workOrderId != null && !orderSaved
     val formLocked: Boolean get() = isSaving || orderSaved
     val hasPermission: Boolean get() = canCreate && (!isCompletingDraft || canUpdate)
     val canSubmit: Boolean
-        get() = hasPermission && !isSaving && doneWorkOrderId == null && !isLoadingCatalog &&
+        get() = hasPermission && isOnline && !isSaving && doneWorkOrderId == null && !isLoadingCatalog &&
             mileage.isNotBlank() && fuel != null && reason.isNotBlank()
     val pendingServices: List<ServiceOption>
         get() = services.filter { it.id in selectedServiceIds && it.id !in addedServiceIds }

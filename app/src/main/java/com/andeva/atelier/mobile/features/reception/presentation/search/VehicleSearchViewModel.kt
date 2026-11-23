@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.reception.presentation.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
@@ -41,7 +42,8 @@ class VehicleSearchViewModel @Inject constructor(
     clock: Clock,
     private val refreshCustomers: RefreshCustomersUseCase? = null,
     observeCustomers: ObserveCustomersUseCase? = null,
-    observeWorkshopVehicles: ObserveWorkshopVehiclesUseCase? = null
+    observeWorkshopVehicles: ObserveWorkshopVehiclesUseCase? = null,
+    connectivity: ConnectivityObserver? = null
 ) : ViewModel() {
 
     constructor(
@@ -105,6 +107,11 @@ class VehicleSearchViewModel @Inject constructor(
         }
         viewModelScope.launch {
             observeAppointments(today).collect { list -> _uiState.update { it.copy(appointments = list) } }
+        }
+        if (connectivity != null) {
+            viewModelScope.launch {
+                connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } }
+            }
         }
         if (observeCustomers != null) {
             viewModelScope.launch {

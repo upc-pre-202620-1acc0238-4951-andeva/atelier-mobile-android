@@ -9,6 +9,8 @@ import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.ChargeForm
 import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditForm
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
+import com.andeva.atelier.mobile.features.workorders.domain.PartMovement
+import com.andeva.atelier.mobile.features.workorders.domain.Profitability
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderDetail
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
@@ -32,8 +34,26 @@ enum class WorkOrderDetailAction {
     APPROVE_QUOTATION,
     REJECT_QUOTATION,
     ASSIGN_BAY,
-    ASSIGN_MECHANIC
+    ASSIGN_MECHANIC,
+    START_ORDER,
+    COMPLETE_ORDER,
+    CANCEL_ORDER,
+    APPROVE_SUSPENSION,
+    REJECT_SUSPENSION,
+    RESUME_TASK
 }
+
+/** Dato que se pide al abrir una hoja (rentabilidad, movimientos de repuestos): nunca al abrir la ficha. */
+data class OnDemand<T>(
+    val isLoading: Boolean = true,
+    val data: T? = null,
+    val error: UiText? = null
+)
+
+/** Cancelar la orden: siempre se confirma en una hoja y exige el motivo. */
+data class CancelOrderForm(
+    val reason: String = ""
+)
 
 /** US22 E1: formulario para agregar una nueva tarea con su servicio y mano de obra sin IGV. */
 data class AddTaskForm(
@@ -98,7 +118,20 @@ data class WorkOrderDetailUiState(
     val showAssignBayDialog: Boolean = false,
     val canReassignMechanic: Boolean = false,
     val availableMechanics: List<MechanicOption> = emptyList(),
-    val assigningMechanicTask: TaskDetail? = null
+    val assigningMechanicTask: TaskDetail? = null,
+    val cancelForm: CancelOrderForm? = null,
+    val showQuotationDecision: Boolean = false,
+    /** Suspensión que el supervisor está revisando en la hoja (H5). */
+    val reviewingSuspension: TaskDetail? = null,
+    val profitability: OnDemand<Profitability>? = null,
+    val movements: OnDemand<List<PartMovement>>? = null,
+    val canCancelWorkOrder: Boolean = false,
+    val canResolveProposals: Boolean = false,
+    val canValidateSuspensions: Boolean = false,
+    val canReadProfitability: Boolean = false,
+    val canReadPartMovements: Boolean = false,
+    /** Alguno de los permisos de cobro y entrega (facturar, cobrar, pase de salida, entrega). */
+    val hasCheckoutPermission: Boolean = false
 ) {
     val isBusy: Boolean get() = busyAction != null
 
@@ -113,6 +146,21 @@ data class WorkOrderDetailUiState(
     val canGeneratePdf: Boolean get() = canReadQuotation && detail != null && isOnline && !isBusy
     val canEmailQuotation: Boolean get() = canSendQuotation && detail != null && isOnline && !isBusy
     val canResolveQuotation: Boolean get() = canApproveQuotation && isDraft && isOnline && !isBusy
+
+    val canStartOrder: Boolean get() = canUpdateWorkOrder && isDraft && isOnline && !isBusy
+    val canCompleteOrder: Boolean get() = canUpdateWorkOrder && status == WorkOrderStatus.IN_PROGRESS && isOnline && !isBusy
+    val canCancelOrder: Boolean get() = canCancelWorkOrder && isEditableOrder && isOnline && !isBusy
+    val canDecideSuspension: Boolean get() = canValidateSuspensions && isOnline && !isBusy
+    val canCheckout: Boolean get() =
+        hasCheckoutPermission && (status == WorkOrderStatus.COMPLETED || status == WorkOrderStatus.PAID)
+
+    /** Hay acciones de ciclo de vida con permiso: si falta la red se dice por qué están apagadas. */
+    val hasLifecyclePermission: Boolean get() =
+        (canUpdateWorkOrder && (isDraft || status == WorkOrderStatus.IN_PROGRESS)) || (canCancelWorkOrder && isEditableOrder)
+
+    val hasOpenSheet: Boolean get() = addTaskForm != null || editLaborForm != null || chargeForm != null ||
+        partEdit != null || rejectForm != null || showAssignBayDialog || assigningMechanicTask != null ||
+        cancelForm != null || showQuotationDecision || reviewingSuspension != null || generatedPdf != null
 
     val breakdown: CascadeBreakdown? get() = detail?.cascadeBreakdown()
 

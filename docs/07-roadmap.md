@@ -11,7 +11,7 @@ Lee docs/07-roadmap.md y haz el paso N. Primero un plan (con revisión de Gemini
 Reglas para todas las sesiones:
 
 1. **Fuente de verdad:** `docs/` (01–06 y `api/`). `atelier-documentation.md` y `atelier-ecosystem-details.md` son solo contexto general y están desactualizados.
-2. **Nada de diseño:** el tema, `core/designsystem/` (componentes, íconos, colores) y `docs/branding/` son de la otra parte del equipo. Las pantallas solo llevan estado, navegación y permisos.
+2. **Diseño:** lo visual sigue `DESIGN.md` y `PRODUCT.md` (raíz del repo). El rediseño va por segmentos — primero dueño y administrador, todo lo que sus permisos habilitan en todos los módulos — y la UI solo se toca cuando la sesión lo pide; un paso sin encargo de UI entrega estado, navegación y permisos.
 3. **Antes de empezar:** el paso anterior debe estar commiteado y el árbol limpio (`git status`). La rama nueva sale de `develop` (o de la rama del paso anterior si aún no se mergeó).
 4. **Una sesión por rama:** no trabajar dos sesiones a la vez sobre los mismos archivos.
 5. **Reutilizar el núcleo** (`core/`, paso 1). No crear otro cliente HTTP, otra cola ni otro manejo de sesión.
@@ -402,8 +402,11 @@ Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los 
 
 | Tema | Detalle | Afecta |
 | --- | --- | --- |
-| Prueba en emulador del paso 1 | No se pudo ejecutar (no había AVD) | Paso 1 |
+| Prueba en emulador | Hecha el 2026-11-20 solo para Hoy, Órdenes, Equipo, Más, Recibir vehículo y la ficha de orden (claro, oscuro y fuente 1,3). Falta recorrer Caja, Reportes, Series, Repuestos (alertas, compras, valorización), Bahías, Perfil y las hojas de decisión | Rediseño dueño/admin |
 | Configuración local | Faltan `API_BASE_URL`, `GOOGLE_WEB_CLIENT_ID`, `SUPABASE_*` en `local.properties` y `app/google-services.json` | Pasos 2, 5, 6 |
 | Tokens en DataStore sin cifrar | `SessionManager` guarda ambos tokens en DataStore normal ([api/README.md](api/README.md) §2). Cifrarlos (Tink / Android Keystore) es decisión de la app, no del backend | Decidir antes de producción |
-| Pantallas sin diseño | Las pantallas se entregan funcionales; el estilo lo aplica la otra parte del equipo | Todos |
+| Rediseño dueño y administrador | Hecho: tema y componentes nuevos, barra flotante Hoy · Órdenes · Equipo · Módulos (hoja de módulos y botón "Recibir"), Hoy con la composición anterior, pantallas de Órdenes, Recepción, Repuestos, Equipo, Bahías, Perfil y las nuevas Caja del día, Cobrar y entregar, Series, Reportes, Alertas, Compras y Valorización. Falta el recorrido completo en dispositivo y las `@Preview` sin renderizar | Segmento 1 |
+| Pantallas de otros segmentos | Mecánico, asesor y demás conservan su barra y su estilo anterior hasta que se pida su rediseño | Segmentos 2+ |
+| Ficha de orden con esqueleto | `WorkOrderDetailScreen` espera la respuesta del backend y no pinta la placa que ya está en Room | Rediseño |
+| Tiempo de espera de red | OkHttp espera 60 s: con el backend dormido el esqueleto dura un minuto | Todos |
 | `retryOnConnectionFailure` de OkHttp | Queda en su valor por defecto (`true`) en `NetworkModule` del núcleo: podría reenviar un `POST` no idempotente (comprobantes, cobros) tras un fallo de conexión antes de que la guarda de la app lo vea. Decidirlo en `core` antes de producción | Paso 9 (`cashier`) |

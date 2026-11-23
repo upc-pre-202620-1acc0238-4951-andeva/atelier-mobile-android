@@ -21,6 +21,9 @@ import kotlinx.coroutines.delay
 /** Ease-out exponencial del diseño: `cubic-bezier(0.23, 1, 0.32, 1)`. */
 val EaseOutQuint = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 
+/** Ease-out expo de la barra flotante: `cubic-bezier(0.16, 1, 0.3, 1)`, el mismo de quina-webapp. */
+val EaseOutExpo = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+
 /** "Quitar animaciones" del sistema: sin movimiento, el contenido aparece directo. */
 @Composable
 fun rememberReducedMotion(): Boolean {
@@ -31,8 +34,8 @@ fun rememberReducedMotion(): Boolean {
 }
 
 /**
- * Entrada escalonada de la pantalla: sube 8 dp y aparece en 420 ms; cada [index] se retrasa 50 ms.
- * Es el único momento animado de cada pantalla.
+ * Entrada escalonada de la pantalla: sube 8 dp y aparece en 240 ms; cada [index] se retrasa 50 ms.
+ * Solo para pantallas ocasionales (acceso, alta): lo que se abre decenas de veces al día no se anima.
  */
 @Composable
 fun Modifier.rise(index: Int = 0): Modifier {
@@ -40,7 +43,7 @@ fun Modifier.rise(index: Int = 0): Modifier {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(index * 50L)
-        progress.animateTo(1f, tween(durationMillis = 420, easing = EaseOutQuint))
+        progress.animateTo(1f, tween(durationMillis = 240, easing = EaseOutQuint))
     }
     val offsetPx = with(LocalDensity.current) { 8.dp.toPx() }
     return graphicsLayer {
@@ -49,14 +52,14 @@ fun Modifier.rise(index: Int = 0): Modifier {
     }
 }
 
-/** Al presionar el control se encoge a [pressed] (97 % por defecto, 160 ms). */
+/** Al presionar el control se encoge a [pressed] (97 % por defecto, 120 ms). */
 @Composable
 fun Modifier.pressScale(interactionSource: InteractionSource, pressed: Float = 0.97f): Modifier {
     if (rememberReducedMotion()) return this
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) pressed else 1f,
-        animationSpec = tween(durationMillis = 160, easing = EaseOutQuint),
+        animationSpec = tween(durationMillis = 120, easing = EaseOutQuint),
         label = "pressScale"
     )
     return graphicsLayer {

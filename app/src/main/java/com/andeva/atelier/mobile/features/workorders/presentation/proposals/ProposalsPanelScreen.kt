@@ -1,25 +1,31 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.proposals
 
-import androidx.compose.foundation.background
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Report
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -33,24 +39,38 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierDecisionRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierFab
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
 import com.andeva.atelier.mobile.features.workorders.domain.Proposal
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalSeverity
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalStatus
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.presentation.components.chipKind
 import com.andeva.atelier.mobile.features.workorders.presentation.components.labelRes
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.PickRow
+import java.time.Instant
 
-/** US15: panel del asesor para notificar al cliente las propuestas y registrar su aprobación o rechazo. */
+/**
+ * US15: panel de propuestas por hallazgo. Las que esperan una decisión (`proposals:resolve`) salen en ámbar y se
+ * deciden en una hoja inferior: notificar al cliente, registrar su aprobación o su rechazo. Todo en línea.
+ */
 @Composable
 fun ProposalsPanelScreen(
     onBack: () -> Unit,
@@ -92,95 +112,216 @@ internal class ProposalsPanelActions(
     val onConfirm: () -> Unit
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProposalsPanelContent(
     state: ProposalsPanelUiState,
     actions: ProposalsPanelActions,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        AtelierTopBar(title = stringResource(R.string.proposals_title), onBack = actions.onBack)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.proposals_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
-            )
-            state.notice?.let {
-                AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
-            }
-            // El error del formulario se muestra dentro de su tarjeta; aquí solo el de carga o el de un aviso.
-            if (state.form == null) {
-                state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-            }
+    // La hoja abierta sobre una propuesta; se cierra sola cuando la propuesta deja de estar en revisión.
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val selected = state.proposals.firstOrNull { it.id == selectedId && it.status == ProposalStatus.PENDING_REVIEW }
+    val showSkeleton = rememberDelayedLoading(state.isLoading && state.proposals.isEmpty())
+    val canDecideAnything = state.canNotify || state.canResolve
 
-            when {
-                state.isLoading -> Text(
-                    text = stringResource(R.string.search_loading),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                state.proposals.isEmpty() -> {
-                    Text(
-                        text = stringResource(R.string.proposals_empty),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    if (state.error != null) {
-                        AtelierButton(
-                            text = stringResource(R.string.branch_retry),
-                            onClick = actions.onRetry,
-                            modifier = Modifier.fillMaxWidth(),
-                            style = AtelierButtonStyle.Text
-                        )
-                    }
-                }
-                else -> state.proposals.forEach { proposal -> ProposalCard(proposal, state, actions) }
-            }
-
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { AtelierTopBar(title = stringResource(R.string.proposals_title), onBack = actions.onBack) },
+        floatingActionButton = {
             if (state.canReport) {
-                AtelierButton(
+                AtelierFab(
                     text = stringResource(R.string.proposals_report),
-                    onClick = actions.onReportFinding,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = AtelierButtonStyle.Outlined
+                    icon = Icons.Outlined.Report,
+                    onClick = actions.onReportFinding
                 )
             }
         }
+    ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = state.isLoading && state.proposals.isNotEmpty(),
+            onRefresh = actions.onRetry,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
+                item(key = "refresh") { AtelierRefreshBar(visible = state.isLoading && state.proposals.isNotEmpty()) }
+                state.notice?.let { notice ->
+                    item(key = "notice") {
+                        AtelierBanner(
+                            message = notice.asString(),
+                            icon = Icons.Outlined.CheckCircle,
+                            kind = BannerKind.Ok,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                when {
+                    showSkeleton -> items(3, key = { "bone-$it" }) {
+                        AtelierListRow(title = "Hallazgo en el foso", subtitle = "Severidad", loading = true)
+                    }
+                    state.isLoading && state.proposals.isEmpty() -> Unit
+                    state.proposals.isEmpty() && state.error != null -> item(key = "error") {
+                        AtelierErrorState(
+                            message = state.error.asString(),
+                            onRetry = actions.onRetry,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    state.proposals.isEmpty() -> item(key = "empty") {
+                        AtelierEmptyState(
+                            text = stringResource(R.string.proposals_empty),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    else -> {
+                        val pending = state.proposals.filter { it.status == ProposalStatus.PENDING_REVIEW }
+                        val resolved = state.proposals - pending.toSet()
+                        if (pending.isNotEmpty()) {
+                            item(key = "pending-header") {
+                                AtelierSectionHeader(
+                                    title = stringResource(R.string.orders_section_decisions),
+                                    count = pending.size,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                            items(pending, key = { "pending-${it.id}" }) { proposal ->
+                                val severity = proposal.severity?.let { stringResource(it.labelRes()) }
+                                if (state.canResolve) {
+                                    AtelierDecisionRow(
+                                        title = proposal.description,
+                                        subtitle = severity,
+                                        onClick = { selectedId = proposal.id },
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                    )
+                                } else {
+                                    AtelierListRow(
+                                        title = proposal.description,
+                                        subtitle = severity,
+                                        onClick = if (canDecideAnything) ({ selectedId = proposal.id }) else null,
+                                        trailing = {
+                                            AtelierChip(
+                                                text = stringResource(ProposalStatus.PENDING_REVIEW.labelRes()),
+                                                kind = ProposalStatus.PENDING_REVIEW.chipKind()
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        if (resolved.isNotEmpty()) {
+                            item(key = "resolved-header") {
+                                AtelierSectionHeader(
+                                    title = stringResource(R.string.orders_proposals_resolved),
+                                    count = resolved.size,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                            items(resolved, key = { "resolved-${it.id}" }) { proposal ->
+                                AtelierListRow(
+                                    title = proposal.description,
+                                    subtitle = listOfNotNull(
+                                        proposal.severity?.let { stringResource(it.labelRes()) },
+                                        proposal.customerNotes?.let { stringResource(R.string.proposals_customer_notes, it) }
+                                    ).joinToString(" · ").ifEmpty { null },
+                                    trailing = proposal.status?.let { status ->
+                                        { AtelierChip(text = stringResource(status.labelRes()), kind = status.chipKind()) }
+                                    }
+                                )
+                            }
+                        }
+                        state.error?.takeIf { state.form == null }?.let { error ->
+                            item(key = "error-banner") {
+                                AtelierBanner(
+                                    message = error.asString(),
+                                    icon = Icons.Outlined.ErrorOutline,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selected?.let { proposal ->
+        ProposalSheet(
+            proposal = proposal,
+            state = state,
+            actions = actions,
+            onDismiss = {
+                actions.onCloseForm()
+                selectedId = null
+            }
+        )
     }
 }
 
 @Composable
-private fun ProposalCard(proposal: Proposal, state: ProposalsPanelUiState, actions: ProposalsPanelActions) {
+private fun ProposalSheet(
+    proposal: Proposal,
+    state: ProposalsPanelUiState,
+    actions: ProposalsPanelActions,
+    onDismiss: () -> Unit
+) {
     val form = state.form?.takeIf { it.proposalId == proposal.id }
     val busy = state.busyProposalId == proposal.id
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    val canAct = state.isOnline && !state.isBusy
+    AtelierBottomSheet(
+        title = stringResource(R.string.orders_proposal_sheet_title),
+        onDismiss = onDismiss,
+        actions = {
+            if (!state.isOnline) AtelierRequiresConnection()
+            if (form != null) {
+                AtelierButton(
+                    text = stringResource(R.string.proposals_confirm),
+                    onClick = actions.onConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canConfirm,
+                    loading = busy
+                )
+                AtelierButton(
+                    text = stringResource(R.string.proposals_cancel),
+                    onClick = actions.onCloseForm,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = AtelierButtonStyle.Text,
+                    enabled = !state.isBusy
+                )
+            } else {
+                if (state.canResolve) {
+                    AtelierButton(
+                        text = stringResource(R.string.proposals_approve),
+                        onClick = { actions.onOpenForm(proposal.id, ProposalAction.APPROVE) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = canAct
+                    )
+                    AtelierButton(
+                        text = stringResource(R.string.proposals_reject),
+                        onClick = { actions.onOpenForm(proposal.id, ProposalAction.REJECT) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Destructive,
+                        enabled = canAct
+                    )
+                }
+                if (state.canNotify) {
+                    AtelierButton(
+                        text = stringResource(R.string.proposals_notify),
+                        onClick = { actions.onNotify(proposal.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Tonal,
+                        enabled = canAct,
+                        loading = busy
+                    )
+                }
+            }
+        }
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             proposal.severity?.let { AtelierChip(text = stringResource(it.labelRes()), kind = it.chipKind()) }
-            proposal.status?.let {
-                AtelierChip(
-                    text = stringResource(it.labelRes()),
-                    kind = it.chipKind()
-                )
-            }
         }
         Text(
             text = proposal.description,
@@ -194,61 +335,18 @@ private fun ProposalCard(proposal: Proposal, state: ProposalsPanelUiState, actio
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(4f / 3f)
-                    .clip(CardShape),
+                    .clip(MaterialTheme.shapes.small),
                 contentScale = ContentScale.Crop
             )
         }
-        proposal.customerNotes?.let {
-            Text(
-                text = stringResource(R.string.proposals_customer_notes, it),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
-            )
+        state.notice?.let {
+            AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
         }
-
-        if (proposal.status == ProposalStatus.PENDING_REVIEW) {
-            if (form != null) {
-                ProposalFormFields(form, state, actions)
-            } else {
-                ProposalButtons(proposal, state, busy, actions)
-            }
+        if (form != null) {
+            ProposalFormFields(form, state, actions)
+        } else {
+            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
         }
-    }
-}
-
-@Composable
-private fun ProposalButtons(proposal: Proposal, state: ProposalsPanelUiState, busy: Boolean, actions: ProposalsPanelActions) {
-    if (state.canNotify) {
-        AtelierButton(
-            text = stringResource(R.string.proposals_notify),
-            onClick = { actions.onNotify(proposal.id) },
-            modifier = Modifier.fillMaxWidth(),
-            style = AtelierButtonStyle.Tonal,
-            enabled = !state.isBusy,
-            loading = busy
-        )
-    }
-    if (state.canResolve) {
-        AtelierButton(
-            text = stringResource(R.string.proposals_approve),
-            onClick = { actions.onOpenForm(proposal.id, ProposalAction.APPROVE) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isBusy
-        )
-        AtelierButton(
-            text = stringResource(R.string.proposals_reject),
-            onClick = { actions.onOpenForm(proposal.id, ProposalAction.REJECT) },
-            modifier = Modifier.fillMaxWidth(),
-            style = AtelierButtonStyle.Outlined,
-            enabled = !state.isBusy
-        )
-    }
-    if (!state.canNotify && !state.canResolve) {
-        AtelierBanner(
-            message = stringResource(R.string.reception_no_permission),
-            icon = Icons.Outlined.Info,
-            kind = BannerKind.Wait
-        )
     }
 }
 
@@ -259,17 +357,18 @@ private fun ProposalFormFields(form: ProposalForm, state: ProposalsPanelUiState,
     if (approve) {
         Text(
             text = stringResource(R.string.proposals_service),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.labelLarge,
+            color = AtelierTheme.colors.inkSecondary
         )
-        state.services.forEach { service ->
-            AtelierButton(
-                text = service.name,
-                onClick = { actions.onServiceChange(service.id) },
-                modifier = Modifier.fillMaxWidth(),
-                style = if (form.serviceId == service.id) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-                enabled = !saving
-            )
+        androidx.compose.foundation.layout.Column {
+            state.services.forEach { service ->
+                PickRow(
+                    title = service.name,
+                    selected = form.serviceId == service.id,
+                    enabled = !saving,
+                    onClick = { actions.onServiceChange(service.id) }
+                )
+            }
         }
         if (state.invalidField == "serviceId") {
             Text(
@@ -310,55 +409,43 @@ private fun ProposalFormFields(form: ProposalForm, state: ProposalsPanelUiState,
             stringResource(R.string.proposals_field_notes)
         } else null
     )
-    state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-    AtelierButton(
-        text = stringResource(R.string.proposals_confirm),
-        onClick = actions.onConfirm,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = state.canConfirm,
-        loading = saving
-    )
-    AtelierButton(
-        text = stringResource(R.string.proposals_cancel),
-        onClick = actions.onCloseForm,
-        modifier = Modifier.fillMaxWidth(),
-        style = AtelierButtonStyle.Text,
-        enabled = !saving
-    )
+    state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
 }
 
-private fun previewProposal(id: String, status: ProposalStatus, notes: String? = null) = Proposal(
-    id, "wo1", null, "s1", "m1", "Fuga de aceite en el cárter", ProposalSeverity.CRITICAL, null, status, notes, null
-)
+// region Previews
+
+private fun previewProposal(id: String, description: String, status: ProposalStatus, severity: ProposalSeverity, notes: String? = null) =
+    Proposal(id, "wo1", null, "s1", "m1", description, severity, null, status, notes, Instant.parse("2026-11-16T14:20:00Z"))
 
 private val previewActions = ProposalsPanelActions({}, {}, {}, {}, { _, _ -> }, {}, {}, {}, {}, {}, {})
 
-@Preview(name = "Propuestas · lista · oscuro", widthDp = 360, heightDp = 1000, showBackground = true)
+private val previewState = ProposalsPanelUiState(
+    isLoading = false, canNotify = true, canResolve = true, canReport = true,
+    proposals = listOf(
+        previewProposal("p1", "Discos de freno con desgaste bajo el mínimo", ProposalStatus.PENDING_REVIEW, ProposalSeverity.CRITICAL),
+        previewProposal("p2", "Fuga de aceite en el cárter", ProposalStatus.REJECTED, ProposalSeverity.MEDIUM, "Es muy caro, lo ve el sábado."),
+        previewProposal("p3", "Bujías con electrodo gastado", ProposalStatus.APPROVED, ProposalSeverity.LOW)
+    ),
+    services = listOf(ServiceOption("s1", "Cambio de discos de freno", null, 90)),
+    notice = UiText.Dynamic("Correo enviado a rosa.quispe@correo.pe.")
+)
+
+@Preview(name = "Propuestas · claro", widthDp = 390, heightDp = 844)
 @Composable
-private fun ProposalsPanelPreviewList() = AtelierWorkshopTheme(darkTheme = true) {
-    ProposalsPanelContent(
-        state = ProposalsPanelUiState(
-            isLoading = false, canNotify = true, canResolve = true, canReport = true,
-            proposals = listOf(
-                previewProposal("p1", ProposalStatus.PENDING_REVIEW),
-                previewProposal("p2", ProposalStatus.REJECTED, "Es muy caro")
-            ),
-            notice = UiText.Dynamic("Correo enviado a ana@correo.pe.")
-        ),
-        actions = previewActions
-    )
+private fun ProposalsPanelPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
+    ProposalsPanelContent(state = previewState, actions = previewActions)
 }
 
-@Preview(name = "Propuestas · aprobar · claro", widthDp = 360, heightDp = 1000, showBackground = true)
+@Preview(name = "Propuestas · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun ProposalsPanelPreviewApprove() = AtelierWorkshopTheme(darkTheme = false) {
-    ProposalsPanelContent(
-        state = ProposalsPanelUiState(
-            isLoading = false, canNotify = true, canResolve = true,
-            proposals = listOf(previewProposal("p1", ProposalStatus.PENDING_REVIEW)),
-            services = listOf(ServiceOption("s1", "Cambio de empaque", null, 90)),
-            form = ProposalForm("p1", ProposalAction.APPROVE, serviceId = "s1", finalPrice = "120", laborHours = "1.5")
-        ),
-        actions = previewActions
-    )
+private fun ProposalsPanelPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
+    ProposalsPanelContent(state = previewState, actions = previewActions)
 }
+
+@Preview(name = "Propuestas · sin conexión", widthDp = 390, heightDp = 844)
+@Composable
+private fun ProposalsPanelPreviewOffline() = AtelierWorkshopTheme(darkTheme = false) {
+    ProposalsPanelContent(state = previewState.copy(isOnline = false, notice = null), actions = previewActions)
+}
+
+// endregion

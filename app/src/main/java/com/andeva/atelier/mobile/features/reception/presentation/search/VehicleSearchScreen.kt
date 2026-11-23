@@ -1,56 +1,68 @@
 package com.andeva.atelier.mobile.features.reception.presentation.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierPlate
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.PlateSize
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
+import com.andeva.atelier.mobile.core.designsystem.theme.PanelShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.features.reception.domain.Appointment
 import com.andeva.atelier.mobile.features.reception.domain.AppointmentStatus
@@ -65,17 +77,17 @@ import java.time.format.DateTimeFormatter
 
 private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(BusinessTime.ZONE)
 
-/** US11: consulta rápida en el counter por placa o documento, agenda de citas, cartera de clientes y vehículos. */
+/**
+ * Recibir vehículo (US11): la placa es el gesto. Debajo del campo, la ficha del vehículo con sus acciones;
+ * más abajo, las citas de hoy. La orden en borrador la continúa la pantalla de la orden.
+ */
 @Composable
 fun VehicleSearchScreen(
+    onBack: () -> Unit,
     onRegisterNew: (initialPlate: String?) -> Unit,
     onAffiliate: () -> Unit,
     onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
-    onOpenMenu: (() -> Unit)? = null,
-    onOpenNotifications: (() -> Unit)? = null,
-    onOpenSync: (() -> Unit)? = null,
     onAddVehicleForCustomer: (Customer) -> Unit = {},
     viewModel: VehicleSearchViewModel = hiltViewModel()
 ) {
@@ -83,18 +95,12 @@ fun VehicleSearchScreen(
     VehicleSearchContent(
         state = state,
         onBack = onBack,
-        onOpenMenu = onOpenMenu,
-        onOpenNotifications = onOpenNotifications,
-        onOpenSync = onOpenSync,
-        onSectionChange = viewModel::onSectionChange,
         onModeChange = viewModel::onModeChange,
         onQueryChange = viewModel::onQueryChange,
         onSearch = viewModel::onSearch,
         onSelectCustomer = viewModel::onSelectCustomer,
         onMarkArrived = viewModel::onMarkArrived,
         onRefresh = viewModel::refresh,
-        onDirectoryFilterChange = viewModel::onDirectoryFilterChange,
-        onRefreshPortfolio = viewModel::refreshPortfolio,
         onRegisterNew = onRegisterNew,
         onAddVehicleForCustomer = onAddVehicleForCustomer,
         onAffiliate = onAffiliate,
@@ -103,9 +109,11 @@ fun VehicleSearchScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VehicleSearchContent(
     state: VehicleSearchUiState,
+    onBack: () -> Unit,
     onModeChange: (SearchMode) -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
@@ -116,659 +124,444 @@ internal fun VehicleSearchContent(
     onAffiliate: () -> Unit,
     onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
-    onOpenMenu: (() -> Unit)? = null,
-    onOpenNotifications: (() -> Unit)? = null,
-    onOpenSync: (() -> Unit)? = null,
-    onSectionChange: (ReceptionSection) -> Unit = {},
-    onDirectoryFilterChange: (String) -> Unit = {},
-    onRefreshPortfolio: () -> Unit = {},
     onAddVehicleForCustomer: (Customer) -> Unit = {}
 ) {
+    var arriveForId by rememberSaveable { mutableStateOf<String?>(null) }
+    var arriveSubmitted by rememberSaveable { mutableStateOf(false) }
+    // La hoja se cierra cuando termina de registrar la llegada sin error; si falla, el error se ve en la hoja.
+    LaunchedEffect(state.arrivingId, state.error) {
+        if (arriveSubmitted && state.arrivingId == null && state.error == null) {
+            arriveForId = null
+            arriveSubmitted = false
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
-        if (onBack != null) {
-            AtelierTopBar(title = stringResource(R.string.search_title), onBack = onBack)
-        } else if (onOpenMenu != null) {
-            AtelierMainTopBar(
-                title = stringResource(R.string.search_title),
-                onOpenMenu = onOpenMenu,
-                onOpenNotifications = onOpenNotifications,
-                onOpenSync = onOpenSync
-            )
-        }
+        AtelierTopBar(title = stringResource(R.string.reception_search_title), onBack = onBack)
 
-        val sections = ReceptionSection.entries
-        PrimaryTabRow(selectedTabIndex = sections.indexOf(state.section)) {
-            sections.forEach { section ->
-                Tab(
-                    selected = state.section == section,
-                    onClick = { onSectionChange(section) },
-                    text = {
-                        Text(
-                            text = when (section) {
-                                ReceptionSection.SEARCH_AND_TODAY -> stringResource(R.string.reception_tab_counter)
-                                ReceptionSection.CUSTOMERS -> stringResource(
-                                    R.string.reception_tab_customers_count,
-                                    state.directoryCustomers.size
-                                )
-                                ReceptionSection.VEHICLES -> stringResource(
-                                    R.string.reception_tab_vehicles_count,
-                                    state.workshopVehicles.size
-                                )
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+        if (!state.canSearch && !state.canViewAppointments) {
+            AtelierNoPermissionState(
+                text = stringResource(R.string.reception_search_no_access),
+                modifier = Modifier.padding(horizontal = Spacing.md)
+            )
+        } else {
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshingAppointments && state.appointments.isNotEmpty(),
+                onRefresh = onRefresh,
+                modifier = Modifier.weight(1f)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = Spacing.lg)
+                ) {
+                    item(key = "search") {
+                        SearchBlock(state, onModeChange, onQueryChange, onSearch)
+                    }
+                    state.error?.let { error ->
+                        item(key = "error") {
+                            AtelierErrorState(
+                                message = error.asString(),
+                                onRetry = if (state.canSubmitSearch) onSearch else onRefresh,
+                                modifier = Modifier.padding(horizontal = Spacing.md)
+                            )
+                        }
+                    }
+                    if (state.canSearch) {
+                        results(state, onSelectCustomer, onRegisterNew, onAddVehicleForCustomer, onAffiliate, onOpenWorkOrder)
+                    }
+                    if (state.canViewAppointments) {
+                        appointments(
+                            state = state,
+                            onRefresh = onRefresh,
+                            onOpenWorkOrder = onOpenWorkOrder,
+                            onArrive = { arriveForId = it }
                         )
                     }
-                )
+                }
             }
         }
+    }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-
-            when (state.section) {
-                ReceptionSection.SEARCH_AND_TODAY -> CounterSearchSection(
-                    state = state,
-                    onModeChange = onModeChange,
-                    onQueryChange = onQueryChange,
-                    onSearch = onSearch,
-                    onSelectCustomer = onSelectCustomer,
-                    onMarkArrived = onMarkArrived,
-                    onRefresh = onRefresh,
-                    onRegisterNew = onRegisterNew,
-                    onAddVehicleForCustomer = onAddVehicleForCustomer,
-                    onAffiliate = onAffiliate,
-                    onOpenWorkOrder = onOpenWorkOrder
-                )
-                ReceptionSection.CUSTOMERS -> CustomersDirectorySection(
-                    state = state,
-                    onDirectoryFilterChange = onDirectoryFilterChange,
-                    onSelectCustomer = onSelectCustomer,
-                    onRefreshPortfolio = onRefreshPortfolio,
-                    onRegisterNew = { onRegisterNew(null) },
-                    onAddVehicleForCustomer = onAddVehicleForCustomer,
-                    onOpenWorkOrder = onOpenWorkOrder
-                )
-                ReceptionSection.VEHICLES -> WorkshopVehiclesSection(
-                    state = state,
-                    onDirectoryFilterChange = onDirectoryFilterChange,
-                    onRefreshPortfolio = onRefreshPortfolio,
-                    onRegisterNew = { onRegisterNew(null) },
-                    onOpenWorkOrder = onOpenWorkOrder
-                )
+    state.appointments.firstOrNull { it.id == arriveForId }?.let { appointment ->
+        ArriveSheet(
+            appointment = appointment,
+            state = state,
+            onConfirm = {
+                arriveSubmitted = true
+                onMarkArrived(appointment.id)
+            },
+            onDismiss = {
+                arriveForId = null
+                arriveSubmitted = false
             }
-        }
+        )
     }
 }
 
 @Composable
-private fun CounterSearchSection(
+private fun SearchBlock(
     state: VehicleSearchUiState,
     onModeChange: (SearchMode) -> Unit,
     onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearch: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        if (!state.isOnline) {
+            AtelierBanner(
+                message = stringResource(R.string.reception_search_offline_cache),
+                icon = Icons.Outlined.Info,
+                kind = BannerKind.Info
+            )
+        }
+        if (!state.canSearch) {
+            AtelierNoPermissionState(stringResource(R.string.reception_search_no_search_permission))
+            return@Column
+        }
+        val plateMode = state.mode == SearchMode.PLATE
+        AtelierTextField(
+            label = stringResource(if (plateMode) R.string.search_field_plate else R.string.search_field_document),
+            value = state.query,
+            onValueChange = { onQueryChange(cleanQuery(it, state.mode)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = Icons.Outlined.Search,
+            placeholder = if (plateMode) stringResource(R.string.reception_search_plate_placeholder) else null,
+            enabled = !state.isSearching,
+            keyboardOptions = KeyboardOptions(
+                capitalization = if (plateMode) KeyboardCapitalization.Characters else KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
+                keyboardType = if (plateMode) KeyboardType.Ascii else KeyboardType.Number,
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() })
+        )
+        AtelierButton(
+            text = stringResource(R.string.search_submit),
+            onClick = onSearch,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.canSubmitSearch,
+            loading = state.isSearching
+        )
+        AtelierButton(
+            text = stringResource(if (plateMode) R.string.reception_search_by_document else R.string.reception_search_by_plate),
+            onClick = { onModeChange(if (plateMode) SearchMode.DOCUMENT else SearchMode.PLATE) },
+            modifier = Modifier.fillMaxWidth(),
+            style = AtelierButtonStyle.Text,
+            enabled = !state.isSearching
+        )
+    }
+}
+
+/** Placa en mayúsculas y sin símbolos; el documento, solo dígitos (DNI de 8, RUC de 11). */
+private fun cleanQuery(raw: String, mode: SearchMode): String = when (mode) {
+    SearchMode.PLATE -> raw.uppercase().filter { it.isLetterOrDigit() || it == '-' }.take(8)
+    SearchMode.DOCUMENT -> raw.filter(Char::isDigit).take(11)
+}
+
+private fun LazyListScope.results(
+    state: VehicleSearchUiState,
     onSelectCustomer: (Customer) -> Unit,
-    onMarkArrived: (String) -> Unit,
-    onRefresh: () -> Unit,
     onRegisterNew: (String?) -> Unit,
     onAddVehicleForCustomer: (Customer) -> Unit,
     onAffiliate: () -> Unit,
     onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
 ) {
-    val plateMode = state.mode == SearchMode.PLATE
-    Text(
-        text = stringResource(R.string.search_subtitle),
-        style = MaterialTheme.typography.bodyLarge,
-        color = AtelierTheme.colors.inkSecondary
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        AtelierButton(
-            text = stringResource(R.string.search_mode_plate),
-            onClick = { onModeChange(SearchMode.PLATE) },
-            modifier = Modifier.weight(1f),
-            style = if (plateMode) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-            enabled = !state.isSearching
-        )
-        AtelierButton(
-            text = stringResource(R.string.search_mode_document),
-            onClick = { onModeChange(SearchMode.DOCUMENT) },
-            modifier = Modifier.weight(1f),
-            style = if (plateMode) AtelierButtonStyle.Outlined else AtelierButtonStyle.Tonal,
-            enabled = !state.isSearching
-        )
-    }
-    AtelierTextField(
-        label = stringResource(if (plateMode) R.string.search_field_plate else R.string.search_field_document),
-        value = state.query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !state.isSearching,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (plateMode) KeyboardType.Ascii else KeyboardType.Number,
-            imeAction = ImeAction.Search
-        ),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() })
-    )
-    AtelierButton(
-        text = stringResource(R.string.search_submit),
-        onClick = onSearch,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = state.canSubmitSearch,
-        loading = state.isSearching,
-        icon = Icons.Outlined.Search
-    )
-    if (state.canRegister) {
-        AtelierButton(
-            text = stringResource(R.string.reception_quick_walk_in),
-            onClick = { onRegisterNew(state.initialPlateCandidate) },
-            modifier = Modifier.fillMaxWidth(),
-            style = AtelierButtonStyle.Tonal,
-            icon = Icons.Outlined.PersonAdd
-        )
-    }
-    if (!state.canSearch) NoPermissionBanner()
-
-    SearchResults(
-        state = state,
-        onSelectCustomer = onSelectCustomer,
-        onRegisterNew = { onRegisterNew(state.initialPlateCandidate) },
-        onAddVehicleForCustomer = onAddVehicleForCustomer,
-        onAffiliate = onAffiliate,
-        onOpenWorkOrder = onOpenWorkOrder
-    )
-
-    Appointments(state, onMarkArrived, onRefresh, onOpenWorkOrder)
-}
-
-@Composable
-private fun CustomersDirectorySection(
-    state: VehicleSearchUiState,
-    onDirectoryFilterChange: (String) -> Unit,
-    onSelectCustomer: (Customer) -> Unit,
-    onRefreshPortfolio: () -> Unit,
-    onRegisterNew: () -> Unit,
-    onAddVehicleForCustomer: (Customer) -> Unit,
-    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        SectionTitle(text = stringResource(R.string.reception_customers_directory_title))
-        if (state.canRegister) {
-            AtelierButton(
-                text = stringResource(R.string.reception_new_customer_btn),
-                onClick = onRegisterNew,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Tonal,
-                icon = Icons.Outlined.PersonAdd
-            )
-        }
-    }
-    AtelierTextField(
-        label = stringResource(R.string.reception_customers_filter_label),
-        value = state.directoryFilter,
-        onValueChange = onDirectoryFilterChange,
-        modifier = Modifier.fillMaxWidth()
-    )
-
-    val customers = state.filteredDirectoryCustomers
-    if (customers.isEmpty()) {
-        AtelierBanner(
-            message = stringResource(R.string.reception_customers_empty_directory),
-            icon = Icons.Outlined.Info,
-            kind = BannerKind.Info
-        )
-    } else {
-        customers.forEach { customer ->
-            val selected = state.selectedCustomer?.id == customer.id
-            CustomerDirectoryCard(
-                customer = customer,
-                selected = selected,
-                canRegister = state.canRegister,
-                canOpenWorkOrder = state.canOpenWorkOrder,
-                isLoadingVehicles = selected && state.isLoadingVehicles,
-                vehicles = if (selected) state.customerVehicles else emptyList(),
-                onSelect = { onSelectCustomer(customer) },
-                onAddVehicle = { onAddVehicleForCustomer(customer) },
-                onOpenWorkOrder = { vehicleId -> onOpenWorkOrder(vehicleId, customer.id, null) }
-            )
-        }
-    }
-
-    AtelierButton(
-        text = stringResource(R.string.reception_refresh_directory),
-        onClick = onRefreshPortfolio,
-        modifier = Modifier.fillMaxWidth(),
-        style = AtelierButtonStyle.Text,
-        loading = state.isRefreshingPortfolio
-    )
-}
-
-@Composable
-private fun WorkshopVehiclesSection(
-    state: VehicleSearchUiState,
-    onDirectoryFilterChange: (String) -> Unit,
-    onRefreshPortfolio: () -> Unit,
-    onRegisterNew: () -> Unit,
-    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        SectionTitle(text = stringResource(R.string.reception_vehicles_directory_title))
-        if (state.canRegister) {
-            AtelierButton(
-                text = stringResource(R.string.reception_new_vehicle_btn),
-                onClick = onRegisterNew,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Tonal,
-                icon = Icons.Outlined.DirectionsCar
-            )
-        }
-    }
-    AtelierTextField(
-        label = stringResource(R.string.reception_vehicles_filter_label),
-        value = state.directoryFilter,
-        onValueChange = onDirectoryFilterChange,
-        modifier = Modifier.fillMaxWidth()
-    )
-
-    val vehicles = state.filteredWorkshopVehicles
-    if (vehicles.isEmpty()) {
-        AtelierBanner(
-            message = stringResource(R.string.reception_vehicles_empty_directory),
-            icon = Icons.Outlined.Info,
-            kind = BannerKind.Info
-        )
-    } else {
-        vehicles.forEach { item ->
-            InfoCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = item.vehicle.plate,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    item.vehicle.engineType?.let { engine ->
-                        AtelierChip(text = engine.name, kind = ChipKind.Info)
-                    }
-                }
-                Text(
-                    text = listOfNotNull(item.vehicle.brand, item.vehicle.model, item.vehicle.year?.toString())
-                        .joinToString(" "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                Text(
-                    text = item.owner?.let { stringResource(R.string.search_vehicle_owner, it.displayName) }
-                        ?: stringResource(R.string.search_vehicle_no_owner),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AtelierTheme.colors.muted
-                )
-                item.vehicle.currentMileage?.let { km ->
-                    Text(
-                        text = stringResource(R.string.reception_vehicle_mileage_km, km),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AtelierTheme.colors.muted
-                    )
-                }
-                val customerId = item.owner?.id ?: item.vehicle.currentOwnerId
-                if (state.canOpenWorkOrder && customerId != null) {
-                    StartServiceButton { onOpenWorkOrder(item.vehicle.id, customerId, null) }
-                }
-            }
-        }
-    }
-
-    AtelierButton(
-        text = stringResource(R.string.reception_refresh_directory),
-        onClick = onRefreshPortfolio,
-        modifier = Modifier.fillMaxWidth(),
-        style = AtelierButtonStyle.Text,
-        loading = state.isRefreshingPortfolio
-    )
-}
-
-@Composable
-private fun CustomerDirectoryCard(
-    customer: Customer,
-    selected: Boolean,
-    canRegister: Boolean,
-    canOpenWorkOrder: Boolean,
-    isLoadingVehicles: Boolean,
-    vehicles: List<Vehicle>,
-    onSelect: () -> Unit,
-    onAddVehicle: () -> Unit,
-    onOpenWorkOrder: (vehicleId: String) -> Unit
-) = InfoCard(modifier = Modifier.clickable(onClick = onSelect)) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = customer.displayName,
-            style = MaterialTheme.typography.titleMedium,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
-        AtelierChip(
-            text = if (customer.type == CustomerType.COMPANY) "RUC" else "DNI",
-            kind = if (selected) ChipKind.Info else ChipKind.Idle
-        )
-    }
-    customer.taxId?.let {
-        Text(text = it, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
-    }
-    val contact = listOfNotNull(customer.phone, customer.email).joinToString(" · ")
-    if (contact.isNotBlank()) {
-        Text(text = contact, style = MaterialTheme.typography.bodySmall, color = AtelierTheme.colors.muted)
-    }
-    if (selected) {
-        if (canRegister) {
-            AtelierButton(
-                text = stringResource(R.string.reception_add_vehicle_to_customer),
-                onClick = onAddVehicle,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Outlined
-            )
-        }
-        when {
-            isLoadingVehicles -> Text(
-                text = stringResource(R.string.search_loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
-            )
-            vehicles.isEmpty() -> Text(
-                text = stringResource(R.string.search_customer_vehicles_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
-            )
-            else -> vehicles.forEach { vehicle ->
-                VehicleTexts(vehicle)
-                if (canOpenWorkOrder) {
-                    StartServiceButton { onOpenWorkOrder(vehicle.id) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NoPermissionBanner() = AtelierBanner(
-    message = stringResource(R.string.reception_no_permission),
-    icon = Icons.Outlined.Info,
-    kind = BannerKind.Wait
-)
-
-@Composable
-private fun SearchResults(
-    state: VehicleSearchUiState,
-    onSelectCustomer: (Customer) -> Unit,
-    onRegisterNew: () -> Unit,
-    onAddVehicleForCustomer: (Customer) -> Unit,
-    onAffiliate: () -> Unit,
-    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
-) {
     state.vehicleResult?.let { result ->
-        VehicleResultCard(result)
-        val customerId = result.owner?.id ?: result.vehicle.currentOwnerId
-        if (state.canOpenWorkOrder && customerId != null) {
-            StartServiceButton { onOpenWorkOrder(result.vehicle.id, customerId, null) }
+        item(key = "vehicle-result") {
+            VehicleFicha(
+                result = result,
+                canOpenWorkOrder = state.canOpenWorkOrder,
+                isOnline = state.isOnline,
+                onOpenWorkOrder = onOpenWorkOrder,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            )
         }
     }
 
-    if (state.vehicleNotFound) {
-        AtelierBanner(
-            title = stringResource(R.string.search_not_found_title),
-            message = stringResource(R.string.search_not_found_body),
-            icon = Icons.Outlined.Info,
-            kind = BannerKind.Wait
-        )
-        NotFoundActions(state.canRegister, onRegisterNew, onAffiliate)
-    }
-
-    if (state.customersNotFound) {
-        AtelierBanner(
-            message = stringResource(R.string.search_customers_empty),
-            icon = Icons.Outlined.Info,
-            kind = BannerKind.Wait
-        )
-        NotFoundActions(state.canRegister, onRegisterNew, onAffiliate)
+    if (state.vehicleNotFound || state.customersNotFound) {
+        item(key = "not-found") {
+            NotFound(
+                text = if (state.vehicleNotFound) {
+                    stringResource(R.string.reception_plate_not_found, state.query.trim())
+                } else {
+                    stringResource(R.string.search_customers_empty)
+                },
+                state = state,
+                onRegisterNew = { onRegisterNew(state.initialPlateCandidate) },
+                onAffiliate = onAffiliate
+            )
+        }
     }
 
     if (state.customers.size > 1) {
-        SectionTitle(stringResource(R.string.search_customers_title))
-        state.customers.forEach { customer ->
-            CustomerRow(customer, selected = customer.id == state.selectedCustomer?.id, onClick = { onSelectCustomer(customer) })
+        item(key = "customers-header") {
+            AtelierSectionHeader(
+                title = stringResource(R.string.search_customers_title),
+                modifier = Modifier.padding(horizontal = Spacing.md)
+            )
+        }
+        items(state.customers, key = { "customer-${it.id}" }) { customer ->
+            val selected = customer.id == state.selectedCustomer?.id
+            AtelierListRow(
+                title = customer.displayName,
+                subtitle = customer.taxId,
+                onClick = { onSelectCustomer(customer) },
+                trailing = if (selected) {
+                    { AtelierChip(text = stringResource(R.string.reception_selected), kind = ChipKind.Info) }
+                } else null
+            )
         }
     }
 
     state.selectedCustomer?.let { customer ->
-        if (state.customers.size == 1) CustomerRow(customer, selected = true, onClick = {})
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionTitle(stringResource(R.string.search_customer_vehicles_title, customer.displayName))
-            if (state.canRegister) {
-                AtelierButton(
-                    text = stringResource(R.string.reception_add_vehicle_to_customer),
-                    onClick = { onAddVehicleForCustomer(customer) },
-                    style = AtelierButtonStyle.Text
+        item(key = "customer-vehicles-header") {
+            AtelierSectionHeader(
+                title = stringResource(R.string.search_customer_vehicles_title, customer.displayName),
+                modifier = Modifier.padding(start = Spacing.md, end = Spacing.xs),
+                action = if (state.canRegister && state.isOnline) {
+                    {
+                        AtelierButton(
+                            text = stringResource(R.string.reception_add_vehicle),
+                            onClick = { onAddVehicleForCustomer(customer) },
+                            style = AtelierButtonStyle.Text
+                        )
+                    }
+                } else null
+            )
+        }
+        when {
+            state.isLoadingVehicles && state.customerVehicles.isEmpty() -> items(2, key = { "vehicle-bone-$it" }) {
+                AtelierListRow(title = "Vehículo", subtitle = "Marca modelo", plate = "ABC123", loading = true)
+            }
+            state.customerVehicles.isEmpty() -> item(key = "customer-vehicles-empty") {
+                AtelierEmptyState(
+                    text = stringResource(R.string.search_customer_vehicles_empty),
+                    modifier = Modifier.padding(horizontal = Spacing.md)
+                )
+            }
+            else -> items(state.customerVehicles, key = { "customer-vehicle-${it.id}" }) { vehicle ->
+                AtelierListRow(
+                    title = vehicleLine(vehicle),
+                    plate = vehicle.plate,
+                    trailing = if (state.canOpenWorkOrder) {
+                        {
+                            AtelierButton(
+                                text = stringResource(R.string.reception_open_order),
+                                onClick = { onOpenWorkOrder(vehicle.id, customer.id, null) },
+                                style = AtelierButtonStyle.Text,
+                                enabled = state.isOnline
+                            )
+                        }
+                    } else null
                 )
             }
         }
-        when {
-            state.isLoadingVehicles -> Text(
-                text = stringResource(R.string.search_loading),
-                style = MaterialTheme.typography.bodyLarge,
+    }
+}
+
+@Composable
+private fun VehicleFicha(
+    result: VehicleWithOwner,
+    canOpenWorkOrder: Boolean,
+    isOnline: Boolean,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val vehicle = result.vehicle
+    val customerId = result.owner?.id ?: vehicle.currentOwnerId
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(PanelShape)
+            .background(AtelierTheme.colors.card)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PanelShape)
+            .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        AtelierPlate(vehicle.plate, size = PlateSize.L)
+        Column {
+            Text(
+                text = vehicleLine(vehicle),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = result.owner?.displayName ?: stringResource(R.string.search_vehicle_no_owner),
+                style = MaterialTheme.typography.bodyMedium,
                 color = AtelierTheme.colors.inkSecondary
             )
-            state.customerVehicles.isEmpty() -> Text(
-                text = stringResource(R.string.search_customer_vehicles_empty),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
+        }
+        if (canOpenWorkOrder && customerId != null) {
+            AtelierButton(
+                text = stringResource(R.string.reception_open_order),
+                onClick = { onOpenWorkOrder(vehicle.id, customerId, null) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isOnline
             )
-            else -> state.customerVehicles.forEach { vehicle ->
-                VehicleRow(vehicle)
-                if (state.canOpenWorkOrder) StartServiceButton { onOpenWorkOrder(vehicle.id, customer.id, null) }
+            if (!isOnline) AtelierRequiresConnection()
+        }
+    }
+}
+
+@Composable
+private fun NotFound(
+    text: String,
+    state: VehicleSearchUiState,
+    onRegisterNew: () -> Unit,
+    onAffiliate: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
+        if (state.canRegister) {
+            AtelierButton(
+                text = stringResource(R.string.search_register),
+                onClick = onRegisterNew,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.isOnline
+            )
+            AtelierButton(
+                text = stringResource(R.string.search_affiliate),
+                onClick = onAffiliate,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Outlined,
+                enabled = state.isOnline
+            )
+            if (!state.isOnline) AtelierRequiresConnection()
+        }
+    }
+}
+
+private fun LazyListScope.appointments(
+    state: VehicleSearchUiState,
+    onRefresh: () -> Unit,
+    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit,
+    onArrive: (String) -> Unit
+) {
+    item(key = "appointments-header") {
+        AtelierSectionHeader(
+            title = stringResource(R.string.search_appointments_title),
+            modifier = Modifier.padding(start = Spacing.md, end = Spacing.md, top = Spacing.sm)
+        )
+    }
+    state.arrival?.let { arrival ->
+        item(key = "arrival") {
+            Column(
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                val ready = arrival is ArrivalResult.WorkOrderReady
+                AtelierBanner(
+                    message = stringResource(if (ready) R.string.search_arrival_ready else R.string.search_arrival_pending),
+                    icon = Icons.Outlined.CheckCircle,
+                    kind = if (ready) BannerKind.Ok else BannerKind.Info
+                )
+                if (arrival is ArrivalResult.WorkOrderReady && state.canOpenWorkOrder) {
+                    AtelierButton(
+                        text = stringResource(R.string.search_complete_order),
+                        onClick = {
+                            onOpenWorkOrder(arrival.appointment.vehicleId, arrival.appointment.customerId, arrival.workOrderId)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = state.isOnline
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-private fun StartServiceButton(onClick: () -> Unit) = AtelierButton(
-    text = stringResource(R.string.search_start_service),
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth()
-)
-
-@Composable
-private fun NotFoundActions(canRegister: Boolean, onRegisterNew: () -> Unit, onAffiliate: () -> Unit) {
-    AtelierButton(
-        text = stringResource(R.string.search_register),
-        onClick = onRegisterNew,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = canRegister
-    )
-    AtelierButton(
-        text = stringResource(R.string.search_affiliate),
-        onClick = onAffiliate,
-        modifier = Modifier.fillMaxWidth(),
-        style = AtelierButtonStyle.Outlined,
-        enabled = canRegister
-    )
-}
-
-@Composable
-private fun Appointments(
-    state: VehicleSearchUiState,
-    onMarkArrived: (String) -> Unit,
-    onRefresh: () -> Unit,
-    onOpenWorkOrder: (vehicleId: String, customerId: String, workOrderId: String?) -> Unit
-) {
-    if (!state.canViewAppointments) return
-    SectionTitle(stringResource(R.string.search_appointments_title))
-    state.arrival?.let { arrival ->
-        val ready = arrival is ArrivalResult.WorkOrderReady
-        AtelierBanner(
-            message = stringResource(if (ready) R.string.search_arrival_ready else R.string.search_arrival_pending),
-            icon = Icons.Outlined.CheckCircle,
-            kind = if (ready) BannerKind.Ok else BannerKind.Info
-        )
-        if (arrival is ArrivalResult.WorkOrderReady && state.canOpenWorkOrder) {
-            AtelierButton(
-                text = stringResource(R.string.search_complete_order),
-                onClick = {
-                    onOpenWorkOrder(arrival.appointment.vehicleId, arrival.appointment.customerId, arrival.workOrderId)
-                },
-                modifier = Modifier.fillMaxWidth()
+    when {
+        state.appointments.isEmpty() && state.isRefreshingAppointments -> items(2, key = { "appointment-bone-$it" }) {
+            AtelierListRow(title = "Cita", subtitle = "Cliente", plate = "ABC123", loading = true)
+        }
+        state.appointments.isEmpty() && !state.isOnline -> item(key = "appointments-offline") {
+            AtelierOfflineState(modifier = Modifier.padding(horizontal = Spacing.md), onRetry = onRefresh)
+        }
+        state.appointments.isEmpty() -> item(key = "appointments-empty") {
+            AtelierEmptyState(
+                text = stringResource(R.string.search_appointments_empty),
+                modifier = Modifier.padding(horizontal = Spacing.md)
+            )
+        }
+        else -> items(state.appointments, key = { it.id }) { appointment ->
+            val canArrive = state.canMarkArrival &&
+                (appointment.status == AppointmentStatus.PENDING || appointment.status == AppointmentStatus.CONFIRMED)
+            val status = appointment.status
+            AtelierListRow(
+                title = appointment.customerName ?: stringResource(R.string.reception_appointment_no_customer),
+                subtitle = appointmentLine(appointment),
+                plate = appointment.plate,
+                onClick = if (canArrive) { { onArrive(appointment.id) } } else null,
+                trailing = if (status != null) {
+                    { AtelierChip(text = stringResource(status.labelRes()), kind = status.chipKind()) }
+                } else null
             )
         }
     }
-    if (state.appointments.isEmpty()) {
-        Text(
-            text = stringResource(R.string.search_appointments_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = AtelierTheme.colors.inkSecondary
-        )
-    }
-    state.appointments.forEach { appointment ->
-        AppointmentCard(
-            appointment = appointment,
-            canMarkArrival = state.canMarkArrival,
-            isArriving = state.arrivingId == appointment.id,
-            busy = state.arrivingId != null,
-            onMarkArrived = { onMarkArrived(appointment.id) }
-        )
-    }
-    AtelierButton(
-        text = stringResource(R.string.search_appointments_refresh),
-        onClick = onRefresh,
-        modifier = Modifier.fillMaxWidth(),
-        style = AtelierButtonStyle.Text,
-        loading = state.isRefreshingAppointments
-    )
 }
 
 @Composable
-private fun SectionTitle(text: String, modifier: Modifier = Modifier) = Text(
-    text = text,
-    modifier = modifier,
-    style = MaterialTheme.typography.titleMedium,
-    color = MaterialTheme.colorScheme.onBackground
-)
-
-@Composable
-private fun InfoCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) = Column(
-    modifier = modifier
-        .fillMaxWidth()
-        .clip(CardShape)
-        .background(AtelierTheme.colors.card)
-        .padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(4.dp)
-) { content() }
-
-@Composable
-private fun VehicleResultCard(result: VehicleWithOwner) = InfoCard {
-    VehicleTexts(result.vehicle)
-    Text(
-        text = result.owner?.let { stringResource(R.string.search_vehicle_owner, it.displayName) }
-            ?: stringResource(R.string.search_vehicle_no_owner),
-        style = MaterialTheme.typography.bodyMedium,
-        color = AtelierTheme.colors.inkSecondary
-    )
-}
-
-@Composable
-private fun VehicleRow(vehicle: Vehicle) = InfoCard { VehicleTexts(vehicle) }
-
-@Composable
-private fun VehicleTexts(vehicle: Vehicle) {
-    Text(text = vehicle.plate, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-    Text(
-        text = listOfNotNull(vehicle.brand, vehicle.model, vehicle.year?.toString()).joinToString(" "),
-        style = MaterialTheme.typography.bodyMedium,
-        color = AtelierTheme.colors.inkSecondary
-    )
-}
-
-@Composable
-private fun CustomerRow(customer: Customer, selected: Boolean, onClick: () -> Unit) = InfoCard(
-    modifier = Modifier.clickable(onClick = onClick)
-) {
-    Text(
-        text = customer.displayName,
-        style = MaterialTheme.typography.titleMedium,
-        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-    )
-    customer.taxId?.let {
-        Text(text = it, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
-    }
-}
-
-@Composable
-private fun AppointmentCard(
+private fun ArriveSheet(
     appointment: Appointment,
-    canMarkArrival: Boolean,
-    isArriving: Boolean,
-    busy: Boolean,
-    onMarkArrived: () -> Unit
-) = InfoCard {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+    state: VehicleSearchUiState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.reception_arrive_title),
+        onDismiss = onDismiss,
+        actions = {
+            if (!state.isOnline) AtelierRequiresConnection()
+            AtelierButton(
+                text = stringResource(R.string.reception_arrive_confirm),
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.isOnline && state.arrivingId == null,
+                loading = state.arrivingId == appointment.id
+            )
+            AtelierButton(
+                text = stringResource(R.string.common_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text
+            )
+        }
     ) {
+        appointment.plate?.let { AtelierPlate(it, size = PlateSize.L) }
         Text(
-            text = stringResource(
-                R.string.search_appointment_line,
-                TimeFormat.format(appointment.scheduledAt),
-                appointment.plate ?: stringResource(R.string.search_appointment_unknown_plate)
-            ),
+            text = appointment.customerName ?: stringResource(R.string.reception_appointment_no_customer),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        appointment.status?.let { status ->
-            AtelierChip(text = stringResource(status.labelRes()), kind = status.chipKind())
+        Text(
+            text = listOfNotNull(
+                stringResource(R.string.reception_arrive_time, TimeFormat.format(appointment.scheduledAt)),
+                appointment.reason
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        state.error?.let {
+            AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline)
         }
     }
-    appointment.customerName?.let {
-        Text(text = it, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
-    }
-    appointment.reason?.let {
-        Text(text = it, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.muted)
-    }
-    val canArrive = appointment.status == AppointmentStatus.PENDING || appointment.status == AppointmentStatus.CONFIRMED
-    if (canArrive) {
-        AtelierButton(
-            text = stringResource(R.string.search_appointment_arrived),
-            onClick = onMarkArrived,
-            modifier = Modifier.fillMaxWidth(),
-            style = AtelierButtonStyle.Tonal,
-            enabled = canMarkArrival && !busy,
-            loading = isArriving
-        )
-    }
+}
+
+private fun vehicleLine(vehicle: Vehicle): String =
+    listOfNotNull(vehicle.brand, vehicle.model, vehicle.year?.toString()).joinToString(" ")
+
+@Composable
+private fun appointmentLine(appointment: Appointment): String {
+    val time = TimeFormat.format(appointment.scheduledAt)
+    return appointment.reason?.let { stringResource(R.string.search_appointment_line, time, it) } ?: time
 }
 
 private fun AppointmentStatus.labelRes(): Int = when (this) {
@@ -785,37 +578,77 @@ private fun AppointmentStatus.chipKind(): ChipKind = when (this) {
     AppointmentStatus.CANCELED -> ChipKind.Idle
 }
 
-private val previewVehicle = Vehicle("v1", "ABC123", null, "Toyota", "Yaris", 2019, EngineType.GASOLINE, "c1", 42_000)
-private val previewOwner = Customer("c1", CustomerType.INDIVIDUAL, "Ana Torres", "45678912", null, null, "ACTIVE")
-private val previewAppointment = Appointment(
-    "a1", "b1", "c1", "v1", Instant.parse("2026-10-27T15:00:00Z"), 60, "Cambio de aceite",
-    AppointmentStatus.CONFIRMED, plate = "ABC123", customerName = "Ana Torres"
+private val previewVehicle = Vehicle("v1", "BKR418", null, "Toyota", "Yaris", 2019, EngineType.GASOLINE, "c1", 42_000)
+private val previewOwner = Customer("c1", CustomerType.INDIVIDUAL, "Ana Torres Quispe", "45678912", null, null, "ACTIVE")
+private val previewAppointments = listOf(
+    Appointment(
+        "a1", "b1", "c1", "v1", Instant.parse("2026-10-27T15:00:00Z"), 60, "Cambio de aceite",
+        AppointmentStatus.CONFIRMED, plate = "BKR418", customerName = "Ana Torres Quispe"
+    ),
+    Appointment(
+        "a2", "b1", "c2", "v2", Instant.parse("2026-10-27T17:30:00Z"), 90, "Frenos",
+        AppointmentStatus.PENDING, plate = "F4T119", customerName = "Transportes Andes SAC"
+    ),
+    Appointment(
+        "a3", "b1", "c3", "v3", Instant.parse("2026-10-27T14:00:00Z"), 60, null,
+        AppointmentStatus.ARRIVED, plate = "D2K807", customerName = "Luis Ramos Huamán"
+    )
 )
 
-@Preview(name = "Recepción · resultado · oscuro", widthDp = 360, heightDp = 900, showBackground = true)
 @Composable
-private fun VehicleSearchPreviewResult() = AtelierWorkshopTheme(darkTheme = true) {
+private fun SearchPreview(state: VehicleSearchUiState, dark: Boolean) = AtelierWorkshopTheme(darkTheme = dark) {
     VehicleSearchContent(
-        state = VehicleSearchUiState(
-            query = "ABC123", searched = true, vehicleResult = VehicleWithOwner(previewVehicle, previewOwner),
-            appointments = listOf(previewAppointment),
-            canSearch = true, canViewAppointments = true, canMarkArrival = true, canRegister = true,
-            canOpenWorkOrder = true
-        ),
+        state = state,
         onBack = {}, onModeChange = {}, onQueryChange = {}, onSearch = {}, onSelectCustomer = {},
         onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}, onOpenWorkOrder = { _, _, _ -> }
     )
 }
 
-@Preview(name = "Recepción · no encontrado · claro", widthDp = 360, heightDp = 900, showBackground = true)
+private val previewAllowed = VehicleSearchUiState(
+    canSearch = true, canViewAppointments = true, canMarkArrival = true, canRegister = true, canOpenWorkOrder = true
+)
+
+@Preview(name = "Recibir · ficha y citas · claro", widthDp = 390, heightDp = 844, showBackground = true)
 @Composable
-private fun VehicleSearchPreviewNotFound() = AtelierWorkshopTheme(darkTheme = false) {
-    VehicleSearchContent(
-        state = VehicleSearchUiState(
-            query = "XYZ999", searched = true, canSearch = true, canRegister = true,
-            error = UiText.Dynamic("Ocurrió un error. Inténtalo de nuevo.")
-        ),
-        onBack = {}, onModeChange = {}, onQueryChange = {}, onSearch = {}, onSelectCustomer = {},
-        onMarkArrived = {}, onRefresh = {}, onRegisterNew = {}, onAffiliate = {}, onOpenWorkOrder = { _, _, _ -> }
-    )
-}
+private fun SearchPreviewResultLight() = SearchPreview(
+    previewAllowed.copy(
+        query = "BKR418", searched = true, vehicleResult = VehicleWithOwner(previewVehicle, previewOwner),
+        appointments = previewAppointments
+    ),
+    dark = false
+)
+
+@Preview(name = "Recibir · ficha y citas · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun SearchPreviewResultDark() = SearchPreview(
+    previewAllowed.copy(
+        query = "BKR418", searched = true, vehicleResult = VehicleWithOwner(previewVehicle, previewOwner),
+        appointments = previewAppointments
+    ),
+    dark = true
+)
+
+@Preview(name = "Recibir · sin resultado, sin red · claro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun SearchPreviewNotFoundOffline() = SearchPreview(
+    previewAllowed.copy(query = "XYZ999", searched = true, isOnline = false, appointments = previewAppointments),
+    dark = false
+)
+
+@Preview(name = "Recibir · cargando citas · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun SearchPreviewLoading() = SearchPreview(
+    previewAllowed.copy(isRefreshingAppointments = true),
+    dark = true
+)
+
+@Preview(name = "Recibir · error · claro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun SearchPreviewError() = SearchPreview(
+    previewAllowed.copy(query = "BKR418", error = UiText.Dynamic("No se pudo consultar el vehículo. Inténtalo de nuevo.")),
+    dark = false
+)
+
+@Preview(name = "Recibir · sin permiso · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun SearchPreviewNoPermission() = SearchPreview(VehicleSearchUiState(), dark = true)

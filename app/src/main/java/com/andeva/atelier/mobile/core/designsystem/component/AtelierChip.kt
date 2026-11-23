@@ -3,9 +3,16 @@ package com.andeva.atelier.mobile.core.designsystem.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,14 +21,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.ChipShape
 
-enum class ChipKind { Ok, Info, Wait, Bad, Idle }
+/**
+ * Vocabulario fijo (DESIGN.md → Chips y marcas de estado): [Info] en curso · [Ok] listo, aprobada,
+ * sincronizado · [Wait] espera decisión · [Bad] rechazada, falló · [Warn] tardanza, stock mínimo,
+ * suspendida · [Idle] pendiente de sincronizar, sin permiso.
+ */
+enum class ChipKind { Ok, Info, Wait, Bad, Idle, Warn }
 
-/** Etiqueta de estado de 28 dp. El color nunca va solo: siempre lleva texto. */
+/**
+ * Marca de estado: ícono y texto sobre el fondo tenue del estado. Nunca solo color: si no se pasa
+ * [icon], lleva el de su [kind]. Va siempre al extremo derecho de la fila.
+ */
 @Composable
 fun AtelierChip(
     text: String,
@@ -36,20 +50,29 @@ fun AtelierChip(
         ChipKind.Wait -> colors.waitContainer to colors.wait
         ChipKind.Bad -> colors.badContainer to colors.bad
         ChipKind.Idle -> colors.idleContainer to colors.idle
+        ChipKind.Warn -> colors.warnContainer to colors.warn
+    }
+    val mark = icon ?: when (kind) {
+        ChipKind.Ok -> Icons.Outlined.CheckCircle
+        ChipKind.Info -> Icons.Outlined.PlayCircle
+        ChipKind.Wait -> Icons.Outlined.HourglassEmpty
+        ChipKind.Bad -> Icons.Outlined.ErrorOutline
+        ChipKind.Idle -> Icons.Outlined.MoreHoriz
+        ChipKind.Warn -> Icons.Outlined.WarningAmber
     }
     Row(
         modifier = modifier
-            .height(28.dp)
+            .heightIn(min = 28.dp)
             .clip(ChipShape)
             .background(container)
-            .padding(start = if (icon != null) 8.dp else 10.dp, end = 10.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = content)
+        Icon(mark, contentDescription = null, modifier = Modifier.size(16.dp), tint = content)
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.labelLarge,
             color = content,
             maxLines = 1,
             softWrap = false

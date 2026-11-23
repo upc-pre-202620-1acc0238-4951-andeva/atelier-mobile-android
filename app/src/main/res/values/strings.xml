@@ -20,6 +20,10 @@
 
     <!-- Común -->
     <string name="common_back">Volver</string>
+    <string name="common_retry">Reintentar</string>
+    <string name="plate_a11y">placa %1$s</string>
+    <string name="section_with_count">%1$s · %2$d</string>
+    <string name="state_offline_no_cache">Sin conexión y sin datos guardados</string>
 
     <!-- Auth: campos -->
     <string name="auth_email_label">Correo institucional</string>
@@ -505,6 +509,8 @@
     <string name="main_tab_profile">Perfil</string>
     <string name="main_tab_settings">Ajustes</string>
     <string name="main_tab_more">Más</string>
+    <string name="main_tab_today">Hoy</string>
+    <string name="main_tab_team">Equipo</string>
     <string name="main_obd_title">Escáneres OBD-II</string>
     <string name="main_obd_subtitle">Enciende tu escáner OBD-II y acércalo al teléfono.</string>
     <string name="profile_sign_out">Cerrar sesión</string>
@@ -865,4 +871,39 @@
     <string name="employee_finding_select_order_title">Seleccionar orden de trabajo</string>
     <string name="employee_finding_select_order_subtitle">Selecciona la orden donde detectaste el hallazgo técnico:</string>
     <string name="employee_dialog_understood">Entendido</string>
+
+    <!-- Hoy: parte de la sede (dueño y administrador) -->
+    <plurals name="today_cars">
+        <item quantity="one">%d auto</item>
+        <item quantity="other">%d autos</item>
+    </plurals>
+    <string name="today_caption">en el taller hoy</string>
+    <string name="today_context">%1$s · %2$s</string>
+    <string name="today_figure_in_bay">en bahía</string>
+    <string name="today_figure_ready">listos para entregar</string>
+    <string name="today_figure_on_shift">en turno</string>
+    <string name="today_decisions">Esperan tu decisión</string>
+    <string name="today_open_orders">Órdenes abiertas</string>
+    <string name="today_see_all">Ver todas</string>
+    <string name="today_receive_vehicle">Recibir vehículo</string>
+    <string name="today_orders_empty">No hay órdenes abiertas en esta sede.</string>
+    <string name="today_orders_no_permission">Tu cuenta no puede ver las órdenes de la sede.</string>
+    <string name="today_offline_cache">Sin conexión. Ves lo último que se guardó en este teléfono.</string>
+    <string name="today_order_number">Orden #%1$d</string>
+    <string name="today_order_no_number">Orden sin número</string>
+    <string name="today_decision_draft">Orden sin iniciar</string>
+    <string name="today_decision_justification">Descargo de asistencia</string>
+    <string name="today_decision_justification_late">Descargo por tardanza</string>
+    <string name="today_decision_justification_absent">Descargo por falta</string>
+    <string name="today_collaborator_fallback">Colaborador</string>
+    <string name="today_justification_approve">Aprobar descargo</string>
+    <string name="today_justification_reject">Rechazar descargo</string>
+    <string name="today_justification_approved">Aprobado</string>
+    <string name="today_justification_rejected">Rechazado</string>
+    <string name="today_justification_no_reason">Sin motivo escrito.</string>
+    <string name="today_justification_no_permission">Tu cuenta no puede aprobar ni rechazar descargos.</string>
+    <plurals name="today_justifications_partial">
+        <item quantity="one">No se pudo consultar %d día de descargos. Desliza para reintentar.</item>
+        <item quantity="other">No se pudieron consultar %d días de descargos. Desliza para reintentar.</item>
+    </plurals>
 </resources>

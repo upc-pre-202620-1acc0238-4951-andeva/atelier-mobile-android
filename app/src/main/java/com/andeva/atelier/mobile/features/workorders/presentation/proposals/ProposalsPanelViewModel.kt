@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
@@ -37,7 +38,8 @@ class ProposalsPanelViewModel @Inject constructor(
     private val notifyProposal: NotifyProposalUseCase,
     private val approveProposal: ApproveProposalUseCase,
     private val rejectProposal: RejectProposalUseCase,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    connectivity: ConnectivityObserver? = null
 ) : ViewModel() {
 
     private val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
@@ -55,6 +57,11 @@ class ProposalsPanelViewModel @Inject constructor(
                         canReport = session?.has(Permission.PROPOSALS_CREATE) == true
                     )
                 }
+            }
+        }
+        if (connectivity != null) {
+            viewModelScope.launch {
+                connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } }
             }
         }
         load()

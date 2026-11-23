@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.main.presentation.obd
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
@@ -41,6 +42,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ObdViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
+    connectivity: ConnectivityObserver,
     private val getDevices: GetObdDevicesUseCase,
     private val registerDevice: RegisterObdDeviceUseCase,
     private val updateStatus: UpdateObdDeviceStatusUseCase,
@@ -64,6 +66,7 @@ class ObdViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         canReadDevices = session?.has(Permission.OBD_DEVICES_READ) == true,
+                        planIncludesTelemetry = session?.plan?.iotTelemetryEnabled ?: true,
                         canRegisterDevices = session?.has(Permission.OBD_DEVICES_REGISTER) == true,
                         canManageInstallations = session?.has(Permission.INSTALLATIONS_MANAGE) == true ||
                             session?.has(Permission.OBD_DEVICES_REGISTER) == true
@@ -107,6 +110,7 @@ class ObdViewModel @Inject constructor(
                 loadInstallations(vehicles)
             }
         }
+        viewModelScope.launch { connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } } }
         loadDevices()
     }
 
@@ -151,7 +155,7 @@ class ObdViewModel @Inject constructor(
     }
 
     fun onOpenInstall(device: ObdDevice) {
-        if (!_uiState.value.canManageInstallations) return
+        if (!_uiState.value.canManageInstallations || !_uiState.value.isOnline) return
         _uiState.update { it.copy(installingDevice = device, error = null, notice = null) }
     }
 
@@ -194,7 +198,7 @@ class ObdViewModel @Inject constructor(
     }
 
     fun onOpenUninstall(device: ObdDevice) {
-        if (!_uiState.value.canManageInstallations) return
+        if (!_uiState.value.canManageInstallations || !_uiState.value.isOnline) return
         _uiState.update { it.copy(uninstallingDevice = device, error = null, notice = null) }
     }
 
@@ -226,7 +230,7 @@ class ObdViewModel @Inject constructor(
     }
 
     fun onOpenRegister() {
-        if (!_uiState.value.canRegisterDevices) return
+        if (!_uiState.value.canRegisterDevices || !_uiState.value.isOnline) return
         _uiState.update { it.copy(registerForm = RegisterObdForm(), error = null, notice = null) }
     }
 
@@ -247,7 +251,7 @@ class ObdViewModel @Inject constructor(
     fun onConfirmRegister() {
         val state = _uiState.value
         val form = state.registerForm ?: return
-        if (!state.canRegisterDevices || !form.canSubmit || state.isSaving) return
+        if (!state.canRegisterDevices || !form.canSubmit || state.isSaving || !state.isOnline) return
         _uiState.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             registerDevice(
@@ -273,7 +277,7 @@ class ObdViewModel @Inject constructor(
     }
 
     fun onOpenStatusDialog(device: ObdDevice) {
-        if (!_uiState.value.canRegisterDevices) return
+        if (!_uiState.value.canRegisterDevices || !_uiState.value.isOnline) return
         _uiState.update { it.copy(editingDevice = device, error = null, notice = null) }
     }
 

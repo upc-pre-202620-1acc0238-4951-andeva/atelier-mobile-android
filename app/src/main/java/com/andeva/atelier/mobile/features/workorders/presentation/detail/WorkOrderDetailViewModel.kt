@@ -14,6 +14,9 @@ import com.andeva.atelier.mobile.features.bays.application.RefreshBayBoardUseCas
 import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ApproveSuspensionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.RejectSuspensionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ResumeSuspendedTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SearchPartsUseCase
 import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
@@ -29,7 +32,12 @@ import com.andeva.atelier.mobile.features.tasks.presentation.invalidTaskField
 import com.andeva.atelier.mobile.features.tasks.presentation.toTaskUiText
 import com.andeva.atelier.mobile.features.workorders.application.AddWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.application.ApproveQuotationUseCase
+import com.andeva.atelier.mobile.features.workorders.application.CancelWorkOrderUseCase
+import com.andeva.atelier.mobile.features.workorders.application.CompleteWorkOrderUseCase
 import com.andeva.atelier.mobile.features.workorders.application.DownloadQuotationPdfUseCase
+import com.andeva.atelier.mobile.features.workorders.application.GetPartMovementsUseCase
+import com.andeva.atelier.mobile.features.workorders.application.GetProfitabilityUseCase
+import com.andeva.atelier.mobile.features.workorders.application.StartWorkOrderUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetBranchMechanicsUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetServiceCatalogUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
@@ -39,6 +47,7 @@ import com.andeva.atelier.mobile.features.workorders.application.UpdateWorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.InvalidWorkOrderInputException
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.NewWorkOrderTask
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderTaskChanges
 import com.andeva.atelier.mobile.features.workorders.presentation.invalidWorkOrderField
@@ -83,7 +92,15 @@ class WorkOrderDetailViewModel @Inject constructor(
     private val refreshBayBoard: RefreshBayBoardUseCase? = null,
     private val reassignBay: ReassignBayUseCase? = null,
     private val getBranchMechanics: GetBranchMechanicsUseCase? = null,
-    private val reassignTaskMechanic: ReassignTaskMechanicUseCase? = null
+    private val reassignTaskMechanic: ReassignTaskMechanicUseCase? = null,
+    private val startOrder: StartWorkOrderUseCase? = null,
+    private val completeOrder: CompleteWorkOrderUseCase? = null,
+    private val cancelOrder: CancelWorkOrderUseCase? = null,
+    private val approveSuspension: ApproveSuspensionUseCase? = null,
+    private val rejectSuspension: RejectSuspensionUseCase? = null,
+    private val resumeSuspendedTask: ResumeSuspendedTaskUseCase? = null,
+    private val getProfitability: GetProfitabilityUseCase? = null,
+    private val getPartMovements: GetPartMovementsUseCase? = null
 ) : ViewModel() {
 
     constructor(
@@ -148,7 +165,20 @@ class WorkOrderDetailViewModel @Inject constructor(
                         canAssignBay = session?.has(Permission.BAYS_ASSIGN) == true &&
                             session.has(Permission.WORK_ORDERS_UPDATE),
                         canReassignMechanic = session?.has(Permission.BAYS_REASSIGN) == true ||
-                            session?.has(Permission.WORK_ORDERS_UPDATE) == true
+                            session?.has(Permission.WORK_ORDERS_UPDATE) == true,
+                        canCancelWorkOrder = session?.has(Permission.WORK_ORDERS_CANCEL) == true,
+                        canResolveProposals = session?.has(Permission.PROPOSALS_RESOLVE) == true,
+                        canValidateSuspensions = session?.has(Permission.TASKS_HOLD_VALIDATE) == true,
+                        canReadProfitability = session?.has(Permission.BATCHES_READ) == true ||
+                            session?.has(Permission.CASHFLOW_EXPORT_PDF) == true,
+                        canReadPartMovements = session?.has(Permission.BATCHES_READ) == true ||
+                            session?.has(Permission.BATCHES_RESTORE) == true,
+                        hasCheckoutPermission = listOf(
+                            Permission.INVOICES_ISSUE_SUNAT,
+                            Permission.PAYMENTS_CREATE,
+                            Permission.EXIT_PASSES_ISSUE,
+                            Permission.VEHICLE_HANDOVER_EXECUTE
+                        ).any { session?.has(it) == true }
                     )
                 }
                 if (canReadParts && _uiState.value.partNamesById.isEmpty()) {
@@ -531,6 +561,7 @@ class WorkOrderDetailViewModel @Inject constructor(
                         chargeForm = null,
                         editingPartTaskId = null,
                         partEdit = null,
+                        reviewingSuspension = null,
                         detail = updated,
                         notice = notice
                     )
@@ -544,6 +575,7 @@ class WorkOrderDetailViewModel @Inject constructor(
                         chargeForm = null,
                         editingPartTaskId = null,
                         partEdit = null,
+                        reviewingSuspension = null,
                         notice = notice,
                         error = e.toWorkOrderUiText()
                     )
@@ -612,6 +644,7 @@ class WorkOrderDetailViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             busyAction = null,
+                            showQuotationDecision = false,
                             detail = it.detail?.copy(workOrder = updatedOrder),
                             notice = UiText.Resource(R.string.quotation_approved_notice)
                         )
@@ -624,7 +657,13 @@ class WorkOrderDetailViewModel @Inject constructor(
     fun onOpenRejectQuotation() {
         if (!_uiState.value.canResolveQuotation) return
         _uiState.update {
-            it.copy(rejectForm = RejectQuotationForm(), notice = null, error = null, invalidField = null)
+            it.copy(
+                rejectForm = RejectQuotationForm(),
+                showQuotationDecision = false,
+                notice = null,
+                error = null,
+                invalidField = null
+            )
         }
     }
 
@@ -660,6 +699,160 @@ class WorkOrderDetailViewModel @Inject constructor(
                 .onFailure(::failWorkOrder)
         }
     }
+
+    // --- Respuesta del cliente a la proforma, en hoja inferior ---
+
+    fun onOpenQuotationDecision() {
+        if (!_uiState.value.let { it.canApproveQuotation && it.isDraft }) return
+        _uiState.update { it.copy(showQuotationDecision = true, notice = null, error = null) }
+    }
+
+    fun onDismissQuotationDecision() = _uiState.update {
+        if (it.isBusy) it else it.copy(showQuotationDecision = false, error = null)
+    }
+
+    // --- Ciclo de vida de la orden: iniciar, completar, cancelar (en línea) ---
+
+    fun onStartOrder() {
+        val start = startOrder ?: return
+        if (!_uiState.value.canStartOrder) return
+        runOrderAction(WorkOrderDetailAction.START_ORDER, R.string.orders_started_notice) { start(workOrderId) }
+    }
+
+    fun onCompleteOrder() {
+        val complete = completeOrder ?: return
+        if (!_uiState.value.canCompleteOrder) return
+        runOrderAction(WorkOrderDetailAction.COMPLETE_ORDER, R.string.orders_completed_notice) { complete(workOrderId) }
+    }
+
+    fun onOpenCancelOrder() {
+        if (!_uiState.value.canCancelOrder) return
+        _uiState.update { it.copy(cancelForm = CancelOrderForm(), notice = null, error = null, invalidField = null) }
+    }
+
+    fun onDismissCancelOrder() = _uiState.update {
+        if (it.isBusy) it else it.copy(cancelForm = null, error = null, invalidField = null)
+    }
+
+    fun onCancelReasonChange(value: String) = _uiState.update {
+        val form = it.cancelForm
+        if (form == null || it.isBusy) it
+        else it.copy(cancelForm = form.copy(reason = value), error = null, invalidField = null)
+    }
+
+    fun onConfirmCancelOrder() {
+        val cancel = cancelOrder ?: return
+        val form = _uiState.value.cancelForm ?: return
+        if (!_uiState.value.canCancelOrder) return
+        runOrderAction(WorkOrderDetailAction.CANCEL_ORDER, R.string.orders_canceled_notice) {
+            cancel(workOrderId, form.reason.trim())
+        }
+    }
+
+    private fun runOrderAction(action: WorkOrderDetailAction, notice: Int, call: suspend () -> Result<WorkOrder>) {
+        _uiState.update { it.copy(busyAction = action, notice = null, error = null, invalidField = null) }
+        viewModelScope.launch {
+            call()
+                .onSuccess { updated ->
+                    _uiState.update { state ->
+                        state.copy(
+                            busyAction = null,
+                            cancelForm = null,
+                            // La respuesta de estas acciones no trae placa ni cliente: se conservan los de la ficha.
+                            detail = state.detail?.let { d ->
+                                d.copy(
+                                    workOrder = updated.copy(
+                                        plate = updated.plate ?: d.workOrder.plate,
+                                        customerName = updated.customerName ?: d.workOrder.customerName,
+                                        bayName = updated.bayName ?: d.workOrder.bayName
+                                    )
+                                )
+                            },
+                            notice = UiText.Resource(notice)
+                        )
+                    }
+                }
+                .onFailure(::failWorkOrder)
+        }
+    }
+
+    // --- Suspensiones por validar (US29, H5) ---
+
+    fun onOpenSuspension(task: TaskDetail) {
+        if (!_uiState.value.canValidateSuspensions) return
+        _uiState.update { it.copy(reviewingSuspension = task, notice = null, error = null) }
+    }
+
+    fun onDismissSuspension() = _uiState.update {
+        if (it.isBusy) it else it.copy(reviewingSuspension = null, error = null)
+    }
+
+    fun onApproveSuspension() {
+        val approve = approveSuspension ?: return
+        val task = _uiState.value.reviewingSuspension ?: return
+        if (!_uiState.value.canDecideSuspension) return
+        runTaskAction(WorkOrderDetailAction.APPROVE_SUSPENSION, R.string.orders_suspension_approved_notice) {
+            approve(task.id)
+        }
+    }
+
+    fun onRejectSuspension() {
+        val reject = rejectSuspension ?: return
+        val task = _uiState.value.reviewingSuspension ?: return
+        if (!_uiState.value.canDecideSuspension) return
+        runTaskAction(WorkOrderDetailAction.REJECT_SUSPENSION, R.string.orders_suspension_rejected_notice) {
+            reject(task.id)
+        }
+    }
+
+    fun onResumeTask(task: TaskDetail) {
+        val resume = resumeSuspendedTask ?: return
+        if (!_uiState.value.canDecideSuspension) return
+        runTaskAction(WorkOrderDetailAction.RESUME_TASK, R.string.orders_task_resumed_notice) { resume(task.id) }
+    }
+
+    private fun runTaskAction(action: WorkOrderDetailAction, notice: Int, call: suspend () -> Result<TaskDetail>) {
+        _uiState.update { it.copy(busyAction = action, notice = null, error = null, invalidField = null) }
+        viewModelScope.launch {
+            call()
+                .onSuccess { reloadOrderAfterPartChange(UiText.Resource(notice)) }
+                .onFailure(::failTask)
+        }
+    }
+
+    // --- Rentabilidad y movimientos de repuestos: se piden al abrir la hoja ---
+
+    fun onOpenProfitability() {
+        val get = getProfitability ?: return
+        val state = _uiState.value
+        if (!state.canReadProfitability || !state.isOnline) return
+        _uiState.update { it.copy(profitability = OnDemand(), notice = null, error = null) }
+        viewModelScope.launch {
+            get(workOrderId)
+                .onSuccess { data -> _uiState.update { it.copy(profitability = OnDemand(isLoading = false, data = data)) } }
+                .onFailure { e ->
+                    _uiState.update { it.copy(profitability = OnDemand(isLoading = false, error = e.toWorkOrderUiText())) }
+                }
+        }
+    }
+
+    fun onDismissProfitability() = _uiState.update { it.copy(profitability = null) }
+
+    fun onOpenMovements() {
+        val get = getPartMovements ?: return
+        val state = _uiState.value
+        if (!state.canReadPartMovements || !state.isOnline) return
+        _uiState.update { it.copy(movements = OnDemand(), notice = null, error = null) }
+        viewModelScope.launch {
+            get(workOrderId)
+                .onSuccess { data -> _uiState.update { it.copy(movements = OnDemand(isLoading = false, data = data)) } }
+                .onFailure { e ->
+                    _uiState.update { it.copy(movements = OnDemand(isLoading = false, error = e.toWorkOrderUiText())) }
+                }
+        }
+    }
+
+    fun onDismissMovements() = _uiState.update { it.copy(movements = null) }
 
     // --- US16 / Tarea 5: asignar o reasignar bahía de trabajo ---
 

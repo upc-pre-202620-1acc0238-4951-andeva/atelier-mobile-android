@@ -20,4 +20,8 @@
 keystore.properties
 *.local.md
 .env*
-/.codegraph/
+/.codegraph
+.claude/
+.codegraph/
+.superpowers/
+.impeccable/

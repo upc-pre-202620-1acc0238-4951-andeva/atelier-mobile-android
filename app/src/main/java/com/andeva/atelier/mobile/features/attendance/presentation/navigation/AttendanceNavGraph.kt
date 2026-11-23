@@ -7,7 +7,7 @@ import androidx.navigation.navigation
 import com.andeva.atelier.mobile.features.attendance.presentation.AttendanceScreen
 import com.andeva.atelier.mobile.features.attendance.presentation.dashboard.EmployeeDashboardScreen
 import com.andeva.atelier.mobile.features.inventory.presentation.navigation.InventoryNavGraphRoute
-import com.andeva.atelier.mobile.features.main.presentation.navigation.MoreHubRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.ProfileRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.ObdRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
@@ -24,7 +24,7 @@ fun NavGraphBuilder.attendanceNavGraph(navController: NavController) {
     navigation<AttendanceRoute>(startDestination = AttendanceHomeRoute) {
         composable<AttendanceHomeRoute> {
             EmployeeDashboardScreen(
-                onOpenMenu = { navController.navigate(MoreHubRoute) },
+                onOpenMenu = { navController.navigate(ProfileRoute) },
                 onOpenNotifications = { navController.navigate(NotificationsRoute) },
                 onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) },
                 onOpenTasks = { navController.navigate(MyTasksRoute) },

@@ -214,6 +214,9 @@ Solo quedan fuera del backend los escenarios marcados 📱 (los resuelve la app)
 | H37 | US33 E1 | `DELETE /tasks/{taskId}/products/{productId}` responde 204 y devuelve el stock al lote, pero la línea sigue en `products` del detalle de la tarea | Tras *Devolver*, el detalle recargado sigue mostrando el repuesto aunque el stock ya volvió: riesgo de devolverlo dos veces. El backend debe quitar la línea |
 | H38 | US22 E2, US33 | `PUT /tasks/{taskId}/products/{productId}` responde 200 pero no cambia la cantidad ni el stock (probado con 1 → 2). Confirma H9 | *Corregir cantidad* no tiene efecto real hasta que el backend lo corrija |
 | H39 | US26, US27 | `GET /tasks/{id}` devuelve `serviceName` = «Service» | El detalle de la tarea muestra «Service» como nombre del servicio |
+| H40 | US31, US32 | `GET /inventory/items/valuation` devuelve solo el total en soles: no hay desglose por categoría ni por lote. | La app muestra el total y, aparte, las existencias por categoría que salen de Room (cantidades, no soles). |
+| H41 | US44 | Tras `DeliverVehicle` la orden sale de la caché de la sede y no hay campo que diga «entregada». | La pantalla de cobro marca «Entregado» solo durante la sesión. |
+| H42 | US15 | `TaskProposalResource` no trae la placa del vehículo. | El panel de propuestas no muestra placa. |
 
 ## Huecos cerrados
 

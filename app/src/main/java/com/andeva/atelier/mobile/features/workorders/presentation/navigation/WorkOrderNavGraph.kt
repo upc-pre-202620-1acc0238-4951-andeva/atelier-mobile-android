@@ -4,10 +4,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.andeva.atelier.mobile.features.main.presentation.navigation.MoreHubRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
-import com.andeva.atelier.mobile.features.reception.presentation.navigation.VehicleSearchRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.WorkOrderDetailScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.finding.ReportFindingScreen
@@ -52,7 +50,11 @@ data class ReportFindingRoute(val workOrderId: String)
  * Destinos de órdenes de trabajo. Se llega a ellos desde otra pantalla con el id de la orden o del vehículo, así que
  * no hay un destino inicial propio: no se agrupan en un `navigation<>`.
  */
-fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
+fun NavGraphBuilder.workOrderNavGraph(
+    navController: NavController,
+    /** Abre "Cobrar y entregar" de la orden (lo construye el feature de caja). */
+    onOpenCheckout: (workOrderId: String) -> Unit
+) {
     composable<OpenWorkOrderRoute> {
         OpenWorkOrderScreen(
             onBack = { navController.popBackStack() },
@@ -66,17 +68,9 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
     }
     composable<WorkOrdersRoute> {
         WorkOrdersScreen(
-            onBack = if (navController.previousBackStackEntry != null) { { navController.popBackStack() } } else null,
-            onOpenMenu = { navController.navigate(MoreHubRoute) },
-            onOpenNotifications = { navController.navigate(NotificationsRoute) },
-            onOpenSync = { navController.navigate(PendingOperationsRoute) },
             onOpenOrder = { workOrderId -> navController.navigate(WorkOrderDetailRoute(workOrderId)) },
-            onOpenNewOrder = { vehicleId, customerId, workOrderId ->
-                navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId.ifBlank { null }))
-            },
-            onNavigateToReception = {
-                navController.navigate(VehicleSearchRoute)
-            }
+            onOpenNotifications = { navController.navigate(NotificationsRoute) },
+            onOpenSync = { navController.navigate(PendingOperationsRoute) }
         )
     }
     composable<WorkOrderDetailRoute> {
@@ -87,7 +81,8 @@ fun NavGraphBuilder.workOrderNavGraph(navController: NavController) {
             onOpenGallery = { workOrderId -> navController.navigate(IntakeGalleryRoute(workOrderId)) },
             onCompleteOrder = { vehicleId, customerId, workOrderId ->
                 navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId))
-            }
+            },
+            onOpenCheckout = onOpenCheckout
         )
     }
     composable<IntakeGalleryRoute> { entry ->

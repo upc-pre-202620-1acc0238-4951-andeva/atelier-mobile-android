@@ -1,22 +1,23 @@
 package com.andeva.atelier.mobile.features.inventory.presentation.catalog
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -28,70 +29,57 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
-import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.domain.Money
+import com.andeva.atelier.mobile.core.presentation.formatQuantity
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.domain.Part
 import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
-import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.BrandFilterChips
 import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.CategoryFilterChips
-import com.andeva.atelier.mobile.features.inventory.presentation.catalog.components.PartCard
+import com.andeva.atelier.mobile.features.inventory.presentation.stockChipKind
+import com.andeva.atelier.mobile.features.inventory.presentation.stockLabelRes
 import java.math.BigDecimal
 
-/** US31: catálogo con buscador por nombre o SKU, chips de categoría y existencias. */
+/** US31: catálogo con buscador por nombre o SKU, categorías y semáforo de existencias. Requiere `PARTS_READ`. */
 @Composable
 fun PartsCatalogScreen(
+    onBack: () -> Unit,
     onOpenPart: (partId: String) -> Unit,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
-    onOpenMenu: (() -> Unit)? = null,
-    onOpenNotifications: (() -> Unit)? = null,
-    onOpenSync: (() -> Unit)? = null,
     viewModel: PartsCatalogViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     PartsCatalogContent(
         state = state,
-        actions = PartsCatalogActions(
-            onBack = onBack,
-            onOpenMenu = onOpenMenu,
-            onOpenNotifications = onOpenNotifications,
-            onOpenSync = onOpenSync,
-            onQueryChange = viewModel::onQueryChange,
-            onCategoryClick = viewModel::onCategoryClick,
-            onBrandClick = viewModel::onBrandClick,
-            onClearFilters = viewModel::onClearFilters,
-            onRefresh = { viewModel.refresh(force = true) },
-            onOpenPart = onOpenPart
-        ),
+        onBack = onBack,
+        onQueryChange = viewModel::onQueryChange,
+        onCategoryClick = viewModel::onCategoryClick,
+        onClearFilters = viewModel::onClearFilters,
+        onRefresh = { viewModel.refresh(force = true) },
+        onOpenPart = onOpenPart,
         modifier = modifier
     )
 }
 
-internal class PartsCatalogActions(
-    val onBack: (() -> Unit)?,
-    val onOpenMenu: (() -> Unit)?,
-    val onOpenNotifications: (() -> Unit)?,
-    val onOpenSync: (() -> Unit)?,
-    val onQueryChange: (String) -> Unit,
-    val onCategoryClick: (ItemCategory) -> Unit,
-    val onBrandClick: (String) -> Unit,
-    val onClearFilters: () -> Unit,
-    val onRefresh: () -> Unit,
-    val onOpenPart: (String) -> Unit
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PartsCatalogContent(
+private fun PartsCatalogContent(
     state: PartsCatalogUiState,
-    actions: PartsCatalogActions,
+    onBack: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onCategoryClick: (ItemCategory) -> Unit,
+    onClearFilters: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenPart: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -100,132 +88,115 @@ internal fun PartsCatalogContent(
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
-        if (actions.onBack != null) {
-            AtelierTopBar(title = stringResource(R.string.catalog_title), onBack = actions.onBack)
-        } else if (actions.onOpenMenu != null) {
-            AtelierMainTopBar(
-                title = stringResource(R.string.catalog_title),
-                onOpenMenu = actions.onOpenMenu,
-                onOpenNotifications = actions.onOpenNotifications,
-                onOpenSync = actions.onOpenSync
+        AtelierTopBar(title = stringResource(R.string.catalog_title), onBack = onBack)
+        if (!state.canRead) {
+            AtelierNoPermissionState(
+                text = stringResource(R.string.catalog_no_permission),
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
+            return@Column
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!state.canRead) {
-                AtelierBanner(
-                    message = stringResource(R.string.catalog_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-            }
-            AtelierTextField(
-                label = stringResource(R.string.catalog_search_label),
-                value = state.query,
-                onValueChange = actions.onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = Icons.Outlined.Search,
-                placeholder = stringResource(R.string.catalog_search_hint),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
-            )
-            CategoryFilterChips(selected = state.category, onClick = actions.onCategoryClick)
-            BrandFilterChips(brands = state.brands, selected = state.brand, onClick = actions.onBrandClick)
-
-            if (state.showingCache) {
-                AtelierBanner(
-                    message = state.error?.asString() ?: stringResource(R.string.catalog_cache_notice),
-                    icon = Icons.Outlined.WifiOff,
-                    kind = BannerKind.Wait
-                )
-            } else {
-                state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-            }
-
-            when {
-                !state.isLoaded || state.isSearching -> Text(
-                    text = stringResource(R.string.search_loading),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                state.parts.isEmpty() -> {
-                    Text(
-                        text = stringResource(
-                            if (state.hasFilters) R.string.catalog_empty_filtered else R.string.catalog_empty
-                        ),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    if (state.hasFilters) {
-                        AtelierButton(
-                            text = stringResource(R.string.catalog_clear_filters),
-                            onClick = actions.onClearFilters,
+        AtelierRefreshBar(visible = state.isRefreshing || state.isSearching)
+        PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.weight(1f)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                item(key = "filters") {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AtelierTextField(
+                            label = stringResource(R.string.catalog_search_label),
+                            value = state.query,
+                            onValueChange = onQueryChange,
                             modifier = Modifier.fillMaxWidth(),
-                            style = AtelierButtonStyle.Text
+                            leadingIcon = Icons.Outlined.Search,
+                            placeholder = stringResource(R.string.catalog_search_hint),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                        )
+                        CategoryFilterChips(selected = state.category, onClick = onCategoryClick)
+                    }
+                }
+                val error = state.error
+                if (state.showingCache && state.parts.isNotEmpty()) {
+                    item(key = "cache") {
+                        AtelierBanner(
+                            message = error?.asString() ?: stringResource(R.string.catalog_cache_notice),
+                            icon = Icons.Outlined.Info,
+                            kind = BannerKind.Info,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                         )
                     }
                 }
-                else -> state.parts.forEach { part ->
-                    PartCard(part, onClick = { actions.onOpenPart(part.id) })
+                when {
+                    !state.isLoaded -> items(6, key = { "bone-$it" }) {
+                        AtelierListRow(title = "Pastillas de freno", subtitle = "SKU BRK-001 · Stock: 12", loading = true)
+                    }
+                    state.parts.isEmpty() && error != null -> item(key = "error") {
+                        AtelierErrorState(
+                            message = error.asString(),
+                            onRetry = onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    state.parts.isEmpty() -> item(key = "empty") {
+                        AtelierEmptyState(
+                            text = stringResource(
+                                if (state.hasFilters) R.string.catalog_empty_filtered else R.string.catalog_empty
+                            ),
+                            actionLabel = if (state.hasFilters) stringResource(R.string.catalog_clear_filters) else null,
+                            onAction = if (state.hasFilters) onClearFilters else null,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    else -> items(state.parts, key = { it.id }) { part ->
+                        AtelierListRow(
+                            title = part.name,
+                            subtitle = stringResource(
+                                R.string.inventory_part_subtitle, part.sku, part.totalStock.formatQuantity()
+                            ),
+                            onClick = { onOpenPart(part.id) },
+                            trailing = {
+                                AtelierChip(text = stringResource(part.stockLabelRes()), kind = part.stockChipKind())
+                            }
+                        )
+                    }
                 }
             }
-
-            AtelierButton(
-                text = stringResource(R.string.tasks_refresh),
-                onClick = actions.onRefresh,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Outlined,
-                loading = state.isRefreshing
-            )
         }
     }
 }
 
-private fun previewPart(id: String, name: String, stock: String, min: String = "5", category: ItemCategory = ItemCategory.BRAKES) =
-    Part(
-        id = id, name = name, sku = "SKU-$id", category = category,
-        basePrice = Money(BigDecimal("89.90"), Money.PEN), totalStock = BigDecimal(stock),
-        minimumStock = BigDecimal(min), unitOfMeasure = "UNIT", status = PartStatus.ACTIVE
-    )
+private fun previewPart(id: String, name: String, stock: String, min: String = "5") = Part(
+    id = id, name = name, sku = "BRK-00$id", category = ItemCategory.BRAKES,
+    basePrice = Money(BigDecimal("89.90"), Money.PEN), totalStock = BigDecimal(stock),
+    minimumStock = BigDecimal(min), unitOfMeasure = "UNIT", status = PartStatus.ACTIVE
+)
 
-private val previewActions = PartsCatalogActions(
-    onBack = {},
-    onOpenMenu = {},
-    onOpenNotifications = {},
-    onOpenSync = {},
-    onQueryChange = {},
-    onCategoryClick = {},
-    onBrandClick = {},
-    onClearFilters = {},
-    onRefresh = {},
+private val previewState = PartsCatalogUiState(
+    isLoaded = true,
+    parts = listOf(
+        previewPart("1", "Pastillas de freno delanteras", "12"),
+        previewPart("2", "Disco de freno ventilado", "3"),
+        previewPart("3", "Líquido de frenos DOT4", "0")
+    )
+)
+
+@Composable
+private fun PreviewContent(state: PartsCatalogUiState) = PartsCatalogContent(
+    state = state, onBack = {}, onQueryChange = {}, onCategoryClick = {}, onClearFilters = {}, onRefresh = {},
     onOpenPart = {}
 )
 
-@Preview(name = "Catálogo · oscuro", widthDp = 360, heightDp = 900, showBackground = true)
+@Preview(name = "Repuestos · claro", widthDp = 390, heightDp = 844)
 @Composable
-private fun PartsCatalogPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
-    PartsCatalogContent(
-        state = PartsCatalogUiState(
-            isLoaded = true, category = ItemCategory.BRAKES,
-            parts = listOf(
-                previewPart("1", "Pastillas de freno delanteras", "12"),
-                previewPart("2", "Disco de freno ventilado", "3"),
-                previewPart("3", "Líquido de frenos DOT4", "0")
-            )
-        ),
-        actions = previewActions
-    )
-}
+private fun PartsCatalogPreviewLight() = AtelierWorkshopTheme(darkTheme = false) { PreviewContent(previewState) }
 
-@Preview(name = "Catálogo · sin resultados · claro", widthDp = 360, heightDp = 600, showBackground = true)
+@Preview(name = "Repuestos · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PartsCatalogPreviewEmpty() = AtelierWorkshopTheme(darkTheme = false) {
-    PartsCatalogContent(
-        state = PartsCatalogUiState(isLoaded = true, query = "xyz"),
-        actions = previewActions
-    )
+private fun PartsCatalogPreviewDark() = AtelierWorkshopTheme(darkTheme = true) { PreviewContent(previewState) }
+
+@Preview(name = "Repuestos · cargando sin caché", widthDp = 390, heightDp = 844)
+@Composable
+private fun PartsCatalogPreviewLoading() = AtelierWorkshopTheme(darkTheme = false) {
+    PreviewContent(PartsCatalogUiState())
 }

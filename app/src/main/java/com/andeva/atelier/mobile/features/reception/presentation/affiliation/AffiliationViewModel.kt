@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.reception.presentation.affiliation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.reception.application.AffiliateCustomerUseCase
@@ -20,13 +21,19 @@ import javax.inject.Inject
 class AffiliationViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
     private val lookupAffiliation: LookupAffiliationUseCase,
-    private val affiliateCustomer: AffiliateCustomerUseCase
+    private val affiliateCustomer: AffiliateCustomerUseCase,
+    connectivity: ConnectivityObserver? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AffiliationUiState())
     val uiState: StateFlow<AffiliationUiState> = _uiState.asStateFlow()
 
     init {
+        if (connectivity != null) {
+            viewModelScope.launch {
+                connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } }
+            }
+        }
         viewModelScope.launch {
             observeSession().collect { session ->
                 _uiState.update {

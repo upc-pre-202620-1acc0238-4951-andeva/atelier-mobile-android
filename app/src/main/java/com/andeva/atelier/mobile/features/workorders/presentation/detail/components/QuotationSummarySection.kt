@@ -1,36 +1,30 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.detail.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Cancel
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.core.presentation.formatQuantity
@@ -46,259 +40,178 @@ import com.andeva.atelier.mobile.features.workorders.presentation.detail.resolve
 import java.math.BigDecimal
 
 /**
- * US22 + US23: tarjeta de tarea con desglose en cascada (Mano de obra + repuestos imputados = total de la tarea),
- * edición de mano de obra, corrección/devolución de repuestos y botón «+ Agregar repuesto».
+ * US22 + US23: una tarea con su desglose en cascada (mano de obra + repuestos imputados = total de la tarea).
+ * Sin tarjeta: la fila de la tarea abre su cronómetro y debajo van mecánico, mano de obra y repuestos, sangrados.
  */
 @Composable
-internal fun TaskCascadeCard(
+internal fun TaskBlock(
     task: TaskDetail,
     state: WorkOrderDetailUiState,
-    bayName: String?,
     onOpenTask: () -> Unit,
     onEditLabor: () -> Unit,
     onAddPart: () -> Unit,
     onEditPart: (TaskProduct) -> Unit,
     onReturnPart: (TaskProduct) -> Unit,
-    onAssignMechanic: () -> Unit = {},
+    onAssignMechanic: () -> Unit,
+    onResume: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currency = state.breakdown?.currency ?: task.price?.currency ?: Money.PEN
     val title = state.taskTitle(task)
-    val taskTotal = task.cascadeTotal(currency)
     val laborMoney = task.price ?: Money(BigDecimal.ZERO, currency)
-    val estimatedMinutes = state.estimatedMinutesFor(task)
+    val mechanicName = state.mechanicNameFor(task)
+    val unassigned = stringResource(R.string.order_mechanic_unassigned)
 
-    Column(
-        modifier = modifier
+    Column(modifier = modifier.fillMaxWidth()) {
+        AtelierListRow(
+            title = title,
+            subtitle = mechanicName ?: unassigned,
+            showDivider = false,
+            onClick = onOpenTask,
+            trailing = {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AtelierChip(
+                        text = stringResource(
+                            if (task.hasPendingSuspension) R.string.task_suspension_pending
+                            else taskStatusLabelRes(task.status, task.holdReason)
+                        ),
+                        kind = if (task.hasPendingSuspension) ChipKind.Wait else taskStatusChipKind(task.status, task.holdReason)
+                    )
+                    Text(
+                        text = task.cascadeTotal(currency).format(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+            }
+        )
+        Column(modifier = Modifier.padding(start = 32.dp, end = 16.dp, bottom = 8.dp)) {
+            DetailLine(
+                label = stringResource(R.string.order_task_mechanic_label),
+                value = mechanicName ?: unassigned,
+                actionLabel = if (state.canChangeMechanic) {
+                    stringResource(if (mechanicName != null) R.string.order_reassign_mechanic_btn else R.string.order_assign_mechanic_btn)
+                } else null,
+                onClick = if (state.canChangeMechanic) onAssignMechanic else null
+            )
+            DetailLine(
+                label = stringResource(R.string.order_task_labor),
+                value = laborMoney.format(),
+                actionLabel = if (state.canModifyTasks) stringResource(R.string.order_edit_labor) else null,
+                onClick = if (state.canModifyTasks) onEditLabor else null
+            )
+            task.products.forEach { product ->
+                PartLine(
+                    product = product,
+                    title = state.productTitle(product) ?: stringResource(R.string.task_part_unnamed),
+                    currency = currency,
+                    canEdit = state.canEditTaskParts,
+                    onEdit = { onEditPart(product) },
+                    onReturn = { onReturnPart(product) }
+                )
+            }
+            if (state.canAddPartToTask) {
+                AtelierButton(
+                    text = stringResource(R.string.order_add_part),
+                    onClick = onAddPart,
+                    style = AtelierButtonStyle.Text
+                )
+            }
+            if (task.isSuspended && state.canValidateSuspensions) {
+                AtelierButton(
+                    text = stringResource(R.string.orders_resume_task),
+                    onClick = onResume,
+                    style = AtelierButtonStyle.Tonal,
+                    enabled = state.canDecideSuspension,
+                    loading = state.busyAction == WorkOrderDetailAction.RESUME_TASK
+                )
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/** Línea rótulo y valor de 48 dp; con [onClick] muestra su acción en el color de acento. */
+@Composable
+private fun DetailLine(label: String, value: String, actionLabel: String?, onClick: (() -> Unit)?) {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .heightIn(min = 48.dp)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AtelierChip(
-                text = stringResource(taskStatusLabelRes(task.status, task.holdReason)),
-                kind = taskStatusChipKind(task.status, task.holdReason)
-            )
-            if (task.hasPendingSuspension) {
-                AtelierChip(text = stringResource(R.string.task_suspension_pending), kind = ChipKind.Wait)
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
+            Text(text = value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenTask),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                val subtitleParts = listOfNotNull(
-                    bayName,
-                    task.description.takeIf { it.isNotBlank() && it != title }
-                )
-                if (subtitleParts.isNotEmpty()) {
-                    Text(
-                        text = subtitleParts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                }
-            }
+        if (actionLabel != null) {
             Text(
-                text = taskTotal.format(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
-
-        // Fila de Mecánico asignado (US12 E2, US22 E2)
-        val assignedMechanicName = state.mechanicNameFor(task)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .then(
-                    if (state.canChangeMechanic) {
-                        Modifier.clickable(onClick = onAssignMechanic)
-                    } else Modifier
-                )
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = if (assignedMechanicName != null) MaterialTheme.colorScheme.primary else AtelierTheme.colors.inkSecondary
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = stringResource(R.string.order_task_mechanic_label),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    Text(
-                        text = assignedMechanicName ?: stringResource(R.string.order_mechanic_unassigned),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (assignedMechanicName != null) MaterialTheme.colorScheme.onSurface else AtelierTheme.colors.inkSecondary
-                    )
-                }
-            }
-            if (state.canChangeMechanic) {
-                Text(
-                    text = stringResource(
-                        if (assignedMechanicName != null) R.string.order_reassign_mechanic_btn
-                        else R.string.order_assign_mechanic_btn
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
-
-        // Fila de Mano de obra (US22)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = state.canModifyTasks, onClick = onEditLabor),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = stringResource(R.string.order_task_labor),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                estimatedMinutes?.takeIf { it > 0 }?.let { minutes ->
-                    Text(
-                        text = formatDurationMinutes(minutes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                }
-            }
-            Text(
-                text = laborMoney.format(),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        // Filas de repuestos imputados a la tarea (US23 / US33)
-        task.products.forEach { product ->
-            HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
-            TaskProductCascadeRow(
-                product = product,
-                productTitle = state.productTitle(product) ?: stringResource(R.string.task_part_unnamed),
-                currency = currency,
-                canEdit = state.canEditTaskParts,
-                onEdit = { onEditPart(product) },
-                onReturn = { onReturnPart(product) }
-            )
-        }
-
-        if (state.canAddPartToTask) {
-            AtelierButton(
-                text = stringResource(R.string.order_add_part),
-                onClick = onAddPart,
-                style = AtelierButtonStyle.Text
+                text = actionLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
 }
 
 @Composable
-private fun TaskProductCascadeRow(
+private fun PartLine(
     product: TaskProduct,
-    productTitle: String,
+    title: String,
     currency: String,
     canEdit: Boolean,
     onEdit: () -> Unit,
     onReturn: () -> Unit
 ) {
-    val unitMoney = product.unitPrice ?: Money(BigDecimal.ZERO, currency)
-    val lineTotal = product.resolvedTotal(currency)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = canEdit, onClick = onEdit),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    val unit = product.unitPrice ?: Money(BigDecimal.ZERO, currency)
+    Column {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    text = productTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(
-                        R.string.order_part_line_detail,
-                        product.quantity.formatQuantity(),
-                        unitMoney.format()
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = stringResource(R.string.order_part_line_detail, product.quantity.formatQuantity(), unit.format()),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = AtelierTheme.colors.inkSecondary
                 )
             }
             Text(
-                text = lineTotal.format(),
+                text = product.resolvedTotal(currency).format(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
             )
         }
         if (canEdit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AtelierButton(
-                    text = stringResource(R.string.task_part_edit),
-                    onClick = onEdit,
-                    style = AtelierButtonStyle.Text
-                )
-                AtelierButton(
-                    text = stringResource(R.string.task_part_return),
-                    onClick = onReturn,
-                    style = AtelierButtonStyle.Text
-                )
+                AtelierButton(text = stringResource(R.string.task_part_edit), onClick = onEdit, style = AtelierButtonStyle.Text)
+                AtelierButton(text = stringResource(R.string.task_part_return), onClick = onReturn, style = AtelierButtonStyle.Text)
             }
         }
     }
 }
 
 /**
- * US22 + US24: tarjeta financiera en cascada (`Subtotal`, `IGV 18 %`, `Total`) y botones para generar/compartir
- * la proforma comercial en PDF y enviarla por correo al cliente.
+ * US22 + US24: la proforma en cascada (`Subtotal`, `IGV 18 %`, `Total`) y las acciones para generar el PDF y
+ * enviarlo por correo. Sin conexión las acciones se apagan y se dice por qué.
  */
 @Composable
-internal fun QuotationCascadeFooter(
+internal fun QuotationSection(
     breakdown: CascadeBreakdown,
     canGeneratePdf: Boolean,
     canEmailQuotation: Boolean,
+    showPdfActions: Boolean,
+    showEmailAction: Boolean,
     busyAction: WorkOrderDetailAction?,
     onGeneratePdf: () -> Unit,
     onSendEmail: () -> Unit,
@@ -307,143 +220,67 @@ internal fun QuotationCascadeFooter(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        SummaryLine(
-            label = stringResource(R.string.quotation_labor_subtotal),
-            value = breakdown.laborSubtotal.format()
-        )
-        SummaryLine(
-            label = stringResource(R.string.quotation_parts_subtotal),
-            value = breakdown.partsSubtotal.format()
-        )
-        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
-        SummaryLine(
-            label = stringResource(R.string.quotation_subtotal),
-            value = breakdown.subtotal.format()
-        )
-        SummaryLine(
-            label = stringResource(R.string.quotation_igv),
-            value = breakdown.taxAmount.format()
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Text(
-                text = stringResource(R.string.quotation_total),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = breakdown.totalAmount.format(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        if (canGeneratePdf || busyAction == WorkOrderDetailAction.DOWNLOAD_PDF) {
-            AtelierButton(
-                text = stringResource(R.string.quotation_generate_pdf),
-                onClick = onGeneratePdf,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canGeneratePdf,
-                loading = busyAction == WorkOrderDetailAction.DOWNLOAD_PDF,
-                icon = Icons.Outlined.Description
-            )
-        }
-        if (canEmailQuotation || busyAction == WorkOrderDetailAction.SEND_EMAIL) {
-            AtelierButton(
-                text = stringResource(R.string.quotation_send_email),
-                onClick = onSendEmail,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Outlined,
-                enabled = canEmailQuotation,
-                loading = busyAction == WorkOrderDetailAction.SEND_EMAIL
-            )
+        SummaryRow(stringResource(R.string.quotation_labor_subtotal), breakdown.laborSubtotal.format())
+        SummaryRow(stringResource(R.string.quotation_parts_subtotal), breakdown.partsSubtotal.format())
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        SummaryRow(stringResource(R.string.quotation_subtotal), breakdown.subtotal.format())
+        SummaryRow(stringResource(R.string.quotation_igv), breakdown.taxAmount.format())
+        SummaryRow(stringResource(R.string.quotation_total), breakdown.totalAmount.format(), emphasized = true)
+        if (showPdfActions || showEmailAction) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (showPdfActions) {
+                    AtelierButton(
+                        text = stringResource(R.string.quotation_generate_pdf),
+                        onClick = onGeneratePdf,
+                        modifier = Modifier.weight(1f),
+                        style = AtelierButtonStyle.Tonal,
+                        enabled = canGeneratePdf,
+                        loading = busyAction == WorkOrderDetailAction.DOWNLOAD_PDF,
+                        icon = Icons.Outlined.Description
+                    )
+                }
+                if (showEmailAction) {
+                    AtelierButton(
+                        text = stringResource(R.string.orders_quotation_send_short),
+                        onClick = onSendEmail,
+                        modifier = Modifier.weight(1f),
+                        style = AtelierButtonStyle.Outlined,
+                        enabled = canEmailQuotation,
+                        loading = busyAction == WorkOrderDetailAction.SEND_EMAIL
+                    )
+                }
+            }
         }
     }
 }
 
+/** Rótulo a la izquierda y cifra a la derecha. */
 @Composable
-private fun SummaryLine(label: String, value: String) {
+internal fun SummaryRow(label: String, value: String, emphasized: Boolean = false) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = AtelierTheme.colors.inkSecondary
+            style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+            color = if (emphasized) MaterialTheme.colorScheme.onSurface else AtelierTheme.colors.inkSecondary,
+            modifier = Modifier.weight(1f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
         )
-    }
-}
-
-/**
- * US25: bloque «¿Qué respondió el cliente?» para aprobar el presupuesto (`IN_PROGRESS`) o registrar el
- * desistimiento con motivo (`CANCELED`).
- */
-@Composable
-internal fun CustomerResolutionSection(
-    canResolve: Boolean,
-    busyAction: WorkOrderDetailAction?,
-    onApprove: () -> Unit,
-    onReject: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        AtelierChip(
-            text = stringResource(R.string.order_status_waiting_customer),
-            kind = ChipKind.Wait
-        )
-        Text(
-            text = stringResource(R.string.quotation_customer_question),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        AtelierButton(
-            text = stringResource(R.string.quotation_approve_action),
-            onClick = onApprove,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = canResolve,
-            loading = busyAction == WorkOrderDetailAction.APPROVE_QUOTATION,
-            icon = Icons.Outlined.CheckCircle
-        )
-        AtelierButton(
-            text = stringResource(R.string.quotation_reject_action),
-            onClick = onReject,
-            modifier = Modifier.fillMaxWidth(),
-            style = AtelierButtonStyle.Tonal,
-            enabled = canResolve,
-            icon = Icons.Outlined.Cancel
-        )
-    }
-}
-
-@Composable
-private fun formatDurationMinutes(minutes: Int): String {
-    val hours = minutes / 60
-    val rem = minutes % 60
-    return when {
-        hours > 0 && rem > 0 -> stringResource(R.string.order_task_hours_minutes, hours, rem)
-        hours > 0 -> stringResource(R.string.order_task_hours, hours)
-        else -> stringResource(R.string.order_task_minutes, rem)
     }
 }

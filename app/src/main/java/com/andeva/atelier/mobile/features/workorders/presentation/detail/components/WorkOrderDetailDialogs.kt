@@ -12,17 +12,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,19 +34,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierSelectionCard
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
@@ -58,6 +59,7 @@ import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.AddTaskForm
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.CancelOrderForm
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.CascadeBreakdown
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.EditLaborForm
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.RejectQuotationForm
@@ -65,124 +67,166 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private val DecimalKeyboard = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
+
+@Composable
+private fun SheetError(error: UiText?) {
+    error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
+}
+
+/** Fila de elección dentro de una hoja: 48 dp mínimo, marca de elegido con ícono y no solo con color. */
+@Composable
+internal fun PickRow(
+    title: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            leading?.invoke()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else AtelierTheme.colors.muted
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AtelierTheme.colors.inkSecondary
+                    )
+                }
+            }
+            trailing?.invoke()
+            if (selected && trailing == null) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
 /** US22 E1: agregar una nueva tarea con su servicio y precio de mano de obra sin IGV. */
 @Composable
-internal fun AddTaskDialog(
+internal fun AddTaskSheet(
     form: AddTaskForm,
     services: List<ServiceOption>,
-    mechanics: List<MechanicOption> = emptyList(),
+    mechanics: List<MechanicOption>,
     isSaving: Boolean,
     invalidField: String?,
     error: UiText?,
     onSelectService: (ServiceOption) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onPriceChange: (String) -> Unit,
-    onSelectMechanic: (String?) -> Unit = {},
+    onSelectMechanic: (String?) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
+    AtelierBottomSheet(
+        title = stringResource(R.string.order_add_task_title),
+        onDismiss = onDismiss,
+        actions = {
             AtelierButton(
                 text = stringResource(R.string.order_add_task_confirm),
                 onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
                 enabled = form.serviceId != null && form.description.isNotBlank() && !isSaving,
                 loading = isSaving
             )
-        },
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
-            )
-        },
-        title = { Text(stringResource(R.string.order_add_task_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.order_add_task_service),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                services.forEach { service ->
-                    val selected = service.id == form.serviceId
-                    AtelierSelectionCard(
-                        title = service.name,
-                        price = service.basePrice?.format(),
-                        selected = selected,
-                        enabled = !isSaving,
-                        onClick = { onSelectService(service) }
-                    )
-                }
-                if (invalidField == "serviceId") {
-                    Text(
-                        text = stringResource(R.string.order_field_service),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AtelierTheme.colors.bad
-                    )
-                }
-                AtelierTextField(
-                    label = stringResource(R.string.order_add_task_description),
-                    value = form.description,
-                    onValueChange = onDescriptionChange,
-                    modifier = Modifier.fillMaxWidth(),
+        }
+    ) {
+        Text(
+            text = stringResource(R.string.order_add_task_service),
+            style = MaterialTheme.typography.labelLarge,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        Column {
+            services.forEach { service ->
+                PickRow(
+                    title = service.name,
+                    subtitle = service.basePrice?.format(),
+                    selected = service.id == form.serviceId,
                     enabled = !isSaving,
-                    isError = invalidField == "description",
-                    errorText = if (invalidField == "description") stringResource(R.string.order_field_description) else null,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                    onClick = { onSelectService(service) }
                 )
-                AtelierTextField(
-                    label = stringResource(R.string.order_add_task_price),
-                    value = form.price,
-                    onValueChange = onPriceChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSaving,
-                    isError = invalidField == "price",
-                    errorText = if (invalidField == "price") stringResource(R.string.order_field_price) else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
-                )
-                if (mechanics.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.order_add_task_mechanic),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    AtelierSelectionCard(
-                        title = stringResource(R.string.open_order_mechanic_none),
-                        selected = form.mechanicId == null,
-                        enabled = !isSaving,
-                        onClick = { onSelectMechanic(null) }
-                    )
-                    mechanics.forEach { mechanic ->
-                        val selected = mechanic.membershipId == form.mechanicId
-                        val subtitle = if (mechanic.name != null && !mechanic.jobTitle.isNullOrBlank()) mechanic.jobTitle else null
-                        AtelierSelectionCard(
-                            title = mechanic.displayName,
-                            subtitle = subtitle,
-                            leadingIcon = Icons.Outlined.Person,
-                            selected = selected,
-                            enabled = !isSaving,
-                            onClick = { onSelectMechanic(mechanic.membershipId) }
-                        )
-                    }
-                }
-                error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
             }
         }
-    )
+        if (invalidField == "serviceId") {
+            Text(
+                text = stringResource(R.string.order_field_service),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.bad
+            )
+        }
+        AtelierTextField(
+            label = stringResource(R.string.order_add_task_description),
+            value = form.description,
+            onValueChange = onDescriptionChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSaving,
+            isError = invalidField == "description",
+            errorText = if (invalidField == "description") stringResource(R.string.order_field_description) else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        AtelierTextField(
+            label = stringResource(R.string.order_add_task_price),
+            value = form.price,
+            onValueChange = onPriceChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSaving,
+            isError = invalidField == "price",
+            errorText = if (invalidField == "price") stringResource(R.string.order_field_price) else null,
+            keyboardOptions = DecimalKeyboard
+        )
+        if (mechanics.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.order_add_task_mechanic),
+                style = MaterialTheme.typography.labelLarge,
+                color = AtelierTheme.colors.inkSecondary
+            )
+            Column {
+                PickRow(
+                    title = stringResource(R.string.open_order_mechanic_none),
+                    selected = form.mechanicId == null,
+                    enabled = !isSaving,
+                    onClick = { onSelectMechanic(null) }
+                )
+                mechanics.forEach { mechanic ->
+                    PickRow(
+                        title = mechanic.displayName,
+                        subtitle = mechanic.jobTitle?.takeIf { mechanic.name != null && it.isNotBlank() },
+                        selected = mechanic.membershipId == form.mechanicId,
+                        enabled = !isSaving,
+                        onClick = { onSelectMechanic(mechanic.membershipId) }
+                    )
+                }
+            }
+        }
+        SheetError(error)
+    }
 }
 
 /** US22 E2: actualizar el precio de mano de obra sin IGV de una tarea existente. */
 @Composable
-internal fun EditLaborDialog(
+internal fun EditLaborSheet(
     form: EditLaborForm,
     isSaving: Boolean,
     invalidField: String?,
@@ -191,54 +235,44 @@ internal fun EditLaborDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
+    AtelierBottomSheet(
+        title = stringResource(R.string.order_edit_labor_title),
+        onDismiss = onDismiss,
+        actions = {
             AtelierButton(
                 text = stringResource(R.string.order_edit_labor_confirm),
                 onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
                 enabled = form.price.isNotBlank() && !isSaving,
                 loading = isSaving
             )
-        },
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
-            )
-        },
-        title = { Text(stringResource(R.string.order_edit_labor_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = form.taskTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                AtelierTextField(
-                    label = stringResource(R.string.order_add_task_price),
-                    value = form.price,
-                    onValueChange = onPriceChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSaving,
-                    isError = invalidField == "price",
-                    errorText = if (invalidField == "price") stringResource(R.string.order_field_price) else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
-                )
-                error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-            }
         }
-    )
+    ) {
+        Text(
+            text = form.taskTitle,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        AtelierTextField(
+            label = stringResource(R.string.order_add_task_price),
+            value = form.price,
+            onValueChange = onPriceChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSaving,
+            isError = invalidField == "price",
+            errorText = if (invalidField == "price") stringResource(R.string.order_field_price) else null,
+            keyboardOptions = DecimalKeyboard
+        )
+        SheetError(error)
+    }
 }
 
 /**
- * US25 E2: modal «Cancelar la orden» tras desistimiento del cliente.
- * «Los repuestos reservados volverán al inventario.» Exige motivo obligatorio (`reason`).
+ * US25 E2: «Cancelar la orden» tras el desistimiento del cliente. Los repuestos reservados vuelven al inventario;
+ * exige el motivo (`reason`).
  */
 @Composable
-internal fun RejectQuotationDialog(
+internal fun RejectQuotationSheet(
     form: RejectQuotationForm,
     isSaving: Boolean,
     invalidField: String?,
@@ -247,55 +281,213 @@ internal fun RejectQuotationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            AtelierButton(
-                text = stringResource(R.string.quotation_reject_confirm),
-                onClick = onConfirm,
-                enabled = form.reason.isNotBlank() && !isSaving,
-                loading = isSaving
-            )
-        },
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.quotation_reject_back),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
-            )
-        },
-        title = { Text(stringResource(R.string.quotation_reject_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.quotation_reject_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                AtelierTextField(
-                    label = stringResource(R.string.quotation_reject_reason_label),
-                    value = form.reason,
-                    onValueChange = onReasonChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSaving,
-                    placeholder = stringResource(R.string.quotation_reject_reason_hint),
-                    isError = invalidField == "reason",
-                    errorText = if (invalidField == "reason") stringResource(R.string.quotation_reject_field_error) else null,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-                )
-                error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-            }
-        }
+    ReasonSheet(
+        title = stringResource(R.string.quotation_reject_title),
+        body = stringResource(R.string.quotation_reject_body),
+        label = stringResource(R.string.quotation_reject_reason_label),
+        hint = stringResource(R.string.quotation_reject_reason_hint),
+        fieldError = stringResource(R.string.quotation_reject_field_error),
+        confirmText = stringResource(R.string.quotation_reject_confirm),
+        value = form.reason,
+        isSaving = isSaving,
+        invalid = invalidField == "reason",
+        error = error,
+        onReasonChange = onReasonChange,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
     )
 }
 
+/** Cancelar la orden en cualquier momento: siempre se confirma aquí y pide el motivo. */
+@Composable
+internal fun CancelOrderSheet(
+    form: CancelOrderForm,
+    isSaving: Boolean,
+    invalidField: String?,
+    error: UiText?,
+    onReasonChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ReasonSheet(
+        title = stringResource(R.string.orders_cancel_title),
+        body = stringResource(R.string.orders_cancel_body),
+        label = stringResource(R.string.orders_cancel_reason_label),
+        hint = stringResource(R.string.orders_cancel_reason_hint),
+        fieldError = stringResource(R.string.orders_cancel_field_error),
+        confirmText = stringResource(R.string.orders_cancel_confirm),
+        value = form.reason,
+        isSaving = isSaving,
+        invalid = invalidField == "reason",
+        error = error,
+        onReasonChange = onReasonChange,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+private fun ReasonSheet(
+    title: String,
+    body: String,
+    label: String,
+    hint: String,
+    fieldError: String,
+    confirmText: String,
+    value: String,
+    isSaving: Boolean,
+    invalid: Boolean,
+    error: UiText?,
+    onReasonChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AtelierBottomSheet(
+        title = title,
+        onDismiss = onDismiss,
+        actions = {
+            AtelierButton(
+                text = confirmText,
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.DestructiveFilled,
+                enabled = value.isNotBlank() && !isSaving,
+                loading = isSaving
+            )
+            AtelierButton(
+                text = stringResource(R.string.quotation_reject_back),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
+        Text(text = body, style = MaterialTheme.typography.bodyLarge, color = AtelierTheme.colors.inkSecondary)
+        AtelierTextField(
+            label = label,
+            value = value,
+            onValueChange = onReasonChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSaving,
+            placeholder = hint,
+            isError = invalid,
+            errorText = if (invalid) fieldError else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        SheetError(error)
+    }
+}
+
 /**
- * US24 (Tarea 4): visor integrado de la proforma digital en PDF con verificación del desglose de mano de obra y repuestos,
- * más botón para compartir el archivo mediante `FileProvider`.
+ * US25: la proforma espera la respuesta del cliente. Aceptó inicia los trabajos; rechazó pasa al motivo
+ * y cancela la orden.
  */
 @Composable
-internal fun PdfPreviewDialog(
+internal fun QuotationDecisionSheet(
+    isApproving: Boolean,
+    isBusy: Boolean,
+    isOnline: Boolean,
+    error: UiText?,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.orders_quotation_decision_title),
+        onDismiss = onDismiss,
+        actions = {
+            if (!isOnline) AtelierRequiresConnection()
+            AtelierButton(
+                text = stringResource(R.string.quotation_approve_action),
+                onClick = onApprove,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isBusy,
+                loading = isApproving
+            )
+            AtelierButton(
+                text = stringResource(R.string.quotation_reject_action),
+                onClick = onReject,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Destructive,
+                enabled = !isBusy
+            )
+        }
+    ) {
+        Text(
+            text = stringResource(R.string.quotation_customer_question),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        SheetError(error)
+    }
+}
+
+/**
+ * H5: un mecánico pidió suspender su tarea (falta un repuesto). Quien tiene `tasks:hold_validate` aprueba o
+ * rechaza aquí, con el motivo a la vista.
+ */
+@Composable
+internal fun SuspensionSheet(
+    taskTitle: String,
+    reason: String?,
+    missingItem: String?,
+    canDecide: Boolean,
+    isOnline: Boolean,
+    busyApprove: Boolean,
+    busyReject: Boolean,
+    error: UiText?,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val busy = busyApprove || busyReject
+    AtelierBottomSheet(
+        title = stringResource(R.string.orders_suspension_title),
+        onDismiss = onDismiss,
+        actions = {
+            if (!isOnline) {
+                AtelierRequiresConnection()
+            }
+            AtelierButton(
+                text = stringResource(R.string.orders_suspension_approve),
+                onClick = onApprove,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canDecide && isOnline && !busy,
+                loading = busyApprove
+            )
+            AtelierButton(
+                text = stringResource(R.string.orders_suspension_reject),
+                onClick = onReject,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Destructive,
+                enabled = canDecide && isOnline && !busy,
+                loading = busyReject
+            )
+        }
+    ) {
+        Text(text = taskTitle, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            text = reason?.takeIf { it.isNotBlank() } ?: stringResource(R.string.orders_suspension_no_reason),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        missingItem?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = stringResource(R.string.orders_suspension_missing_item, it),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
+        SheetError(error)
+    }
+}
+
+/**
+ * US24: vista de la proforma en PDF con el desglose y el botón de compartir (`FileProvider`).
+ */
+@Composable
+internal fun PdfPreviewSheet(
     pdfFile: File,
     breakdown: CascadeBreakdown?,
     onShare: () -> Unit,
@@ -333,105 +525,65 @@ internal fun PdfPreviewDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        title = { Text(stringResource(R.string.quotation_pdf_preview_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = pdfFile.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                breakdown?.let { b ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(AtelierTheme.colors.card)
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.quotation_labor_subtotal), style = MaterialTheme.typography.bodySmall)
-                            Text(b.laborSubtotal.format(), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.quotation_parts_subtotal), style = MaterialTheme.typography.bodySmall)
-                            Text(b.partsSubtotal.format(), style = MaterialTheme.typography.bodySmall)
-                        }
-                        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.quotation_subtotal), style = MaterialTheme.typography.bodySmall)
-                            Text(b.subtotal.format(), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.quotation_igv), style = MaterialTheme.typography.bodySmall)
-                            Text(b.taxAmount.format(), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(stringResource(R.string.quotation_total), style = MaterialTheme.typography.titleSmall)
-                            Text(b.totalAmount.format(), style = MaterialTheme.typography.titleSmall)
-                        }
-                    }
-                }
-                when {
-                    pages.isNotEmpty() -> pages.forEachIndexed { idx, bitmap ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White)
-                                .padding(4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = stringResource(R.string.quotation_pdf_page_desc, idx + 1),
-                                modifier = Modifier.fillMaxWidth(),
-                                contentScale = ContentScale.FillWidth
-                            )
-                        }
-                    }
-                    renderError -> AtelierBanner(
-                        message = stringResource(R.string.quotation_pdf_ready),
-                        icon = Icons.Outlined.Description,
-                        kind = BannerKind.Info
-                    )
-                    else -> Text(
-                        text = stringResource(R.string.search_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                }
-                AtelierButton(
-                    text = stringResource(R.string.quotation_share_chooser),
-                    onClick = onShare,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Outlined.Share
-                )
-                AtelierButton(
-                    text = stringResource(R.string.quotation_pdf_close),
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = AtelierButtonStyle.Outlined
-                )
-            }
+    AtelierBottomSheet(
+        title = stringResource(R.string.quotation_pdf_preview_title),
+        onDismiss = onDismiss,
+        actions = {
+            AtelierButton(
+                text = stringResource(R.string.quotation_share_chooser),
+                onClick = onShare,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Outlined.Share
+            )
+            AtelierButton(
+                text = stringResource(R.string.quotation_pdf_close),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text
+            )
         }
-    )
+    ) {
+        Text(text = pdfFile.name, style = MaterialTheme.typography.bodyMedium, color = AtelierTheme.colors.inkSecondary)
+        breakdown?.let { b ->
+            SummaryRow(stringResource(R.string.quotation_subtotal), b.subtotal.format())
+            SummaryRow(stringResource(R.string.quotation_igv), b.taxAmount.format())
+            SummaryRow(stringResource(R.string.quotation_total), b.totalAmount.format(), emphasized = true)
+        }
+        when {
+            pages.isNotEmpty() -> pages.forEachIndexed { idx, bitmap ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .background(AtelierTheme.colors.plate)
+                        .padding(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = stringResource(R.string.quotation_pdf_page_desc, idx + 1),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.FillWidth
+                    )
+                }
+            }
+            renderError -> AtelierBanner(
+                message = stringResource(R.string.quotation_pdf_ready),
+                icon = Icons.Outlined.Description,
+                kind = BannerKind.Info
+            )
+            else -> Text(
+                text = stringResource(R.string.search_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
+    }
 }
 
-/**
- * US16 / Tarea 5: asignación o cambio de bahía física de trabajo para la orden en intervención técnica.
- */
+/** US16: asignación o cambio de bahía de trabajo para la orden. */
 @Composable
-internal fun AssignBayDialog(
+internal fun AssignBaySheet(
     bays: List<WorkBay>,
     currentBayId: String?,
     isSaving: Boolean,
@@ -439,71 +591,52 @@ internal fun AssignBayDialog(
     onSelectBay: (WorkBay) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
+    AtelierBottomSheet(title = stringResource(R.string.order_assign_bay_title), onDismiss = onDismiss) {
+        Text(
+            text = stringResource(R.string.order_assign_bay_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        if (bays.isEmpty()) {
+            Text(
+                text = stringResource(R.string.bays_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = AtelierTheme.colors.inkSecondary
             )
-        },
-        title = { Text(stringResource(R.string.order_assign_bay_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 460.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.order_assign_bay_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                if (bays.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.bays_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                } else {
-                    bays.forEach { bay ->
-                        val isCurrent = bay.id == currentBayId
-                        val statusText = when (bay.status) {
-                            BayStatus.AVAILABLE -> stringResource(R.string.bay_status_available)
-                            BayStatus.OCCUPIED -> stringResource(R.string.bay_status_occupied)
-                            BayStatus.MAINTENANCE -> stringResource(R.string.bay_status_maintenance)
-                            null -> null
-                        }
-                        val statusBadgeColor = when (bay.status) {
-                            BayStatus.AVAILABLE -> AtelierTheme.colors.ok.copy(alpha = 0.2f)
-                            BayStatus.OCCUPIED -> MaterialTheme.colorScheme.primaryContainer
-                            BayStatus.MAINTENANCE -> AtelierTheme.colors.wait.copy(alpha = 0.2f)
-                            null -> null
-                        }
-                        AtelierSelectionCard(
-                            title = bay.name,
-                            subtitle = bay.type?.name,
-                            badgeText = if (isCurrent) stringResource(R.string.order_bay_current) else statusText,
-                            badgeColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else statusBadgeColor,
-                            selected = isCurrent,
-                            enabled = bay.canReceive && !isCurrent && !isSaving,
-                            onClick = { onSelectBay(bay) }
-                        )
+        } else {
+            Column {
+                bays.forEach { bay ->
+                    val isCurrent = bay.id == currentBayId
+                    val (statusText, statusKind) = when (bay.status) {
+                        BayStatus.AVAILABLE -> stringResource(R.string.bay_status_available) to ChipKind.Ok
+                        BayStatus.OCCUPIED -> stringResource(R.string.bay_status_occupied) to ChipKind.Info
+                        BayStatus.MAINTENANCE -> stringResource(R.string.bay_status_maintenance) to ChipKind.Wait
+                        null -> null to ChipKind.Idle
                     }
+                    PickRow(
+                        title = bay.name,
+                        subtitle = bay.type?.name,
+                        selected = isCurrent,
+                        enabled = bay.canReceive && !isCurrent && !isSaving,
+                        onClick = { onSelectBay(bay) },
+                        trailing = {
+                            if (isCurrent) {
+                                AtelierChip(text = stringResource(R.string.order_bay_current), kind = ChipKind.Info)
+                            } else if (statusText != null) {
+                                AtelierChip(text = statusText, kind = statusKind)
+                            }
+                        }
+                    )
                 }
-                error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
             }
         }
-    )
+        SheetError(error)
+    }
 }
 
-/** Asignar o reasignar el mecánico responsable de una tarea técnica (US12 E2, US22 E2). */
+/** Asignar o reasignar el mecánico responsable de una tarea (US12 E2, US22 E2). */
 @Composable
-internal fun AssignMechanicDialog(
+internal fun AssignMechanicSheet(
     taskTitle: String,
     currentMechanicId: String?,
     mechanics: List<MechanicOption>,
@@ -512,54 +645,42 @@ internal fun AssignMechanicDialog(
     onSelectMechanic: (MechanicOption) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
+    AtelierBottomSheet(title = stringResource(R.string.order_assign_mechanic_title), onDismiss = onDismiss) {
+        Text(
+            text = stringResource(R.string.order_assign_mechanic_subtitle, taskTitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        if (mechanics.isEmpty()) {
+            Text(
+                text = stringResource(R.string.order_mechanics_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = AtelierTheme.colors.inkSecondary
             )
-        },
-        title = { Text(stringResource(R.string.order_assign_mechanic_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 460.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.order_assign_mechanic_subtitle, taskTitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                if (mechanics.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.order_mechanics_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
+        } else {
+            Column {
+                mechanics.forEach { mechanic ->
+                    val isCurrent = mechanic.membershipId == currentMechanicId
+                    PickRow(
+                        title = mechanic.displayName,
+                        subtitle = mechanic.jobTitle?.takeIf { mechanic.name != null && it.isNotBlank() },
+                        selected = isCurrent,
+                        enabled = !isSaving,
+                        onClick = { onSelectMechanic(mechanic) },
+                        leading = {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                tint = AtelierTheme.colors.inkSecondary
+                            )
+                        },
+                        trailing = if (isCurrent) {
+                            { AtelierChip(text = stringResource(R.string.order_mechanic_current), kind = ChipKind.Info) }
+                        } else null
                     )
-                } else {
-                    mechanics.forEach { mechanic ->
-                        val isCurrent = mechanic.membershipId == currentMechanicId
-                        val subtitle = if (mechanic.name != null && !mechanic.jobTitle.isNullOrBlank()) mechanic.jobTitle else null
-                        AtelierSelectionCard(
-                            title = mechanic.displayName,
-                            subtitle = subtitle,
-                            badgeText = if (isCurrent) stringResource(R.string.order_mechanic_current) else null,
-                            badgeColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else null,
-                            leadingIcon = Icons.Outlined.Person,
-                            selected = isCurrent,
-                            enabled = !isSaving,
-                            onClick = { onSelectMechanic(mechanic) }
-                        )
-                    }
                 }
-                error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
             }
         }
-    )
+        SheetError(error)
+    }
 }

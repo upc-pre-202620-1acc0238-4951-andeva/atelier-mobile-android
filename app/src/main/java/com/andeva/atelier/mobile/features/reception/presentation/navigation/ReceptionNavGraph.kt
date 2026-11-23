@@ -4,9 +4,6 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navigation
-import com.andeva.atelier.mobile.features.main.presentation.navigation.MoreHubRoute
-import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
-import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
 import com.andeva.atelier.mobile.features.reception.presentation.affiliation.AffiliationScreen
 import com.andeva.atelier.mobile.features.reception.presentation.register.RegisterCustomerScreen
 import com.andeva.atelier.mobile.features.reception.presentation.search.VehicleSearchScreen
@@ -40,12 +37,8 @@ data class RegisterCustomerRoute(
 fun NavGraphBuilder.receptionNavGraph(navController: NavController) {
     navigation<ReceptionNavGraphRoute>(startDestination = VehicleSearchRoute) {
         composable<VehicleSearchRoute> {
-            val canPop = navController.previousBackStackEntry != null
             VehicleSearchScreen(
-                onBack = if (canPop) { { navController.popBackStack() } } else null,
-                onOpenMenu = { navController.navigate(MoreHubRoute) },
-                onOpenNotifications = { navController.navigate(NotificationsRoute) },
-                onOpenSync = { navController.navigate(PendingOperationsRoute) },
+                onBack = { navController.popBackStack() },
                 onRegisterNew = { initialPlate ->
                     navController.navigate(RegisterCustomerRoute(plate = initialPlate?.takeIf { it.isNotBlank() }))
                 },

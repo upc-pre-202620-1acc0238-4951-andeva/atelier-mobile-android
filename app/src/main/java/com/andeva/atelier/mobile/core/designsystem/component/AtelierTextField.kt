@@ -106,7 +106,7 @@ fun AtelierTextField(
                         .heightIn(min = 56.dp)
                         .clip(FieldShape)
                         .background(scheme.surface)
-                        .border(1.5.dp, borderColor, FieldShape)
+                        .border(if (focused || isError) 2.dp else 1.dp, borderColor, FieldShape)
                         .padding(start = 16.dp, end = if (trailing != null) 4.dp else 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -37,8 +37,9 @@ data class ProposalsPanelUiState(
     val invalidField: String? = null,
     val canNotify: Boolean = false,
     val canResolve: Boolean = false,
-    val canReport: Boolean = false
+    val canReport: Boolean = false,
+    val isOnline: Boolean = true
 ) {
     val isBusy: Boolean get() = busyProposalId != null
-    val canConfirm: Boolean get() = form?.isFilled == true && !isBusy
+    val canConfirm: Boolean get() = form?.isFilled == true && !isBusy && isOnline
 }

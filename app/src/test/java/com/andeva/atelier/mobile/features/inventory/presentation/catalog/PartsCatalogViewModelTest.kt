@@ -7,7 +7,6 @@ import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
-import com.andeva.atelier.mobile.features.inventory.application.ObservePartBrandsUseCase
 import com.andeva.atelier.mobile.features.inventory.application.ObservePartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.RefreshPartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.SearchPartsCatalogUseCase
@@ -38,7 +37,6 @@ class PartsCatalogViewModelTest {
 
     private val repository = mockk<InventoryRepository>()
     private val online = MutableStateFlow(true)
-    private val brands = MutableStateFlow<List<String>>(emptyList())
     private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
 
     private fun repuesto(
@@ -57,13 +55,11 @@ class PartsCatalogViewModelTest {
     private fun viewModel(permissions: List<Permission> = listOf(Permission.PARTS_READ)): PartsCatalogViewModel {
         val observeSession = mockk<ObserveSessionUseCase>()
         every { observeSession() } returns flowOf(sessionWith(permissions))
-        every { repository.observeBrands() } returns brands
         return PartsCatalogViewModel(
             observeSession,
             ObservePartsCatalogUseCase(repository),
             RefreshPartsCatalogUseCase(repository),
             SearchPartsCatalogUseCase(repository),
-            ObservePartBrandsUseCase(repository),
             connectivity
         )
     }
@@ -235,94 +231,5 @@ class PartsCatalogViewModelTest {
 
         assertFalse(vm.uiState.value.showingCache)
         coVerify(exactly = 2) { repository.refreshCatalog(false) }
-    }
-
-    // --- US31: filtro por marca (H35) ---
-
-    @Test
-    fun `sin marcas en el catalogo no hay filtro de marca`() = runTest(mainRule.dispatcher) {
-        conCatalogo(repuesto("1", "10"))
-        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
-        val vm = viewModel()
-        settle()
-
-        assertTrue(vm.uiState.value.brands.isEmpty())
-        assertNull(vm.uiState.value.brand)
-    }
-
-    @Test
-    fun `la marca filtra el catalogo y tocarla de nuevo la quita`() = runTest(mainRule.dispatcher) {
-        conCatalogo(repuesto("1", "10", brand = "Bosch"), repuesto("2", "3", brand = "Mobil"))
-        every { repository.observeCatalog(null, "Bosch") } returns flowOf(listOf(repuesto("1", "10", brand = "Bosch")))
-        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
-        brands.value = listOf("Bosch", "Mobil")
-        val vm = viewModel()
-        settle()
-        assertEquals(listOf("Bosch", "Mobil"), vm.uiState.value.brands)
-
-        vm.onBrandClick("Bosch")
-        settle()
-        assertEquals("Bosch", vm.uiState.value.brand)
-        assertEquals(listOf("1"), vm.uiState.value.parts.map { it.id })
-        assertTrue(vm.uiState.value.hasFilters)
-
-        vm.onBrandClick("Bosch")
-        settle()
-        assertNull(vm.uiState.value.brand)
-        assertEquals(2, vm.uiState.value.parts.size)
-    }
-
-    @Test
-    fun `la marca se combina con el texto de busqueda`() = runTest(mainRule.dispatcher) {
-        conCatalogo(repuesto("1", "10", brand = "Bosch"))
-        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
-        coEvery { repository.searchParts("pas", null, "Bosch") } returns Result.success(listOf(repuesto("1", "10", brand = "Bosch")))
-        brands.value = listOf("Bosch")
-        val vm = viewModel()
-        settle()
-
-        vm.onBrandClick("Bosch")
-        vm.onQueryChange("pas")
-        settle()
-
-        coVerify { repository.searchParts("pas", null, "Bosch") }
-        assertEquals(listOf("1"), vm.uiState.value.parts.map { it.id })
-    }
-
-    @Test
-    fun `si la marca elegida desaparece del catalogo se quita el filtro`() = runTest(mainRule.dispatcher) {
-        conCatalogo(repuesto("1", "10", brand = "Bosch"))
-        every { repository.observeCatalog(null, "Bosch") } returns flowOf(listOf(repuesto("1", "10", brand = "Bosch")))
-        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
-        brands.value = listOf("Bosch")
-        val vm = viewModel()
-        settle()
-        vm.onBrandClick("Bosch")
-        settle()
-        assertEquals("Bosch", vm.uiState.value.brand)
-
-        brands.value = emptyList()
-        settle()
-
-        assertNull(vm.uiState.value.brand)
-        assertEquals(1, vm.uiState.value.parts.size)
-    }
-
-    @Test
-    fun `quitar filtros tambien quita la marca`() = runTest(mainRule.dispatcher) {
-        conCatalogo(repuesto("1", "10", brand = "Bosch"))
-        every { repository.observeCatalog(null, "Bosch") } returns flowOf(listOf(repuesto("1", "10", brand = "Bosch")))
-        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
-        brands.value = listOf("Bosch")
-        val vm = viewModel()
-        settle()
-        vm.onBrandClick("Bosch")
-        settle()
-
-        vm.onClearFilters()
-        settle()
-
-        assertNull(vm.uiState.value.brand)
-        assertFalse(vm.uiState.value.hasFilters)
     }
 }

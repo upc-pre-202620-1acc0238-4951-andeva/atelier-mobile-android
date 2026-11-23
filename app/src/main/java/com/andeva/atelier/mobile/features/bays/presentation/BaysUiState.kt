@@ -7,11 +7,17 @@ import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 
+/**
+ * Tablero de bahías de la sede. Se pinta desde Room; reasignar y crear bahías son acciones en línea
+ * (no se encolan), por eso [isOnline] las habilita.
+ */
 data class BaysUiState(
     val board: List<BayBoardItem> = emptyList(),
     val activeOrders: List<WorkOrder> = emptyList(),
     val statusFilter: BayStatus? = null,
     val isRefreshing: Boolean = false,
+    val hasLoaded: Boolean = false,
+    val isOnline: Boolean = true,
     val isAssigning: Boolean = false,
     val targetBayForAssign: WorkBay? = null,
     val canReadBays: Boolean = false,
@@ -33,4 +39,7 @@ data class BaysUiState(
         get() = activeOrders.filter {
             it.status == WorkOrderStatus.IN_PROGRESS || it.status == WorkOrderStatus.DRAFT
         }
+
+    /** Esqueleto solo sin caché: primera carga y ninguna bahía que pintar todavía. */
+    val showSkeleton: Boolean get() = !hasLoaded && board.isEmpty()
 }

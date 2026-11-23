@@ -33,7 +33,7 @@ class PendingOperationsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeOperations().collect { ops ->
-                _uiState.update { it.copy(operations = ops, isSyncingNow = false) }
+                _uiState.update { it.copy(operations = ops, isSyncingNow = false, hasLoaded = true) }
             }
         }
         viewModelScope.launch {

@@ -1,21 +1,20 @@
 package com.andeva.atelier.mobile.features.inventory.presentation.detail
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,28 +25,34 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierFichaPanel
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
-import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
+import com.andeva.atelier.mobile.core.presentation.formatLimaDate
 import com.andeva.atelier.mobile.core.presentation.formatQuantity
 import com.andeva.atelier.mobile.features.inventory.domain.Batch
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.domain.Part
 import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
-import com.andeva.atelier.mobile.features.inventory.presentation.detail.components.BatchFifoTimeline
 import com.andeva.atelier.mobile.features.inventory.presentation.labelRes
 import com.andeva.atelier.mobile.features.inventory.presentation.stockChipKind
 import com.andeva.atelier.mobile.features.inventory.presentation.stockLabelRes
 import java.math.BigDecimal
 import java.time.Instant
 
-/** US32: ficha del repuesto con sus lotes de compra en orden FIFO. */
+/**
+ * US32: ficha del repuesto. Las existencias salen de la caché; los lotes en orden FIFO y sus costos solo se ven
+ * con `BATCHES_READ`.
+ */
 @Composable
 fun PartDetailScreen(
     onBack: () -> Unit,
@@ -63,105 +68,119 @@ fun PartDetailScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PartDetailContent(
+private fun PartDetailContent(
     state: PartDetailUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val part = state.part
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
-        AtelierTopBar(title = stringResource(R.string.part_detail_title), onBack = onBack)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            state.part?.let { PartSummary(it) }
-            if (state.showingCache) {
-                AtelierBanner(
-                    message = state.error?.asString() ?: stringResource(R.string.batches_cache_notice),
-                    icon = Icons.Outlined.WifiOff,
-                    kind = BannerKind.Wait
-                )
-            } else {
-                state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
+        AtelierFichaPanel(
+            onBack = onBack,
+            title = part?.name ?: stringResource(R.string.part_detail_title),
+            subtitle = part?.let { stringResource(R.string.part_sku, it.sku) },
+            status = part?.let { { AtelierChip(text = stringResource(it.stockLabelRes()), kind = it.stockChipKind()) } }
+        )
+        AtelierRefreshBar(visible = state.isLoading)
+        PullToRefreshBox(isRefreshing = false, onRefresh = onRefresh, modifier = Modifier.weight(1f)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                if (state.showingCache) {
+                    item(key = "cache") {
+                        AtelierBanner(
+                            message = state.error?.asString() ?: stringResource(R.string.batches_cache_notice),
+                            icon = Icons.Outlined.Info,
+                            kind = BannerKind.Info,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+                if (part != null) {
+                    item(key = "facts-header") {
+                        AtelierSectionHeader(
+                            title = stringResource(R.string.inventory_detail_stock_section),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    item(key = "stock") { Fact(R.string.inventory_detail_stock, part.totalStock.formatQuantity()) }
+                    item(key = "min") { Fact(R.string.inventory_detail_minimum, part.minimumStock.formatQuantity()) }
+                    part.basePrice?.let { price ->
+                        item(key = "price") { Fact(R.string.inventory_detail_price, price.format()) }
+                    }
+                    part.category?.let { category ->
+                        item(key = "category") {
+                            Fact(R.string.inventory_detail_category, stringResource(category.labelRes()))
+                        }
+                    }
+                }
+                item(key = "batches-header") {
+                    AtelierSectionHeader(
+                        title = stringResource(R.string.batches_title),
+                        count = if (state.canReadBatches && state.batches.isNotEmpty()) state.batches.size else null,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                when {
+                    !state.canReadBatches -> item(key = "batches-no-permission") {
+                        AtelierNoPermissionState(
+                            text = stringResource(R.string.batches_no_permission),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    state.batches.isEmpty() && state.isLoading -> items(2, key = { "bone-$it" }) {
+                        AtelierListRow(title = "Lote L-0001", subtitle = "Saldo: 6 · Ingresó el 10/03/2026", loading = true)
+                    }
+                    state.batches.isEmpty() -> item(key = "batches-empty") {
+                        AtelierEmptyState(
+                            text = stringResource(R.string.batches_empty),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                    else -> items(state.batches, key = { it.id }) { batch ->
+                        BatchRow(batch, isNext = batch.id == state.nextBatchId)
+                    }
+                }
             }
+        }
+    }
+}
 
-            Text(
-                text = stringResource(R.string.batches_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.batches_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
-            )
+@Composable
+private fun Fact(labelRes: Int, value: String) {
+    AtelierListRow(
+        title = stringResource(labelRes),
+        trailing = {
+            Text(text = value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+    )
+}
+
+@Composable
+private fun BatchRow(batch: Batch, isNext: Boolean) {
+    val arrival = batch.arrivalDate?.let { stringResource(R.string.batch_arrival, it.formatLimaDate()) }
+    val cost = batch.unitCost?.let { stringResource(R.string.batch_unit_cost, it.format()) }
+    AtelierListRow(
+        title = stringResource(R.string.batch_number, batch.batchNumber),
+        subtitle = listOfNotNull(
+            stringResource(R.string.batch_remaining, batch.remainingQty.formatQuantity()),
+            arrival,
+            cost
+        ).joinToString(" · "),
+        trailing = {
             when {
-                !state.canReadBatches -> AtelierBanner(
-                    message = stringResource(R.string.batches_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-                state.batches.isEmpty() -> Text(
-                    text = stringResource(if (state.isLoading) R.string.search_loading else R.string.batches_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-                else -> BatchFifoTimeline(batches = state.batches, nextBatchId = state.nextBatchId)
-            }
-            if (state.canReadBatches) {
-                AtelierButton(
-                    text = stringResource(R.string.tasks_refresh),
-                    onClick = onRefresh,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = AtelierButtonStyle.Outlined,
-                    loading = state.isLoading
-                )
+                isNext -> AtelierChip(text = stringResource(R.string.batch_next), kind = ChipKind.Info)
+                batch.isActive -> AtelierChip(text = stringResource(R.string.batch_waiting), kind = ChipKind.Ok)
+                else -> AtelierChip(text = stringResource(R.string.batch_depleted), kind = ChipKind.Idle)
             }
         }
-    }
-}
-
-@Composable
-private fun PartSummary(part: Part) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PartChips(part)
-        Text(text = part.name, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-        Text(
-            text = stringResource(R.string.part_sku, part.sku),
-            style = MaterialTheme.typography.bodyMedium,
-            color = AtelierTheme.colors.inkSecondary
-        )
-        Text(
-            text = stringResource(R.string.part_stock, part.totalStock.formatQuantity()),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        part.basePrice?.let {
-            Text(
-                text = stringResource(R.string.part_price, it.format()),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-@Composable
-private fun PartChips(part: Part) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AtelierChip(text = stringResource(part.stockLabelRes()), kind = part.stockChipKind())
-        part.category?.let { AtelierChip(text = stringResource(it.labelRes())) }
-    }
+    )
 }
 
 private val previewPart = Part(
@@ -170,32 +189,34 @@ private val previewPart = Part(
     unitOfMeasure = "UNIT", status = PartStatus.ACTIVE
 )
 
-private fun previewBatch(id: String, number: String, remaining: String, day: Int) = Batch(
+private fun previewBatch(id: String, number: String, remaining: String, month: Int) = Batch(
     id = id, itemId = "1", batchNumber = number, remainingQty = BigDecimal(remaining),
-    unitCost = Money(BigDecimal("52.00"), Money.PEN), arrivalDate = Instant.parse("2026-0${day}-10T12:00:00Z")
+    unitCost = Money(BigDecimal("52.00"), Money.PEN), arrivalDate = Instant.parse("2026-0$month-10T12:00:00Z")
 )
 
-@Preview(name = "Repuesto · lotes FIFO · oscuro", widthDp = 360, heightDp = 1000, showBackground = true)
-@Composable
-private fun PartDetailPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
-    PartDetailContent(
-        state = PartDetailUiState(
-            part = previewPart, isLoading = false, canReadBatches = true,
-            batches = listOf(
-                previewBatch("b1", "L-0001", "0", 3),
-                previewBatch("b2", "L-0002", "6", 5),
-                previewBatch("b3", "L-0003", "8", 7)
-            )
-        ),
-        onBack = {}, onRefresh = {}
+private val previewState = PartDetailUiState(
+    part = previewPart, isLoading = false, canReadBatches = true,
+    batches = listOf(
+        previewBatch("b1", "L-0001", "0", 3),
+        previewBatch("b2", "L-0002", "6", 5),
+        previewBatch("b3", "L-0003", "8", 7)
     )
+)
+
+@Preview(name = "Repuesto · claro", widthDp = 390, heightDp = 844)
+@Composable
+private fun PartDetailPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
+    PartDetailContent(previewState, onBack = {}, onRefresh = {})
 }
 
-@Preview(name = "Repuesto · sin permiso · claro", widthDp = 360, heightDp = 700, showBackground = true)
+@Preview(name = "Repuesto · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PartDetailPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
+    PartDetailContent(previewState, onBack = {}, onRefresh = {})
+}
+
+@Preview(name = "Repuesto · sin permiso de lotes", widthDp = 390, heightDp = 844)
 @Composable
 private fun PartDetailPreviewNoPermission() = AtelierWorkshopTheme(darkTheme = false) {
-    PartDetailContent(
-        state = PartDetailUiState(part = previewPart, isLoading = false, canReadBatches = false),
-        onBack = {}, onRefresh = {}
-    )
+    PartDetailContent(previewState.copy(canReadBatches = false, batches = emptyList()), onBack = {}, onRefresh = {})
 }

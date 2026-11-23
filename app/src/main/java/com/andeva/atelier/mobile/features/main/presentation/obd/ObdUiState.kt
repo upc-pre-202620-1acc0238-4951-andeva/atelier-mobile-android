@@ -35,6 +35,9 @@ data class ObdUiState(
     val deviceInstallations: Map<String, DeviceInstallationInfo> = emptyMap(),
     val workshopVehicles: List<VehicleWithOwner> = emptyList(),
     val canReadDevices: Boolean = false,
+    /** El plan contratado incluye telemetría; sin plan conocido no se oculta nada, el backend decide. */
+    val planIncludesTelemetry: Boolean = true,
+    val isOnline: Boolean = true,
     val canRegisterDevices: Boolean = false,
     val canManageInstallations: Boolean = false,
     val error: UiText? = null,

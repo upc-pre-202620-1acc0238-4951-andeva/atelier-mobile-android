@@ -12,9 +12,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,19 +25,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.features.reception.domain.AffiliationLookup
 import com.andeva.atelier.mobile.features.reception.domain.AffiliationStep
 import com.andeva.atelier.mobile.features.reception.domain.PlatformAccount
@@ -75,6 +77,7 @@ internal fun AffiliationContent(
     onRegisterWalkIn: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // safeDrawingPadding incluye el teclado: el botón de abajo sube con él.
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -86,15 +89,17 @@ internal fun AffiliationContent(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
                 text = stringResource(R.string.affiliation_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
-
+            if (!state.canLookup) {
+                AtelierNoPermissionState(stringResource(R.string.reception_no_permission))
+            }
             AtelierTextField(
                 label = stringResource(R.string.affiliation_email),
                 value = state.email,
@@ -106,30 +111,45 @@ internal fun AffiliationContent(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() })
             )
-            AtelierButton(
-                text = stringResource(R.string.affiliation_search),
-                onClick = onSearch,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = state.canSearch,
-                loading = state.isSearching
-            )
-            if (!state.canLookup) {
-                AtelierBanner(
-                    message = stringResource(R.string.reception_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-            }
-
-            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
-
             LookupResult(
                 state = state,
                 onTaxIdChange = onTaxIdChange,
                 onPhoneChange = onPhoneChange,
-                onAffiliate = onAffiliate,
-                onRegisterWalkIn = onRegisterWalkIn
+                onAffiliate = onAffiliate
             )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column(
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
+            if (!state.isOnline) AtelierRequiresConnection()
+            // Un solo botón principal, según el paso: buscar, afiliar o registrar en el counter.
+            when {
+                state.affiliated != null || state.step == AffiliationStep.ALREADY_CUSTOMER -> Unit
+                state.lookup == null -> AtelierButton(
+                    text = stringResource(R.string.affiliation_search),
+                    onClick = onSearch,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canSearch,
+                    loading = state.isSearching
+                )
+                state.step == AffiliationStep.AFFILIATE -> AtelierButton(
+                    text = stringResource(R.string.affiliation_submit),
+                    onClick = onAffiliate,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canSubmitAffiliation,
+                    loading = state.isAffiliating
+                )
+                else -> AtelierButton(
+                    text = stringResource(R.string.affiliation_register_walk_in),
+                    onClick = onRegisterWalkIn,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canAffiliate && state.isOnline
+                )
+            }
         }
     }
 }
@@ -139,8 +159,7 @@ private fun LookupResult(
     state: AffiliationUiState,
     onTaxIdChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
-    onAffiliate: () -> Unit,
-    onRegisterWalkIn: () -> Unit
+    onAffiliate: () -> Unit
 ) {
     val lookup = state.lookup ?: return
     state.affiliated?.let { customer ->
@@ -190,68 +209,62 @@ private fun LookupResult(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAffiliate() })
             )
-            AtelierButton(
-                text = stringResource(R.string.affiliation_submit),
-                onClick = onAffiliate,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = state.canSubmitAffiliation,
-                loading = state.isAffiliating
-            )
-            if (!state.canAffiliate) {
-                AtelierBanner(
-                    message = stringResource(R.string.reception_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-            }
         }
-        AffiliationStep.REGISTER_WALK_IN, null -> {
-            AtelierBanner(
-                title = stringResource(R.string.affiliation_not_found_title),
-                message = stringResource(R.string.affiliation_not_found_body),
-                icon = Icons.Outlined.Info,
-                kind = BannerKind.Wait
-            )
-            AtelierButton(
-                text = stringResource(R.string.affiliation_register_walk_in),
-                onClick = onRegisterWalkIn,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Tonal,
-                enabled = state.canAffiliate
-            )
-        }
+        AffiliationStep.REGISTER_WALK_IN, null -> AtelierBanner(
+            title = stringResource(R.string.affiliation_not_found_title),
+            message = stringResource(R.string.affiliation_not_found_body),
+            icon = Icons.Outlined.Info,
+            kind = BannerKind.Wait
+        )
     }
 }
 
 private val previewLookup = AffiliationLookup(
     workshopCustomer = null,
-    platformAccount = PlatformAccount("u1", "ana@correo.pe", "Ana Torres", "ACTIVE"),
+    platformAccount = PlatformAccount("u1", "ana.torres@correo.pe", "Ana Torres Quispe", "ACTIVE"),
     vehicles = emptyList(),
     nextStep = AffiliationStep.AFFILIATE
 )
 
-@Preview(name = "Afiliar · encontrada · oscuro", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
-private fun AffiliationPreviewFound() = AtelierWorkshopTheme(darkTheme = true) {
+private fun AffiliationPreview(state: AffiliationUiState, dark: Boolean) = AtelierWorkshopTheme(darkTheme = dark) {
     AffiliationContent(
-        state = AffiliationUiState(
-            email = "ana@correo.pe", lookup = previewLookup, canLookup = true, canAffiliate = true
-        ),
+        state = state,
         onBack = {}, onEmailChange = {}, onTaxIdChange = {}, onPhoneChange = {},
         onSearch = {}, onAffiliate = {}, onRegisterWalkIn = {}
     )
 }
 
-@Preview(name = "Afiliar · error · claro", widthDp = 360, heightDp = 800, showBackground = true)
+@Preview(name = "Afiliar · encontrada · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
 @Composable
-private fun AffiliationPreviewError() = AtelierWorkshopTheme(darkTheme = false) {
-    AffiliationContent(
-        state = AffiliationUiState(
-            email = "ana@", canLookup = true, invalidField = "email",
-            error = UiText.Dynamic("Revisa los datos marcados."),
-            affiliated = null
-        ),
-        onBack = {}, onEmailChange = {}, onTaxIdChange = {}, onPhoneChange = {},
-        onSearch = {}, onAffiliate = {}, onRegisterWalkIn = {}
-    )
-}
+private fun AffiliationPreviewFound() = AffiliationPreview(
+    AffiliationUiState(email = "ana.torres@correo.pe", lookup = previewLookup, canLookup = true, canAffiliate = true),
+    dark = true
+)
+
+@Preview(name = "Afiliar · error · claro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun AffiliationPreviewError() = AffiliationPreview(
+    AffiliationUiState(
+        email = "ana@", canLookup = true, invalidField = "email",
+        error = UiText.Dynamic("Revisa los datos marcados.")
+    ),
+    dark = false
+)
+
+@Preview(name = "Afiliar · sin cuenta, sin red · claro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun AffiliationPreviewOffline() = AffiliationPreview(
+    AffiliationUiState(
+        email = "luis.ramos@correo.pe", canLookup = true, canAffiliate = true, isOnline = false,
+        lookup = AffiliationLookup(
+            workshopCustomer = null, platformAccount = null, vehicles = emptyList(),
+            nextStep = AffiliationStep.REGISTER_WALK_IN
+        )
+    ),
+    dark = false
+)
+
+@Preview(name = "Afiliar · sin permiso · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun AffiliationPreviewNoPermission() = AffiliationPreview(AffiliationUiState(), dark = true)

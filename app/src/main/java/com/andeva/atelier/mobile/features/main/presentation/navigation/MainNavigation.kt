@@ -2,9 +2,8 @@ package com.andeva.atelier.mobile.features.main.presentation.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddCircleOutline
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -22,32 +21,31 @@ import com.andeva.atelier.mobile.features.attendance.presentation.navigation.Att
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.BranchSelectionRoute
 import com.andeva.atelier.mobile.features.bays.presentation.BaysScreen
 import com.andeva.atelier.mobile.features.inventory.presentation.navigation.InventoryNavGraphRoute
-import com.andeva.atelier.mobile.features.inventory.presentation.navigation.PartsCatalogRoute
 import com.andeva.atelier.mobile.features.main.presentation.attendance.AdminAttendanceScreen
 import com.andeva.atelier.mobile.features.main.presentation.dashboard.AdminDashboardScreen
-import com.andeva.atelier.mobile.features.main.presentation.more.MoreHubScreen
+import com.andeva.atelier.mobile.features.cashier.presentation.navigation.DailyCashRoute
+import com.andeva.atelier.mobile.features.cashier.presentation.navigation.FiscalSeriesRoute
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.InventoryValuationRoute
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.PurchaseOrdersRoute
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.StockAlertsRoute
+import com.andeva.atelier.mobile.features.main.presentation.more.MoreDestination
+import com.andeva.atelier.mobile.features.reports.presentation.navigation.ReportsRoute
 import com.andeva.atelier.mobile.features.main.presentation.notifications.NotificationsScreen
 import com.andeva.atelier.mobile.features.main.presentation.obd.ObdScreen
 import com.andeva.atelier.mobile.features.main.presentation.profile.ProfileScreen
 import com.andeva.atelier.mobile.features.main.presentation.sync.PendingOperationsScreen
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.ReceptionNavGraphRoute
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.RegisterCustomerRoute
-import com.andeva.atelier.mobile.features.reception.presentation.navigation.VehicleSearchRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.MyTasksRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TasksNavGraphRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrderDetailRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrdersRoute
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
 
 /** B1: Dashboard operativo de sede para dueño, administrador, jefe de taller y asesor de recepción. */
 @Serializable
 data object AdminDashboardRoute
-
-/** Hub "Más" con todos los módulos administrativos y operativos del taller. */
-@Serializable
-data object MoreHubRoute
 
 /** Tablero de bahías de trabajo de la sede (US15 / US16 / Tarea 5). */
 @Serializable
@@ -95,33 +93,28 @@ sealed class MainTab(
     val icon: ImageVector
 ) {
     data object Home : MainTab(AttendanceRoute, AttendanceHomeRoute::class, R.string.main_tab_home, home)
-    data object DashboardHome : MainTab(AdminDashboardRoute, AdminDashboardRoute::class, R.string.main_tab_home, home)
+    data object Today : MainTab(AdminDashboardRoute, AdminDashboardRoute::class, R.string.main_tab_today, Icons.Outlined.Today)
     data object Tasks : MainTab(TasksNavGraphRoute, MyTasksRoute::class, R.string.main_tab_tasks, assignment)
     data object Orders : MainTab(WorkOrdersRoute, WorkOrdersRoute::class, R.string.main_tab_orders, assignment)
-    data object Reception : MainTab(
-        ReceptionNavGraphRoute, VehicleSearchRoute::class, R.string.main_tab_reception, Icons.Outlined.AddCircleOutline
-    )
+    data object Team : MainTab(AdminAttendanceRoute, AdminAttendanceRoute::class, R.string.main_tab_team, Icons.Outlined.Groups)
     data object Obd : MainTab(ObdRoute, ObdRoute::class, R.string.main_tab_obd, bluetooth_searching)
-    data object Stock : MainTab(
-        InventoryNavGraphRoute, PartsCatalogRoute::class, R.string.main_tab_stock, Icons.Outlined.Inventory2
-    )
     data object Profile : MainTab(ProfileRoute, ProfileRoute::class, R.string.main_tab_profile, person)
-    data object Settings : MainTab(MoreHubRoute, MoreHubRoute::class, R.string.main_tab_more, Icons.Outlined.Settings)
 
     companion object {
+        /** Quien registra tiempo de tareas y no supervisa la sede usa la barra de campo (sin Módulos). */
+        private fun isFieldStaff(session: Session) =
+            !session.prefersOperationalDashboard() && session.has(Permission.TASKS_TRACK_TIME)
+
+        /** La barra de supervisión añade al final el slot "Módulos", que abre la hoja y no es un destino. */
+        fun hasModules(session: Session) = !isFieldStaff(session)
+
         /**
-         * Pestañas según los permisos de la sesión, nunca según el rol (docs/02-roles-and-permissions.md).
+         * Destinos de la barra según los permisos de la sesión, nunca según el rol (docs/02-roles-and-permissions.md).
+         * Quien supervisa la sede ve Hoy · Órdenes · Equipo (+ Módulos); recepción, repuestos, caja y reportes cuelgan
+         * de la hoja de módulos y del botón de acción "Recibir vehículo".
          */
-        fun tabsFor(session: Session): List<MainTab> {
-            return if (session.prefersOperationalDashboard()) {
-                buildList {
-                    add(DashboardHome)
-                    if (session.has(Permission.WORK_ORDERS_READ)) add(Orders)
-                    if (session.has(Permission.VEHICLES_CREATE) || session.has(Permission.CUSTOMERS_READ)) add(Reception)
-                    if (session.has(Permission.PARTS_READ)) add(Stock)
-                    add(Profile)
-                }
-            } else if (session.has(Permission.TASKS_TRACK_TIME)) {
+        fun tabsFor(session: Session): List<MainTab> =
+            if (isFieldStaff(session)) {
                 buildList {
                     add(Home)
                     if (session.has(Permission.TASKS_READ)) add(Tasks)
@@ -131,14 +124,11 @@ sealed class MainTab(
                 }
             } else {
                 buildList {
-                    add(DashboardHome)
+                    add(Today)
                     if (session.has(Permission.WORK_ORDERS_READ)) add(Orders)
-                    if (session.has(Permission.VEHICLES_CREATE)) add(Reception)
-                    if (session.has(Permission.PARTS_READ)) add(Stock)
-                    add(Profile)
+                    if (session.has(Permission.ATTENDANCE_AUDIT_ALL)) add(Team)
                 }
             }
-        }
     }
 }
 
@@ -157,45 +147,43 @@ fun NavController.navigateToTab(tab: MainTab) {
     }
 }
 
+/** Abre un destino de la hoja de módulos (los mismos que las baldosas de `ModulesSheet`). */
+fun NavController.navigateToModule(destination: MoreDestination) {
+    val route: Any = when (destination) {
+        MoreDestination.BRANCH -> BranchSelectionRoute
+        MoreDestination.RECEPTION -> ReceptionNavGraphRoute
+        MoreDestination.BAYS -> BaysRoute
+        MoreDestination.DAILY_CASH -> DailyCashRoute
+        MoreDestination.FISCAL_SERIES -> FiscalSeriesRoute
+        MoreDestination.REPORTS -> ReportsRoute
+        MoreDestination.PARTS -> InventoryNavGraphRoute
+        MoreDestination.STOCK_ALERTS -> StockAlertsRoute
+        MoreDestination.PURCHASE_ORDERS -> PurchaseOrdersRoute
+        MoreDestination.VALUATION -> InventoryValuationRoute
+        MoreDestination.OBD -> ObdRoute
+        MoreDestination.NOTIFICATIONS -> NotificationsRoute
+        MoreDestination.SYNC_QUEUE -> PendingOperationsRoute
+        MoreDestination.PROFILE -> ProfileRoute
+    }
+    navigate(route)
+}
+
 /** Destinos propios de `main`: Dashboard, Más, Bahías, Asistencia de Sede, Notificaciones, Cola Offline, OBD-II y Perfil. */
-fun NavGraphBuilder.mainTabsDestinations(
-    navController: NavController,
-    sessionFlow: StateFlow<Session?>,
-    pendingSyncCountFlow: StateFlow<Int>
-) {
+fun NavGraphBuilder.mainTabsDestinations(navController: NavController) {
     composable<AdminDashboardRoute> {
         AdminDashboardScreen(
-            onOpenMoreHub = { navController.navigate(MoreHubRoute) },
             onSelectBranch = { navController.navigate(BranchSelectionRoute) },
             onOpenNotifications = { navController.navigate(NotificationsRoute) },
             onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) },
-            onOpenReception = { navController.navigate(ReceptionNavGraphRoute) },
-            onOpenWalkInRegister = { navController.navigate(RegisterCustomerRoute()) },
-            onOpenOrdersList = { navController.navigate(WorkOrdersRoute) },
-            onOpenOrderDetail = { id -> navController.navigate(WorkOrderDetailRoute(id)) },
+            onOpenProfile = { navController.navigate(ProfileRoute) },
+            onReceiveVehicle = { navController.navigate(ReceptionNavGraphRoute) },
+            onRegisterWalkIn = { navController.navigate(RegisterCustomerRoute()) },
+            onOpenOrder = { id -> navController.navigate(WorkOrderDetailRoute(id)) },
+            onOpenOrders = { navController.navigateToTab(MainTab.Orders) },
             onOpenBays = { navController.navigate(BaysRoute) },
-            onOpenStockAlerts = { navController.navigate(NotificationsRoute) },
-            onOpenAttendanceHub = { navController.navigate(AdminAttendanceRoute) },
-            onOpenObdInventory = { navController.navigate(ObdRoute) }
-        )
-    }
-    composable<MoreHubRoute> {
-        MoreHubScreen(
-            sessionFlow = sessionFlow,
-            pendingSyncCountFlow = pendingSyncCountFlow,
-            onBack = { navController.popBackStack() },
-            onSelectBranch = { navController.navigate(BranchSelectionRoute) },
-            onOpenReception = { navController.navigate(ReceptionNavGraphRoute) },
-            onOpenBays = { navController.navigate(BaysRoute) },
-            onOpenObdInventory = { navController.navigate(ObdRoute) },
-            onOpenAttendance = { navController.navigate(AdminAttendanceRoute) },
-            onOpenStockCatalog = { navController.navigate(InventoryNavGraphRoute) },
-            onOpenStockAlerts = { navController.navigate(NotificationsRoute) },
-            onOpenPurchaseOrders = { navController.navigate(InventoryNavGraphRoute) },
-            onOpenValuation = { navController.navigate(InventoryNavGraphRoute) },
-            onOpenNotifications = { navController.navigate(NotificationsRoute) },
-            onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) },
-            onOpenProfile = { navController.navigate(ProfileRoute) }
+            onOpenStockAlerts = { navController.navigate(StockAlertsRoute) },
+            onOpenTeam = { navController.navigateToTab(MainTab.Team) },
+            onOpenObd = { navController.navigate(ObdRoute) }
         )
     }
     composable<BaysRoute> {
@@ -205,13 +193,13 @@ fun NavGraphBuilder.mainTabsDestinations(
         )
     }
     composable<AdminAttendanceRoute> {
-        AdminAttendanceScreen(onBack = { navController.popBackStack() })
+        AdminAttendanceScreen()
     }
     composable<NotificationsRoute> {
         NotificationsScreen(
             onBack = { navController.popBackStack() },
             onOpenOrder = { workOrderId -> navController.navigate(WorkOrderDetailRoute(workOrderId)) },
-            onOpenStockAlerts = { navController.navigate(InventoryNavGraphRoute) },
+            onOpenStockAlerts = { navController.navigate(StockAlertsRoute) },
             onOpenAttendanceReview = { navController.navigate(AdminAttendanceRoute) },
             onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) }
         )
@@ -226,7 +214,6 @@ fun NavGraphBuilder.mainTabsDestinations(
         val canPop = navController.previousBackStackEntry != null
         ProfileScreen(
             onBack = if (canPop) { { navController.popBackStack() } } else null,
-            onOpenMenu = { navController.navigate(MoreHubRoute) },
             onSelectBranch = { navController.navigate(BranchSelectionRoute) },
             onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) },
             onOpenNotifications = { navController.navigate(NotificationsRoute) }

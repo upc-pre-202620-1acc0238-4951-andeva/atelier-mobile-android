@@ -63,8 +63,6 @@ value class Permission(val value: String) {
         val ALERTS_READ = Permission("inventory:alerts:read")
         val INVENTORY_ALERTS_READ = ALERTS_READ
         val ALERTS_RESOLVE = Permission("inventory:alerts:resolve")
-        val VALUATION_READ = Permission("inventory:valuation:read")
-        val INVENTORY_VALUATION_READ = VALUATION_READ
 
         // IoT
         val DEVICES_READ = Permission("iot:devices:read")

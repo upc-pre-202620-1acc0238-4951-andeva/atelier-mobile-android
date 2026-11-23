@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.main.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObservePendingOperationCountUseCase
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.main.presentation.navigation.MainTab
@@ -21,6 +22,8 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = combine(observeSession(), observePendingCount()) { session, pending ->
         MainUiState(
             tabs = session?.let(MainTab::tabsFor).orEmpty(),
+            showModules = session?.let(MainTab::hasModules) == true,
+            canReceiveVehicle = session?.has(Permission.WORK_ORDERS_CREATE) == true,
             pendingCount = pending
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
