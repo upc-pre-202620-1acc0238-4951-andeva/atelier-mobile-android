@@ -8,6 +8,7 @@ import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.notifications.PushInbox
 import com.andeva.atelier.mobile.features.attendance.application.GetBranchDailyAttendanceUseCase
+import com.andeva.atelier.mobile.features.attendance.application.ObserveTodayAttendanceUseCase
 import com.andeva.atelier.mobile.features.auth.application.GetSelectableBranchesUseCase
 import com.andeva.atelier.mobile.features.bays.application.ObserveBayBoardUseCase
 import com.andeva.atelier.mobile.features.bays.application.RefreshBayBoardUseCase
@@ -21,12 +22,15 @@ import com.andeva.atelier.mobile.features.reception.application.RefreshAppointme
 import com.andeva.atelier.mobile.features.reception.application.RefreshCustomersUseCase
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.reception.application.EnrichReceptionReferencesUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ObserveMyTasksUseCase
+import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.team.application.ApproveJustificationUseCase
 import com.andeva.atelier.mobile.features.team.application.GetPendingJustificationsUseCase
 import com.andeva.atelier.mobile.features.team.application.RejectJustificationUseCase
 import com.andeva.atelier.mobile.features.team.domain.TeamAttendance
 import com.andeva.atelier.mobile.features.workorders.application.ObserveBranchWorkOrdersUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RefreshBranchWorkOrdersUseCase
+import com.andeva.atelier.mobile.features.workorders.infrastructure.repository.PendingSuspensionMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,10 +65,13 @@ class AdminDashboardViewModel @Inject constructor(
     private val getPendingJustifications: GetPendingJustificationsUseCase,
     private val approveJustification: ApproveJustificationUseCase,
     private val rejectJustification: RejectJustificationUseCase,
+    observePersonalToday: ObserveTodayAttendanceUseCase,
+    observeMyTasks: ObserveMyTasksUseCase,
     observePendingSyncCount: ObservePendingOperationCountUseCase,
     connectivity: ConnectivityObserver,
     pushInbox: PushInbox,
-    clock: Clock
+    clock: Clock,
+    private val pendingSuspensionMonitor: PendingSuspensionMonitor? = null
 ) : ViewModel() {
 
     private val today = BusinessTime.limaDate(clock.instant())
@@ -88,19 +95,35 @@ class AdminDashboardViewModel @Inject constructor(
                         canCreateWorkOrder = session?.has(Permission.WORK_ORDERS_CREATE) == true,
                         canReadWorkOrders = session?.has(Permission.WORK_ORDERS_READ) == true,
                         canStartWorkOrders = session?.has(Permission.WORK_ORDERS_UPDATE) == true,
+                        canReviewSuspensions = session?.has(Permission.TASKS_SUSPEND) == true &&
+                            session.has(Permission.WORK_ORDERS_READ),
                         canReadBays = session?.has(Permission.BAYS_READ) == true,
                         canReadAppointments = session?.has(Permission.APPOINTMENTS_READ) == true,
                         canReadCustomers = session?.has(Permission.CUSTOMERS_READ) == true,
                         canRegisterCustomers = session?.has(Permission.CUSTOMERS_CREATE) == true,
-                        canReadInventory = session?.has(Permission.INVENTORY_ALERTS_READ) == true ||
-                            session?.has(Permission.PARTS_READ) == true,
+                        canReadInventory = session?.has(Permission.INVENTORY_ALERTS_READ) == true,
                         canReadObd = session?.has(Permission.OBD_DEVICES_READ) == true &&
                             session.plan?.iotTelemetryEnabled != false,
                         canAuditAttendance = session?.has(Permission.ATTENDANCE_AUDIT_ALL) == true,
-                        canApproveJustifications = session?.has(Permission.JUSTIFICATIONS_APPROVE) == true
+                        canApproveJustifications = session?.has(Permission.JUSTIFICATIONS_APPROVE) == true,
+                        canClockPersonalAttendance = session?.has(Permission.ATTENDANCE_CLOCK_IN) == true ||
+                            session?.has(Permission.ATTENDANCE_CLOCK_OUT) == true,
+                        canWorkOwnTasks = session?.has(Permission.TASKS_TRACK_TIME) == true &&
+                            session.has(Permission.TASKS_READ)
                     )
                 }
                 if (branchChanged) refresh()
+            }
+        }
+        viewModelScope.launch {
+            observePersonalToday().collect { personal ->
+                _uiState.update { it.copy(personalTodayAttendance = personal) }
+            }
+        }
+        viewModelScope.launch {
+            observeMyTasks().collect { tasks ->
+                val activeCount = tasks.count { it.status != TaskStatus.COMPLETED }
+                _uiState.update { it.copy(activePersonalTasksCount = activeCount) }
             }
         }
         viewModelScope.launch {
@@ -134,6 +157,13 @@ class AdminDashboardViewModel @Inject constructor(
             }
         }
         viewModelScope.launch { connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } } }
+        if (pendingSuspensionMonitor != null) {
+            viewModelScope.launch {
+                pendingSuspensionMonitor.items.collect { list ->
+                    _uiState.update { it.copy(pendingSuspensions = list) }
+                }
+            }
+        }
         refresh()
     }
 
@@ -148,13 +178,16 @@ class AdminDashboardViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             branchName = branches.firstOrNull { it.id == state.branchId }?.name,
-                            canChangeBranch = branches.size > 1
+                            canChangeBranch = session.canSwitchBranch() && branches.size > 1
                         )
                     }
                 }
             }
             if (session?.has(Permission.WORK_ORDERS_READ) == true) {
                 refreshOrders().onFailure { failure = it }
+                if (session.has(Permission.TASKS_SUSPEND)) {
+                    launch { pendingSuspensionMonitor?.refreshForActiveBranch(force = false) }
+                }
             }
             if (session?.has(Permission.BAYS_READ) == true) {
                 refreshBayBoard()
@@ -165,7 +198,7 @@ class AdminDashboardViewModel @Inject constructor(
             if (session?.has(Permission.CUSTOMERS_READ) == true) {
                 refreshCustomers(force = false)
             }
-            if (session?.has(Permission.INVENTORY_ALERTS_READ) == true || session?.has(Permission.PARTS_READ) == true) {
+            if (session?.has(Permission.INVENTORY_ALERTS_READ) == true) {
                 getStockAlerts().onSuccess { alerts -> _uiState.update { it.copy(stockAlerts = alerts) } }
             }
             if (session?.has(Permission.OBD_DEVICES_READ) == true && session.plan?.iotTelemetryEnabled != false) {

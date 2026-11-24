@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.main.presentation.dashboard
 
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.features.attendance.domain.BranchAttendanceItem
+import com.andeva.atelier.mobile.features.attendance.domain.TodayAttendance
 import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
 import com.andeva.atelier.mobile.features.bays.domain.BayStatus
 import com.andeva.atelier.mobile.features.diagnostics.domain.DeviceStatus
@@ -9,6 +10,7 @@ import com.andeva.atelier.mobile.features.diagnostics.domain.ObdDevice
 import com.andeva.atelier.mobile.features.inventory.domain.StockAlert
 import com.andeva.atelier.mobile.features.reception.domain.Appointment
 import com.andeva.atelier.mobile.features.team.domain.TeamAttendance
+import com.andeva.atelier.mobile.features.workorders.domain.PendingSuspensionItem
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import java.time.LocalDate
@@ -33,6 +35,7 @@ data class AdminDashboardUiState(
     val vehiclesCount: Int = 0,
     val branchAttendances: List<BranchAttendanceItem> = emptyList(),
     val justifications: List<TeamAttendance> = emptyList(),
+    val pendingSuspensions: List<PendingSuspensionItem> = emptyList(),
     /** Descargos ya resueltos (id → aprobado) que aún muestran su resultado antes de retirarse de la lista. */
     val resolved: Map<String, Boolean> = emptyMap(),
     /** Días de descargos cuya consulta falló (H32): el resultado es parcial y se avisa. */
@@ -49,6 +52,7 @@ data class AdminDashboardUiState(
     val canCreateWorkOrder: Boolean = false,
     val canReadWorkOrders: Boolean = false,
     val canStartWorkOrders: Boolean = false,
+    val canReviewSuspensions: Boolean = false,
     val canReadBays: Boolean = false,
     val canReadAppointments: Boolean = false,
     val canReadCustomers: Boolean = false,
@@ -56,7 +60,11 @@ data class AdminDashboardUiState(
     val canReadInventory: Boolean = false,
     val canReadObd: Boolean = false,
     val canAuditAttendance: Boolean = false,
-    val canApproveJustifications: Boolean = false
+    val canApproveJustifications: Boolean = false,
+    val canClockPersonalAttendance: Boolean = false,
+    val personalTodayAttendance: TodayAttendance = TodayAttendance.NotClockedIn,
+    val canWorkOwnTasks: Boolean = false,
+    val activePersonalTasksCount: Int = 0
 ) {
     /** La caché de la sede no guarda órdenes cerradas: toda orden aquí es un auto en el taller. */
     val carsInWorkshop: Int get() = orders.size
@@ -73,7 +81,11 @@ data class AdminDashboardUiState(
     val draftOrders: List<WorkOrder>
         get() = if (canStartWorkOrders) orders.filter { it.status == WorkOrderStatus.DRAFT } else emptyList()
 
-    val decisionsCount: Int get() = draftOrders.size + justifications.count { it.id !in resolved }
+    val visiblePendingSuspensions: List<PendingSuspensionItem>
+        get() = if (canReviewSuspensions) pendingSuspensions else emptyList()
+
+    val decisionsCount: Int
+        get() = draftOrders.size + visiblePendingSuspensions.size + justifications.count { it.id !in resolved }
 
     /** Esqueleto solo sin caché: primera carga y nada que pintar todavía. */
     val showSkeleton: Boolean get() = !hasLoaded && orders.isEmpty()

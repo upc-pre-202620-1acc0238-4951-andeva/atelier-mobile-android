@@ -15,17 +15,13 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.R
-import com.andeva.atelier.mobile.core.designsystem.component.LocalFloatingBarInset
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
@@ -43,15 +38,21 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierDecisionRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierReportPanel
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSegmentedControl
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.LocalFloatingBarInset
 import com.andeva.atelier.mobile.core.designsystem.component.PanelFigure
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.domain.BusinessTime
@@ -79,6 +80,9 @@ private val TimeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(Busine
 @Composable
 fun AdminAttendanceScreen(
     onBack: (() -> Unit)? = null,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenSync: (() -> Unit)? = null,
+    onOpenProfile: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: AdminAttendanceViewModel = hiltViewModel()
 ) {
@@ -86,6 +90,9 @@ fun AdminAttendanceScreen(
     AdminAttendanceContent(
         state = state,
         onBack = onBack,
+        onOpenNotifications = onOpenNotifications,
+        onOpenSync = onOpenSync,
+        onOpenProfile = onOpenProfile,
         onTabChange = viewModel::onTabChange,
         onRefresh = viewModel::refresh,
         onOpenJustification = viewModel::onOpenJustification,
@@ -100,6 +107,9 @@ fun AdminAttendanceScreen(
 private fun AdminAttendanceContent(
     state: AdminAttendanceUiState,
     onBack: (() -> Unit)?,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenSync: (() -> Unit)? = null,
+    onOpenProfile: (() -> Unit)? = null,
     onTabChange: (TeamTab) -> Unit,
     onRefresh: () -> Unit,
     onOpenJustification: (TeamAttendance) -> Unit,
@@ -108,29 +118,38 @@ private fun AdminAttendanceContent(
     modifier: Modifier = Modifier
 ) {
     // La decisión se confirma en la mano además de en la fila.
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberAtelierHaptics()
     LaunchedEffect(state.resolved.size) {
-        if (state.resolved.isNotEmpty()) haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        if (state.resolved.isNotEmpty()) haptics.confirm()
     }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            if (onBack != null) {
+                AtelierTopBar(title = stringResource(R.string.team_title), onBack = onBack)
+            } else {
+                AtelierMainTopBar(
+                    title = stringResource(R.string.team_title),
+                    onOpenNotifications = onOpenNotifications,
+                    onOpenSync = onOpenSync,
+                    onOpenProfile = onOpenProfile
+                )
+            }
+        }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {
                 !state.canAuditAll && !state.canClockIn -> {
-                    AtelierTopBar(title = stringResource(R.string.team_title), onBack = onBack ?: {})
                     AtelierNoPermissionState(
                         text = stringResource(R.string.team_no_permission),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
                 state.tab == TeamTab.MINE || !state.canAuditAll -> {
-                    Box(modifier = Modifier.statusBarsPadding()) {
-                        if (state.hasTabs) TeamTabs(state.tab, onTabChange)
-                    }
+                    if (state.hasTabs) TeamTabs(state.tab, onTabChange)
                     Box(modifier = Modifier.weight(1f)) { AttendanceScreen() }
                 }
                 else -> TeamList(
@@ -156,21 +175,15 @@ private fun AdminAttendanceContent(
 
 @Composable
 private fun TeamTabs(selected: TeamTab, onTabChange: (TeamTab) -> Unit) {
-    PrimaryTabRow(selectedTabIndex = selected.ordinal, containerColor = MaterialTheme.colorScheme.background) {
-        TeamTab.entries.forEach { tab ->
-            Tab(
-                selected = selected == tab,
-                onClick = { onTabChange(tab) },
-                text = {
-                    Text(
-                        text = stringResource(if (tab == TeamTab.TEAM) R.string.team_tab_team else R.string.team_tab_mine),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1
-                    )
-                }
-            )
-        }
-    }
+    val teamLabel = stringResource(R.string.team_tab_team)
+    val mineLabel = stringResource(R.string.team_tab_mine)
+    AtelierSegmentedControl(
+        options = TeamTab.entries,
+        selected = selected,
+        onSelect = onTabChange,
+        label = { tab -> if (tab == TeamTab.TEAM) teamLabel else mineLabel },
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -181,13 +194,15 @@ private fun TeamList(
     onRefresh: () -> Unit,
     onOpenJustification: (TeamAttendance) -> Unit
 ) {
+    val showSkeleton = rememberDelayedLoading(state.showSkeleton)
     PullToRefreshBox(
         isRefreshing = state.isRefreshing && state.hasLoaded,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize()
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + LocalFloatingBarInset.current)) {
-            item(key = "panel") { TeamPanel(state) }
+            item(key = "panel") { TeamPanel(state, showSkeleton) }
+            item(key = "refresh") { AtelierRefreshBar(visible = state.isRefreshing && state.hasLoaded) }
             if (state.hasTabs) item(key = "tabs") { TeamTabs(state.tab, onTabChange) }
             if (!state.isOnline) {
                 item(key = "offline") {
@@ -218,9 +233,10 @@ private fun TeamList(
                 )
             }
             when {
-                state.showSkeleton -> items(4, key = { "bone-$it" }) {
+                showSkeleton -> items(4, key = { "bone-$it" }) {
                     AtelierListRow(title = "Colaborador", subtitle = "Entrada", loading = true)
                 }
+                state.showSkeleton -> Unit
                 state.records.isEmpty() && error != null && !state.isOnline -> item(key = "offline-state") {
                     AtelierOfflineState(modifier = Modifier.padding(horizontal = 16.dp), onRetry = onRefresh)
                 }
@@ -244,7 +260,7 @@ private fun TeamList(
 }
 
 @Composable
-private fun TeamPanel(state: AdminAttendanceUiState) {
+private fun TeamPanel(state: AdminAttendanceUiState, loading: Boolean) {
     val date = ContextDateFormatter.format(state.today)
     AtelierReportPanel(
         context = state.branchName?.let { stringResource(R.string.today_context, it, date) } ?: date,
@@ -255,7 +271,7 @@ private fun TeamPanel(state: AdminAttendanceUiState) {
             PanelFigure(state.lateCount.toString(), stringResource(R.string.team_figure_late)),
             PanelFigure(state.absentCount.toString(), stringResource(R.string.team_figure_absent))
         ),
-        loading = state.showSkeleton
+        loading = loading
     )
 }
 
@@ -432,7 +448,15 @@ private val previewState = AdminAttendanceUiState(
 
 @Composable
 private fun PreviewContent(state: AdminAttendanceUiState) {
-    AdminAttendanceContent(state, null, {}, {}, {}, {}, {})
+    AdminAttendanceContent(
+        state = state,
+        onBack = null,
+        onTabChange = {},
+        onRefresh = {},
+        onOpenJustification = {},
+        onDismissJustification = {},
+        onReviewJustification = {}
+    )
 }
 
 @Preview(name = "Equipo · claro", widthDp = 390, heightDp = 844)

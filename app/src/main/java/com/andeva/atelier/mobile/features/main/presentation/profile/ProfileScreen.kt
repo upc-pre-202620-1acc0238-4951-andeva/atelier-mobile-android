@@ -1,37 +1,47 @@
 package com.andeva.atelier.mobile.features.main.presentation.profile
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andeva.atelier.mobile.BuildConfig
 import com.andeva.atelier.mobile.R
-import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
@@ -39,8 +49,14 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierFichaPanel
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedCard
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.core.designsystem.theme.HeroShape
 
 /**
  * Perfil de la cuenta: quién es, su taller y sede, el plan y la sesión. Se abre desde "Más" con Atrás.
@@ -56,6 +72,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = rememberAtelierHaptics()
     ProfileContent(
         state = state,
         onBack = onBack,
@@ -64,7 +81,10 @@ fun ProfileScreen(
         onOpenNotifications = onOpenNotifications,
         onSignOutClick = viewModel::onSignOutClick,
         onSignOutDismiss = viewModel::onSignOutDismiss,
-        onSignOutConfirm = viewModel::onSignOutConfirm,
+        onSignOutConfirm = {
+            haptics.confirm()
+            viewModel.onSignOutConfirm()
+        },
         modifier = modifier
     )
 }
@@ -108,6 +128,80 @@ private fun ProfileContent(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (onBack == null) {
+                AtelierSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tier = SurfaceTier.HeroNavy,
+                    shape = HeroShape,
+                    contentPadding = PaddingValues(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(colors.onPanel.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                tint = colors.onPanel,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colors.onPanel,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (state.email.isNotBlank()) {
+                                Text(
+                                    text = state.email,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.onPanel.copy(alpha = 0.82f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                AtelierSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tier = SurfaceTier.Elevated,
+                    shape = CardLargeShape,
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.profile_account_summary),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.primaryText
+                        )
+                        Text(
+                            text = listOfNotNull(
+                                state.tenantName.takeIf { it.isNotBlank() },
+                                state.branchName
+                            ).joinToString(" · ").ifBlank { stringResource(R.string.profile_branch_unknown) },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
             AtelierGroupedCard(title = stringResource(R.string.profile_section_workshop)) {
                 if (state.tenantName.isNotBlank()) {
                     AtelierGroupedRow(

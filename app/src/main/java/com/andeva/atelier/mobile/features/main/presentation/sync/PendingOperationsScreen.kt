@@ -1,8 +1,10 @@
 package com.andeva.atelier.mobile.features.main.presentation.sync
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,12 +38,16 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierLiveBeacon
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.features.main.domain.PendingOperation
 import com.andeva.atelier.mobile.features.main.domain.PendingOperationStatus
@@ -50,8 +57,8 @@ import java.time.format.DateTimeFormatter
 private val SyncTimeFormat = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(BusinessTime.ZONE)
 
 /**
- * Cola de sincronización: lo que se guardó en el teléfono y aún no llegó al servidor (solo fotos de recepción
- * y propuestas se encolan, docs/06-offline-sync.md). Tocar una fila abre su detalle con reintentar o descartar.
+ * Cola de sincronización: lo que se guardó en el teléfono y aún no llegó al servidor (asistencia, fotos, tareas,
+ * propuestas y telemetría/fallas OBD-II, docs/06-offline-sync.md). Tocar una fila abre su detalle con reintentar o descartar.
  */
 @Composable
 fun PendingOperationsScreen(
@@ -93,37 +100,69 @@ internal fun PendingOperationsContent(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item(key = "summary") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                val colors = AtelierTheme.colors
+                AtelierSurface(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .fillMaxWidth(),
+                    tier = SurfaceTier.Elevated,
+                    shape = CardLargeShape,
+                    contentPadding = PaddingValues(16.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.sync_queue_subtitle),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    if (!state.isOnline) {
-                        AtelierBanner(
-                            message = stringResource(R.string.sync_status_offline),
-                            icon = Icons.Outlined.Info,
-                            kind = BannerKind.Wait
-                        )
-                    }
-                    if (state.isSyncingNow) {
-                        state.notice?.let {
-                            AtelierBanner(message = it.asString(), icon = Icons.Outlined.Sync, kind = BannerKind.Info)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (state.syncingCount > 0 || state.isSyncingNow) {
+                                AtelierLiveBeacon(color = colors.info, size = 8.dp)
+                            }
+                            Text(
+                                text = stringResource(R.string.sync_summary_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    }
-                    if (state.operations.isNotEmpty()) {
-                        AtelierButton(
-                            text = stringResource(R.string.sync_now_btn, state.operations.size),
-                            onClick = onSyncNow,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = state.isOnline,
-                            loading = state.isSyncingNow,
-                            icon = Icons.Outlined.Sync
+                        if (state.hasLoaded && state.operations.isNotEmpty()) {
+                            Text(
+                                text = stringResource(
+                                    R.string.sync_summary_counts,
+                                    state.pendingCount,
+                                    state.syncingCount,
+                                    state.failedCount
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.primaryText
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.sync_queue_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.inkSecondary
                         )
-                        if (!state.isOnline) AtelierRequiresConnection()
+                        if (!state.isOnline) {
+                            AtelierBanner(
+                                message = stringResource(R.string.sync_status_offline),
+                                icon = Icons.Outlined.Info,
+                                kind = BannerKind.Wait
+                            )
+                        }
+                        if (state.isSyncingNow) {
+                            state.notice?.let {
+                                AtelierBanner(message = it.asString(), icon = Icons.Outlined.Sync, kind = BannerKind.Info)
+                            }
+                        }
+                        if (state.operations.isNotEmpty()) {
+                            AtelierButton(
+                                text = stringResource(R.string.sync_now_btn, state.operations.size),
+                                onClick = onSyncNow,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = state.isOnline,
+                                loading = state.isSyncingNow,
+                                icon = Icons.Outlined.Sync
+                            )
+                            if (!state.isOnline) AtelierRequiresConnection()
+                        }
                     }
                 }
             }
@@ -170,7 +209,13 @@ internal fun PendingOperationsContent(
 private fun OperationChip(status: PendingOperationStatus) {
     when (status) {
         PendingOperationStatus.PENDING -> AtelierChip(stringResource(R.string.sync_op_pending), kind = ChipKind.Idle)
-        PendingOperationStatus.SYNCING -> AtelierChip(stringResource(R.string.sync_op_syncing), kind = ChipKind.Info)
+        PendingOperationStatus.SYNCING -> Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AtelierLiveBeacon(color = AtelierTheme.colors.info, size = 8.dp)
+            AtelierChip(stringResource(R.string.sync_op_syncing), kind = ChipKind.Info)
+        }
         PendingOperationStatus.FAILED -> AtelierChip(stringResource(R.string.sync_op_failed), kind = ChipKind.Bad)
     }
 }
@@ -247,6 +292,7 @@ private fun operationTypeLabel(type: String): String = when (type) {
     "PAUSE_TASK" -> stringResource(R.string.sync_type_pause_task)
     "RESUME_TASK" -> stringResource(R.string.sync_type_resume_task)
     "COMPLETE_TASK" -> stringResource(R.string.sync_type_complete_task)
+    "SUBMIT_PROPOSAL" -> stringResource(R.string.sync_type_submit_proposal)
     "TELEMETRY_BATCH" -> stringResource(R.string.sync_type_telemetry)
     "REGISTER_FAULT" -> stringResource(R.string.sync_type_register_fault)
     "RESOLVE_FAULT" -> stringResource(R.string.sync_type_resolve_fault)

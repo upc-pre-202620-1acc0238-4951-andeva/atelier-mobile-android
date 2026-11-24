@@ -43,7 +43,7 @@ class ProfileViewModel @Inject constructor(
                         aiDiagnosticsEnabled = plan?.aiDiagnosticsEnabled ?: false
                     )
                 }
-                resolveBranch(session.branchId)
+                resolveBranch(session.branchId, session.canSwitchBranch())
             }
         }
         viewModelScope.launch {
@@ -57,14 +57,14 @@ class ProfileViewModel @Inject constructor(
     }
 
     /** Sin red conserva el estado previo: el nombre de la sede no está en la sesión. */
-    private fun resolveBranch(branchId: String?) {
+    private fun resolveBranch(branchId: String?, allowSwitch: Boolean) {
         if (branchId.isNullOrBlank()) return
         viewModelScope.launch {
             getBranches().onSuccess { branches ->
                 _uiState.update {
                     it.copy(
                         branchName = branches.firstOrNull { b -> b.id == branchId }?.name ?: it.branchName,
-                        canChangeBranch = branches.size > 1
+                        canChangeBranch = allowSwitch && branches.size > 1
                     )
                 }
             }

@@ -2,12 +2,11 @@ package com.andeva.atelier.mobile.features.main.presentation.more
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,16 +15,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.AssignmentTurnedIn
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Garage
+import androidx.compose.material.icons.outlined.Handyman
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Sync
@@ -51,20 +57,22 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedCard
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedRow
-import com.andeva.atelier.mobile.core.designsystem.component.pressScale
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.icon.bluetooth_searching
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.ControlShape
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
+import com.andeva.atelier.mobile.features.main.presentation.navigation.MainTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Adónde puede ir quien abre "Módulos". El grafo de navegación decide la ruta de cada uno. */
 enum class MoreDestination {
-    BRANCH, RECEPTION, BAYS, DAILY_CASH, FISCAL_SERIES, REPORTS,
-    PARTS, STOCK_ALERTS, PURCHASE_ORDERS, VALUATION, OBD, NOTIFICATIONS, SYNC_QUEUE, PROFILE
+    BRANCH, MY_ATTENDANCE, MY_TASKS, WORK_ORDERS, RECEPTION, BAYS, SERVICES, DAILY_CASH, VOUCHERS, FISCAL_SERIES, REPORTS,
+    PARTS, STOCK_ALERTS, PURCHASE_ORDERS, SUPPLIERS, VALUATION, OBD, NOTIFICATIONS, SYNC_QUEUE, PROFILE
 }
 
 private const val TILE_COLUMNS = 4
@@ -147,28 +155,42 @@ private fun ModulesBody(rows: List<MoreRow>, email: String?, pendingSync: Int, o
 
 @Composable
 private fun ModuleTile(row: MoreRow, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val interaction = remember { MutableInteractionSource() }
-    Column(
-        modifier = modifier
-            .heightIn(min = 80.dp)
-            .pressScale(interaction)
-            .clip(ControlShape)
-            .background(MaterialTheme.colorScheme.background)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, ControlShape)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically)
+    val colors = AtelierTheme.colors
+    AtelierSurface(
+        modifier = modifier.heightIn(min = 88.dp),
+        tier = SurfaceTier.Card,
+        shape = ControlShape,
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)
     ) {
-        Icon(row.icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-        Text(
-            text = stringResource(row.title),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(colors.surfaceRecessed),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = row.icon,
+                    contentDescription = null,
+                    tint = colors.primaryText,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Text(
+                text = stringResource(row.title),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -192,25 +214,59 @@ private fun moreRows(s: Session): List<MoreRow> = buildList {
     fun add(group: MoreGroup, destination: MoreDestination, icon: ImageVector, title: Int, sub: Int) =
         add(MoreRow(group, destination, icon, title, sub))
 
-    if (s.has(Permission.BRANCHES_READ)) {
+    if (s.canSwitchBranch()) {
         add(MoreGroup.WORKSHOP, MoreDestination.BRANCH, Icons.Outlined.Storefront, R.string.more_h_branch, R.string.more_h_branch_sub)
     }
-    if (s.has(Permission.CUSTOMERS_READ) || s.has(Permission.VEHICLES_READ) || s.has(Permission.WORK_ORDERS_CREATE)) {
+    if (s.has(Permission.ATTENDANCE_CLOCK_IN) || s.has(Permission.ATTENDANCE_CLOCK_OUT)) {
+        add(MoreGroup.WORKSHOP, MoreDestination.MY_ATTENDANCE, Icons.Outlined.Schedule, R.string.more_h_my_attendance, R.string.more_h_my_attendance_sub)
+    }
+    if (s.has(Permission.TASKS_READ)) {
+        val isOwnExecution = s.has(Permission.TASKS_TRACK_TIME)
+        val isWorkshopSupervision = s.has(Permission.WORK_ORDERS_UPDATE) ||
+            s.has(Permission.TASKS_HOLD_VALIDATE) ||
+            s.has(Permission.BAYS_REASSIGN)
+        when {
+            isOwnExecution -> add(
+                MoreGroup.WORKSHOP,
+                MoreDestination.MY_TASKS,
+                Icons.Outlined.AssignmentTurnedIn,
+                R.string.more_h_my_tasks,
+                R.string.more_h_my_tasks_sub
+            )
+            isWorkshopSupervision -> add(
+                MoreGroup.WORKSHOP,
+                MoreDestination.MY_TASKS,
+                Icons.Outlined.AssignmentTurnedIn,
+                R.string.more_h_workshop_tasks,
+                R.string.more_h_workshop_tasks_sub
+            )
+        }
+    }
+    if (s.has(Permission.WORK_ORDERS_READ) && MainTab.Orders !in MainTab.tabsFor(s)) {
+        add(MoreGroup.WORKSHOP, MoreDestination.WORK_ORDERS, Icons.Outlined.Build, R.string.more_h_orders, R.string.more_h_orders_sub)
+    }
+    if (s.has(Permission.CUSTOMERS_READ) || s.has(Permission.VEHICLES_READ) || s.has(Permission.WORK_ORDERS_CREATE) || s.has(Permission.APPOINTMENTS_READ)) {
         add(MoreGroup.WORKSHOP, MoreDestination.RECEPTION, Icons.Outlined.DirectionsCar, R.string.more_h_reception, R.string.more_h_reception_sub)
     }
     if (s.has(Permission.BAYS_READ)) {
         add(MoreGroup.WORKSHOP, MoreDestination.BAYS, Icons.Outlined.Garage, R.string.more_h_bays, R.string.more_h_bays_sub)
     }
-    if (s.has(Permission.DEVICES_READ) || s.has(Permission.DEVICES_REGISTER)) {
+    if (s.has(Permission.SERVICES_READ) || s.has(Permission.SERVICES_MANAGE)) {
+        add(MoreGroup.WORKSHOP, MoreDestination.SERVICES, Icons.Outlined.Handyman, R.string.more_h_services, R.string.more_h_services_sub)
+    }
+    if (s.canUseTelemetry() || s.canReadTelemetry() || s.canUseAiDiagnostics() || s.canReadAiReports() ||
+        s.has(Permission.DEVICES_READ) || s.has(Permission.DEVICES_REGISTER) || s.has(Permission.PREDICTIVE_ALERTS_READ)
+    ) {
         add(MoreGroup.WORKSHOP, MoreDestination.OBD, bluetooth_searching, R.string.more_h_obd, R.string.more_h_obd_sub)
     }
     if (s.has(Permission.INVOICES_READ)) {
         add(MoreGroup.CASHIER, MoreDestination.DAILY_CASH, Icons.Outlined.Payments, R.string.more_h_daily_cash, R.string.more_h_daily_cash_sub)
+        add(MoreGroup.CASHIER, MoreDestination.VOUCHERS, Icons.Outlined.Description, R.string.more_h_vouchers, R.string.more_h_vouchers_sub)
     }
-    if (s.has(Permission.CASHFLOW_EXPORT_PDF) || s.canReadAiReports()) {
+    if (s.has(Permission.CASHFLOW_EXPORT_PDF) || (s.canReadAiReports() && s.has(Permission.CUSTOMERS_READ))) {
         add(MoreGroup.CASHIER, MoreDestination.REPORTS, Icons.Outlined.Assessment, R.string.more_h_reports, R.string.more_h_reports_sub)
     }
-    if (s.has(Permission.FISCAL_CONFIG_MANAGE)) {
+    if (s.has(Permission.FISCAL_CONFIG_MANAGE) || s.has(Permission.TENANTS_UPDATE)) {
         add(MoreGroup.CASHIER, MoreDestination.FISCAL_SERIES, Icons.Outlined.ReceiptLong, R.string.more_h_series, R.string.more_h_series_sub)
     }
     if (s.has(Permission.PARTS_READ)) {
@@ -221,6 +277,9 @@ private fun moreRows(s: Session): List<MoreRow> = buildList {
     }
     if (s.has(Permission.PURCHASE_ORDERS_READ)) {
         add(MoreGroup.STOCK, MoreDestination.PURCHASE_ORDERS, Icons.Outlined.ShoppingCart, R.string.more_h_purchases, R.string.more_h_purchases_sub)
+    }
+    if (s.has(Permission.SUPPLIERS_MANAGE)) {
+        add(MoreGroup.STOCK, MoreDestination.SUPPLIERS, Icons.Outlined.LocalShipping, R.string.more_h_suppliers, R.string.more_h_suppliers_sub)
     }
     // El endpoint de valorización exige `inventory:batches:read` (docs/02); no existe un permiso de valorización.
     if (s.has(Permission.BATCHES_READ)) {

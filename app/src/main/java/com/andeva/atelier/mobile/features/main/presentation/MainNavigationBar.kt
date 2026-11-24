@@ -1,8 +1,12 @@
 package com.andeva.atelier.mobile.features.main.presentation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -16,14 +20,18 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBarAction
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNavItem
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNavigationBar
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.SkuScannerRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.BarPrimaryAction
 import com.andeva.atelier.mobile.features.main.presentation.navigation.MainTab
 import com.andeva.atelier.mobile.features.main.presentation.navigation.navigateToTab
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.ReceptionNavGraphRoute
+import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TasksNavGraphRoute
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrdersRoute
 
 /**
  * Barra flotante de la sesión. Solo se dibuja sobre la pantalla principal de una pestaña: en los detalles se oculta.
- * El último slot, "Módulos", no navega: abre la hoja de módulos ([onOpenModules]) y se resalta mientras está abierta
- * ([modulesOpen]). El botón circular de la derecha recibe un vehículo.
+ * El último slot, "Módulos", no navega: abre la hoja universal de módulos ([onOpenModules]) y muestra el contador
+ * de operaciones pendientes. El botón circular de la derecha expone la acción principal que habilitan los permisos.
  */
 @Composable
 fun MainNavigationBar(
@@ -40,7 +48,6 @@ fun MainNavigationBar(
 
     val items = buildList {
         state.tabs.forEachIndexed { index, tab ->
-            // Sin slot Módulos, la insignia de pendientes va en la última pestaña (barra de campo).
             val badge = if (!state.showModules && index == state.tabs.lastIndex) state.pendingCount else 0
             add(AtelierNavItem(label = stringResource(tab.label), icon = tab.icon, badge = badge))
         }
@@ -55,8 +62,40 @@ fun MainNavigationBar(
         }
     }
     val modulesIndex = if (state.showModules) items.lastIndex else -1
-    val receiveLabel = stringResource(R.string.bar_action_receive)
-    val receiveDescription = stringResource(R.string.today_receive_vehicle)
+    val barAction: AtelierBarAction? = when (state.primaryAction) {
+        BarPrimaryAction.RECEIVE_VEHICLE -> AtelierBarAction(
+            label = stringResource(R.string.bar_action_receive),
+            description = stringResource(R.string.today_receive_vehicle),
+            icon = Icons.Outlined.DirectionsCar,
+            onClick = { navController.navigate(ReceptionNavGraphRoute) { launchSingleTop = true } }
+        )
+        BarPrimaryAction.NEW_APPOINTMENT -> AtelierBarAction(
+            label = stringResource(R.string.bar_action_appointment),
+            description = stringResource(R.string.bar_action_appointment_desc),
+            icon = Icons.Outlined.EventAvailable,
+            onClick = { navController.navigate(ReceptionNavGraphRoute) { launchSingleTop = true } }
+        )
+        BarPrimaryAction.COLLECT_PAYMENT -> AtelierBarAction(
+            label = stringResource(R.string.bar_action_collect),
+            description = stringResource(R.string.bar_action_collect_desc),
+            icon = Icons.Outlined.Payments,
+            onClick = { navController.navigate(WorkOrdersRoute) { launchSingleTop = true } }
+        )
+        BarPrimaryAction.SCAN_SKU -> AtelierBarAction(
+            label = stringResource(R.string.bar_action_scan),
+            description = stringResource(R.string.bar_action_scan_desc),
+            icon = Icons.Outlined.QrCodeScanner,
+            onClick = { navController.navigate(SkuScannerRoute) { launchSingleTop = true } }
+        )
+        BarPrimaryAction.MY_TASKS -> AtelierBarAction(
+            label = stringResource(R.string.bar_action_tasks),
+            description = stringResource(R.string.bar_action_tasks_desc),
+            icon = Icons.Outlined.AssignmentTurnedIn,
+            onClick = { navController.navigate(TasksNavGraphRoute) { launchSingleTop = true } }
+        )
+        BarPrimaryAction.NONE -> null
+    }
+
     AtelierNavigationBar(
         items = items,
         selectedIndex = if (modulesOpen && modulesIndex >= 0) modulesIndex else tabIndex,
@@ -67,11 +106,7 @@ fun MainNavigationBar(
             }
         },
         modifier = modifier,
-        action = if (state.canReceiveVehicle) {
-            AtelierBarAction(receiveLabel, receiveDescription, Icons.Outlined.DirectionsCar) {
-                navController.navigate(ReceptionNavGraphRoute)
-            }
-        } else null
+        action = barAction
     )
 }
 

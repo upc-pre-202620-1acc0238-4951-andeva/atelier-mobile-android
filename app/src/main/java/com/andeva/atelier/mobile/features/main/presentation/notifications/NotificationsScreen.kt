@@ -7,8 +7,10 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,12 +22,14 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -42,11 +46,16 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierLiveBeacon
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.core.notifications.NotificationRecord
 import com.andeva.atelier.mobile.core.notifications.PushChannel
@@ -141,22 +150,70 @@ private fun NotificationsContent(
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (!notificationsEnabled) {
                     item(key = "disabled") {
-                        Column(
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
-                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                        AtelierSurface(
+                            modifier = Modifier
+                                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                                .fillMaxWidth(),
+                            tier = SurfaceTier.Elevated,
+                            shape = CardLargeShape,
+                            contentPadding = PaddingValues(16.dp)
                         ) {
-                            AtelierBanner(
-                                title = stringResource(R.string.notifications_disabled_title),
-                                message = stringResource(R.string.notifications_disabled_body),
-                                icon = Icons.Outlined.Notifications,
-                                kind = BannerKind.Wait
-                            )
-                            AtelierButton(
-                                text = stringResource(R.string.notifications_enable_btn),
-                                onClick = onEnableNotifications,
-                                modifier = Modifier.fillMaxWidth(),
-                                style = AtelierButtonStyle.Tonal
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                AtelierBanner(
+                                    title = stringResource(R.string.notifications_disabled_title),
+                                    message = stringResource(R.string.notifications_disabled_body),
+                                    icon = Icons.Outlined.Notifications,
+                                    kind = BannerKind.Wait
+                                )
+                                AtelierButton(
+                                    text = stringResource(R.string.notifications_enable_btn),
+                                    onClick = onEnableNotifications,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = AtelierButtonStyle.Tonal
+                                )
+                            }
+                        }
+                    }
+                }
+                if (state.totalActiveAlerts > 0) {
+                    item(key = "attention-summary") {
+                        val colors = AtelierTheme.colors
+                        AtelierSurface(
+                            modifier = Modifier
+                                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                                .fillMaxWidth(),
+                            tier = SurfaceTier.Elevated,
+                            shape = CardLargeShape,
+                            contentPadding = PaddingValues(16.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AtelierLiveBeacon(color = colors.warnMark, size = 8.dp)
+                                        Text(
+                                            text = stringResource(R.string.notif_summary_title),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    AtelierChip(
+                                        text = state.totalActiveAlerts.toString(),
+                                        kind = ChipKind.Wait
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.notif_summary_body),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.inkSecondary
+                                )
+                            }
                         }
                     }
                 }

@@ -2,45 +2,47 @@ package com.andeva.atelier.mobile.features.main.presentation.dashboard
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material.icons.outlined.Storefront
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedCard
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedRow
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierKpiCard
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
-import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
-import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -54,29 +56,46 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierDecisionRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierFab
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedCard
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierKpiCard
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierLiveBeacon
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierReportPanel
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
-import com.andeva.atelier.mobile.core.designsystem.component.PanelActions
+import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.component.PanelFigure
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.core.presentation.formatLimaDate
 import com.andeva.atelier.mobile.features.attendance.domain.AttendanceStatus
 import com.andeva.atelier.mobile.features.attendance.domain.JustificationStatus
+import com.andeva.atelier.mobile.features.attendance.domain.TodayAttendance
+import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
+import com.andeva.atelier.mobile.features.bays.domain.BayOccupant
+import com.andeva.atelier.mobile.features.bays.domain.BayStatus
+import com.andeva.atelier.mobile.features.bays.domain.BayType
+import com.andeva.atelier.mobile.features.bays.domain.WorkBay
 import com.andeva.atelier.mobile.features.team.domain.TeamAttendance
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.presentation.chipKind
 import com.andeva.atelier.mobile.features.workorders.presentation.labelRes
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -105,6 +124,8 @@ fun AdminDashboardScreen(
     onOpenStockAlerts: () -> Unit,
     onOpenTeam: () -> Unit,
     onOpenObd: () -> Unit,
+    onOpenMyAttendance: () -> Unit = {},
+    onOpenMyTasks: () -> Unit = {},
     viewModel: AdminDashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -124,6 +145,8 @@ fun AdminDashboardScreen(
             onOpenStockAlerts = onOpenStockAlerts,
             onOpenTeam = onOpenTeam,
             onOpenObd = onOpenObd,
+            onOpenMyAttendance = onOpenMyAttendance,
+            onOpenMyTasks = onOpenMyTasks,
             onOpenJustification = viewModel::onOpenJustification,
             onDismissJustification = viewModel::onDismissJustification,
             onReviewJustification = viewModel::onReviewJustification
@@ -145,6 +168,8 @@ private data class DashboardActions(
     val onOpenStockAlerts: () -> Unit = {},
     val onOpenTeam: () -> Unit = {},
     val onOpenObd: () -> Unit = {},
+    val onOpenMyAttendance: () -> Unit = {},
+    val onOpenMyTasks: () -> Unit = {},
     val onOpenJustification: (TeamAttendance) -> Unit = {},
     val onDismissJustification: () -> Unit = {},
     val onReviewJustification: (Boolean) -> Unit = {}
@@ -154,9 +179,10 @@ private data class DashboardActions(
 @Composable
 private fun AdminDashboardContent(state: AdminDashboardUiState, actions: DashboardActions) {
     // La decisión se confirma en la mano además de en la fila.
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberAtelierHaptics()
+    val showSkeleton = rememberDelayedLoading(state.showSkeleton)
     LaunchedEffect(state.resolved.size) {
-        if (state.resolved.isNotEmpty()) haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        if (state.resolved.isNotEmpty()) haptics.confirm()
     }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -177,9 +203,10 @@ private fun AdminDashboardContent(state: AdminDashboardUiState, actions: Dashboa
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 // La barra flotante tapa el final de la lista: se suma su alto.
-                contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item(key = "hero-panel") { DashboardReportPanel(state, actions, loading = showSkeleton) }
                 if (!state.isOnline) {
                     item(key = "offline") {
                         AtelierBanner(
@@ -201,10 +228,13 @@ private fun AdminDashboardContent(state: AdminDashboardUiState, actions: Dashboa
                     }
                 }
                 item(key = "branch") { BranchCard(state, actions.onSelectBranch) }
+                if (state.canClockPersonalAttendance || state.canWorkOwnTasks) {
+                    item(key = "personal-shift") { PersonalShiftCard(state, actions) }
+                }
                 if (state.canCreateWorkOrder) {
                     item(key = "reception") { ReceptionCard(state, actions) }
                 }
-                item(key = "kpis") { KpiGrid(state, actions) }
+                item(key = "kpis") { KpiGrid(state, actions, loading = showSkeleton) }
                 decisions(state, actions.onOpenOrder, actions.onOpenJustification)
                 item(key = "orders-header") {
                     AtelierSectionHeader(
@@ -223,19 +253,33 @@ private fun AdminDashboardContent(state: AdminDashboardUiState, actions: Dashboa
                 }
                 when {
                     !state.canReadWorkOrders -> item(key = "orders-no-permission") {
-                        AtelierNoPermissionState(stringResource(R.string.today_orders_no_permission))
+                        AtelierNoPermissionState(
+                            text = stringResource(R.string.today_orders_no_permission),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
-                    state.showSkeleton -> items(3, key = { "bone-$it" }) {
+                    showSkeleton -> items(3, key = { "bone-$it" }) {
                         AtelierListRow(title = "Orden", subtitle = "Cliente", plate = "ABC123", loading = true)
                     }
+                    state.showSkeleton -> Unit
                     state.orders.isEmpty() && error != null && !state.isOnline -> item(key = "orders-offline") {
-                        AtelierOfflineState(onRetry = actions.onRefresh)
+                        AtelierOfflineState(
+                            onRetry = actions.onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
                     state.orders.isEmpty() && error != null -> item(key = "orders-error") {
-                        AtelierErrorState(message = error.asString(), onRetry = actions.onRefresh)
+                        AtelierErrorState(
+                            message = error.asString(),
+                            onRetry = actions.onRefresh,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
                     state.orders.isEmpty() -> item(key = "orders-empty") {
-                        AtelierEmptyState(text = stringResource(R.string.today_orders_empty))
+                        AtelierEmptyState(
+                            text = stringResource(R.string.today_orders_empty),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
                     else -> items(state.orders.take(ORDERS_PREVIEW), key = { it.id }) { order ->
                         OrderRow(order, onClick = { actions.onOpenOrder(order.id) })
@@ -256,48 +300,220 @@ private fun AdminDashboardContent(state: AdminDashboardUiState, actions: Dashboa
     }
 }
 
+/** Resumen vivo de la sede en formato Parte Hero Navy. */
+@Composable
+private fun DashboardReportPanel(
+    state: AdminDashboardUiState,
+    actions: DashboardActions,
+    loading: Boolean = state.showSkeleton
+) {
+    val dateText = if (state.today != LocalDate.MIN) ContextDateFormatter.format(state.today) else ""
+    val contextText = listOfNotNull(
+        state.branchName?.takeIf { it.isNotBlank() },
+        dateText.takeIf { it.isNotBlank() }
+    ).joinToString(" · ").ifBlank { stringResource(R.string.dashboard_title) }
+
+    val legend = when {
+        !state.canReadWorkOrders -> "–"
+        !state.showSkeleton && state.carsInWorkshop == 0 -> stringResource(R.string.today_cars_empty)
+        else -> pluralStringResource(R.plurals.today_cars, state.carsInWorkshop, state.carsInWorkshop)
+    }
+    val caption = if (state.canReadWorkOrders) {
+        stringResource(R.string.today_caption)
+    } else {
+        state.branchName ?: stringResource(R.string.dashboard_title)
+    }
+    val figures = buildList {
+        if (state.canReadBays) {
+            add(PanelFigure(state.occupiedBaysCount.toString(), stringResource(R.string.today_figure_in_bay), actions.onOpenBays))
+        }
+        if (state.canReadWorkOrders) {
+            add(PanelFigure(state.readyOrdersCount.toString(), stringResource(R.string.today_figure_ready_short), actions.onOpenOrders))
+        }
+        if (state.canAuditAttendance) {
+            add(PanelFigure(state.onShiftCount.toString(), stringResource(R.string.today_figure_on_shift), actions.onOpenTeam))
+        }
+    }
+
+    AtelierReportPanel(
+        context = contextText,
+        legend = legend,
+        caption = caption,
+        figures = figures,
+        loading = loading
+    )
+}
+
 /** Sede activa de la jornada; con más de una sede, toca para cambiarla. */
 @Composable
 private fun BranchCard(state: AdminDashboardUiState, onSelectBranch: () -> Unit) {
+    val colors = AtelierTheme.colors
+    AtelierSurface(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth(),
+        tier = SurfaceTier.Card,
+        shape = CardLargeShape,
+        onClick = if (state.canChangeBranch) onSelectBranch else null,
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(colors.surfaceRecessed),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Storefront,
+                    contentDescription = null,
+                    tint = colors.primaryText,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = state.branchName ?: stringResource(R.string.dashboard_select_branch_prompt),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.dashboard_branch_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (state.occupiedBaysCount > 0) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AtelierLiveBeacon(color = colors.okMark, size = 8.dp)
+                    Text(
+                        text = stringResource(R.string.today_live_bay_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.ok
+                    )
+                }
+            }
+            if (state.canChangeBranch) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.inkSecondary
+                )
+            }
+        }
+    }
+}
+
+/** Accesos personales en "Hoy" para roles operativos que también marcan turno o ejecutan tareas (Jefe / Asesor). */
+@Composable
+private fun PersonalShiftCard(state: AdminDashboardUiState, actions: DashboardActions) {
     AtelierGroupedCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-        AtelierGroupedRow(
-            title = state.branchName ?: stringResource(R.string.dashboard_select_branch_prompt),
-            subtitle = stringResource(R.string.dashboard_branch_label),
-            icon = Icons.Outlined.Storefront,
-            showChevron = state.canChangeBranch,
-            onClick = if (state.canChangeBranch) onSelectBranch else null
-        )
+        if (state.canClockPersonalAttendance) {
+            val (subtitleRes, badgeRes) = when (state.personalTodayAttendance) {
+                is TodayAttendance.ClockedIn -> R.string.dashboard_my_shift_clocked_in to R.string.floor_hub_shift_active
+                is TodayAttendance.ClockInQueued, is TodayAttendance.ClockOutQueued ->
+                    R.string.dashboard_my_shift_queued to R.string.floor_hub_shift_pending
+                is TodayAttendance.Completed -> R.string.dashboard_my_shift_completed to R.string.floor_hub_shift_closed
+                TodayAttendance.NotClockedIn -> R.string.dashboard_my_shift_not_clocked_in to R.string.floor_hub_shift_idle
+            }
+            AtelierGroupedRow(
+                title = stringResource(R.string.dashboard_my_shift_title),
+                subtitle = stringResource(subtitleRes),
+                icon = Icons.Outlined.Schedule,
+                trailingBadgeText = stringResource(badgeRes),
+                showDivider = state.canWorkOwnTasks,
+                onClick = actions.onOpenMyAttendance
+            )
+        }
+        if (state.canWorkOwnTasks) {
+            AtelierGroupedRow(
+                title = stringResource(R.string.dashboard_my_tasks_title),
+                subtitle = stringResource(R.string.dashboard_my_tasks_sub, state.activePersonalTasksCount),
+                icon = Icons.Outlined.AssignmentTurnedIn,
+                trailingBadgeText = if (state.activePersonalTasksCount > 0) state.activePersonalTasksCount.toString() else null,
+                onClick = actions.onOpenMyTasks
+            )
+        }
     }
 }
 
 @Composable
 private fun ReceptionCard(state: AdminDashboardUiState, actions: DashboardActions) {
-    AtelierGroupedCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(R.string.dashboard_reception_cta_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+    val colors = AtelierTheme.colors
+    AtelierSurface(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth(),
+        tier = SurfaceTier.Elevated,
+        shape = CardLargeShape,
+        contentPadding = PaddingValues(20.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(colors.infoContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DirectionsCar,
+                        contentDescription = null,
+                        tint = colors.primaryText,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.dashboard_reception_cta_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                if (state.occupiedBaysCount > 0) {
+                    AtelierLiveBeacon(color = colors.okMark, size = 8.dp)
+                }
+            }
             Text(
                 text = stringResource(R.string.dashboard_reception_cta_body),
                 style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary
+                color = colors.inkSecondary
             )
-            AtelierButton(
-                text = stringResource(R.string.dashboard_search_plate_btn),
-                onClick = actions.onReceiveVehicle,
-                modifier = Modifier.fillMaxWidth(),
-                icon = Icons.Outlined.DirectionsCar
-            )
-            if (state.canRegisterCustomers) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AtelierButton(
-                    text = stringResource(R.string.dashboard_walk_in_btn),
-                    onClick = actions.onRegisterWalkIn,
+                    text = stringResource(R.string.dashboard_search_plate_btn),
+                    onClick = actions.onReceiveVehicle,
                     modifier = Modifier.fillMaxWidth(),
-                    style = AtelierButtonStyle.Tonal,
-                    icon = Icons.Outlined.PersonAdd
+                    icon = Icons.Outlined.DirectionsCar
                 )
+                if (state.canRegisterCustomers) {
+                    AtelierButton(
+                        text = stringResource(R.string.dashboard_walk_in_btn),
+                        onClick = actions.onRegisterWalkIn,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Tonal,
+                        icon = Icons.Outlined.PersonAdd
+                    )
+                }
             }
         }
     }
@@ -305,8 +521,11 @@ private fun ReceptionCard(state: AdminDashboardUiState, actions: DashboardAction
 
 /** Seis indicadores de la sede, dos por fila. Cada uno aparece solo con el permiso de su fuente. */
 @Composable
-private fun KpiGrid(state: AdminDashboardUiState, actions: DashboardActions) {
-    val loading = state.showSkeleton
+private fun KpiGrid(
+    state: AdminDashboardUiState,
+    actions: DashboardActions,
+    loading: Boolean = state.showSkeleton
+) {
     val cards = buildList<@Composable (Modifier) -> Unit> {
         if (state.canReadWorkOrders) add { m ->
             AtelierKpiCard(
@@ -398,18 +617,32 @@ private fun KpiGrid(state: AdminDashboardUiState, actions: DashboardActions) {
     }
 }
 
-/** "Esperan tu decisión": órdenes sin iniciar y descargos por revisar. Sin nada pendiente, la sección no existe. */
+/** "Esperan tu decisión": órdenes sin iniciar, suspensiones por pieza defectuosa y descargos por revisar. Sin nada pendiente, la sección no existe. */
 private fun androidx.compose.foundation.lazy.LazyListScope.decisions(
     state: AdminDashboardUiState,
     onOpenOrder: (String) -> Unit,
     onOpenJustification: (TeamAttendance) -> Unit
 ) {
-    if (state.draftOrders.isEmpty() && state.justifications.isEmpty() && state.failedJustificationDays == 0) return
+    val pendingSuspensions = state.visiblePendingSuspensions
+    if (state.draftOrders.isEmpty() && pendingSuspensions.isEmpty() && state.justifications.isEmpty() && state.failedJustificationDays == 0) return
     item(key = "decisions-header") {
         AtelierSectionHeader(
             title = stringResource(R.string.today_decisions),
             count = state.decisionsCount,
             modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+    items(pendingSuspensions, key = { "susp-${it.taskId}" }) { item ->
+        val sub = listOfNotNull(
+            item.serviceName ?: item.taskDescription.takeIf { it.isNotBlank() },
+            item.reason?.takeIf { it.isNotBlank() }
+        ).joinToString(" · ")
+        AtelierDecisionRow(
+            title = stringResource(R.string.today_decision_suspension),
+            subtitle = sub.ifBlank { null },
+            plate = item.plate,
+            onClick = { onOpenOrder(item.workOrderId) },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
     }
     items(state.draftOrders, key = { "draft-${it.id}" }) { order ->
@@ -551,6 +784,20 @@ private val previewState = AdminDashboardUiState(
         previewOrder("2", 1041, "F5U731", "Transportes Huamán S.A.C.", WorkOrderStatus.IN_PROGRESS, "Bahía 2", "1260.50"),
         previewOrder("3", 1040, "AXT209", "Luis Alberto Paredes", WorkOrderStatus.IN_PROGRESS, "Bahía 1", "320.00"),
         previewOrder("4", 1038, "D2C604", "Carmen Flores", WorkOrderStatus.COMPLETED, null, "890.00")
+    ),
+    bays = listOf(
+        BayBoardItem(
+            WorkBay("bay1", "b1", "Bahía 1", BayType.LIFT, BayStatus.OCCUPIED, "3"),
+            BayOccupant("3", 1040, "AXT209", listOf("m1"), Duration.ofMinutes(45))
+        ),
+        BayBoardItem(
+            WorkBay("bay2", "b1", "Bahía 2", BayType.LIFT, BayStatus.OCCUPIED, "2"),
+            BayOccupant("2", 1041, "F5U731", listOf("m2"), Duration.ofMinutes(80))
+        ),
+        BayBoardItem(
+            WorkBay("bay3", "b1", "Bahía 3", BayType.DIAGNOSTIC_PIT, BayStatus.AVAILABLE, null),
+            null
+        )
     ),
     justifications = listOf(previewJustification()),
     hasLoaded = true,
