@@ -42,27 +42,41 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.notifications.AuthDeepLink
 import com.andeva.atelier.mobile.core.notifications.PushDestination
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.AttendanceRoute
 import com.andeva.atelier.mobile.features.attendance.presentation.navigation.attendanceNavGraph
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.BranchSelectionRoute
+import com.andeva.atelier.mobile.features.auth.presentation.navigation.RegisterRoute
+import com.andeva.atelier.mobile.features.auth.presentation.navigation.ResetPasswordRoute
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.authNavGraph
 import com.andeva.atelier.mobile.features.auth.presentation.navigation.branchSelectionDestination
-import com.andeva.atelier.mobile.features.inventory.presentation.navigation.PartDetailRoute
+import com.andeva.atelier.mobile.features.inventory.presentation.navigation.StockAlertsRoute
 import com.andeva.atelier.mobile.features.inventory.presentation.navigation.inventoryNavGraph
 import com.andeva.atelier.mobile.features.main.presentation.MainNavigationBar
 import com.andeva.atelier.mobile.features.main.presentation.MainViewModel
 import com.andeva.atelier.mobile.features.main.presentation.isTabRoot
 import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminAttendanceRoute
 import com.andeva.atelier.mobile.features.main.presentation.navigation.AdminDashboardRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.MainTab
 import com.andeva.atelier.mobile.features.main.presentation.navigation.mainTabsDestinations
 import com.andeva.atelier.mobile.features.cashier.presentation.navigation.WorkOrderCheckoutRoute
 import com.andeva.atelier.mobile.features.cashier.presentation.navigation.cashierNavGraph
+import com.andeva.atelier.mobile.features.diagnostics.presentation.navigation.DiagnosticsHubRoute
+import com.andeva.atelier.mobile.features.diagnostics.presentation.navigation.diagnosticsNavGraph
+import com.andeva.atelier.mobile.features.main.presentation.navigation.NotificationsRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.PendingOperationsRoute
+import com.andeva.atelier.mobile.features.main.presentation.navigation.ProfileRoute
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.ReceptionNavGraphRoute
 import com.andeva.atelier.mobile.features.reception.presentation.navigation.receptionNavGraph
 import com.andeva.atelier.mobile.features.reports.presentation.navigation.reportsNavGraph
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.TaskDetailRoute
 import com.andeva.atelier.mobile.features.tasks.presentation.navigation.tasksNavGraph
+import com.andeva.atelier.mobile.features.workorders.presentation.navigation.ReportFindingRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.WorkOrderDetailRoute
 import com.andeva.atelier.mobile.features.workorders.presentation.navigation.workOrderNavGraph
 import kotlinx.serialization.Serializable
@@ -81,7 +95,10 @@ data object MainStartRoute
 @Composable
 fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
-    if (sessionState == SessionState.Loading) return
+    if (sessionState == SessionState.Loading) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        return
+    }
 
     val signedInState = sessionState as? SessionState.SignedIn
     val signedIn = signedInState != null
@@ -104,10 +121,27 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
             is PushDestination.TaskSuspensionReview -> WorkOrderDetailRoute(destination.workOrderId)
             is PushDestination.TaskProducts -> TaskDetailRoute(destination.workOrderId, destination.taskId)
             is PushDestination.WorkOrderDetail -> WorkOrderDetailRoute(destination.workOrderId)
-            is PushDestination.LowStockAlerts -> PartDetailRoute(destination.itemId)
+            is PushDestination.LowStockAlerts -> StockAlertsRoute
             is PushDestination.CollaboratorAttendance -> AdminAttendanceRoute
             is PushDestination.MyAttendance -> AttendanceRoute
             is PushDestination.ClockIn -> AttendanceRoute
+        }
+        navController.navigate(target) { launchSingleTop = true }
+    }
+
+    val context = LocalContext.current
+    val signedInDeepLinkWarning = stringResource(R.string.auth_deeplink_signed_in_warning)
+    val pendingAuthDeepLink by viewModel.pendingAuthDeepLink.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingAuthDeepLink, signedIn) {
+        if (pendingAuthDeepLink == null) return@LaunchedEffect
+        val link = viewModel.consumeAuthDeepLink() ?: return@LaunchedEffect
+        if (signedIn) {
+            Toast.makeText(context, signedInDeepLinkWarning, Toast.LENGTH_LONG).show()
+            return@LaunchedEffect
+        }
+        val target: Any = when (link) {
+            is AuthDeepLink.ResetPassword -> ResetPasswordRoute(token = link.token)
+            is AuthDeepLink.AcceptInvitation -> RegisterRoute(token = link.token)
         }
         navController.navigate(target) { launchSingleTop = true }
     }
@@ -180,12 +214,33 @@ fun AppNavHost(viewModel: AppNavHostViewModel = hiltViewModel()) {
                 receptionNavGraph(navController)
                 workOrderNavGraph(
                     navController = navController,
-                    onOpenCheckout = { id -> navController.navigate(WorkOrderCheckoutRoute(id)) }
+                    onOpenCheckout = { id -> navController.navigate(WorkOrderCheckoutRoute(id)) },
+                    onOpenObd = { vehicleId, _ ->
+                        navController.navigate(DiagnosticsHubRoute(initialVehicleId = vehicleId))
+                    }
                 )
-                cashierNavGraph(navController)
+                cashierNavGraph(
+                    navController = navController,
+                    showDailyCashBack = MainTab.Cash !in mainState.tabs
+                )
                 reportsNavGraph(navController)
-                tasksNavGraph(navController)
+                tasksNavGraph(
+                    navController = navController,
+                    onOpenNotifications = { navController.navigate(NotificationsRoute) },
+                    onOpenSync = { navController.navigate(PendingOperationsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                    onOpenObd = { vehicleId, _ ->
+                        navController.navigate(DiagnosticsHubRoute(initialVehicleId = vehicleId))
+                    }
+                )
                 inventoryNavGraph(navController)
+                diagnosticsNavGraph(
+                    navController = navController,
+                    onReportFinding = { woId -> navController.navigate(ReportFindingRoute(woId)) },
+                    onOpenNotifications = { navController.navigate(NotificationsRoute) },
+                    onOpenSyncQueue = { navController.navigate(PendingOperationsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) }
+                )
                 mainTabsDestinations(navController)
             }
         }
