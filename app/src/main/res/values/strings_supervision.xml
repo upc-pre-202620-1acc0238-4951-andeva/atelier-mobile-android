@@ -25,6 +25,7 @@
     <string name="bays_offline">Sin conexión. Ves el último tablero guardado; reasignar y crear bahías necesita red.</string>
     <string name="bays_labor">Mano de obra %1$s</string>
     <string name="bays_tap_to_assign">Toca para ingresar una orden</string>
+    <string name="bays_mechanics_section">Mecánicos y faenas en bahía</string>
 
     <!-- Notificaciones -->
     <string name="notif_title">Notificaciones</string>

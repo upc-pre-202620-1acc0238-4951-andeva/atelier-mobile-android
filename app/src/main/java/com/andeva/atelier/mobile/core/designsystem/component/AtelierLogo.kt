@@ -13,16 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.theme.AlbertSans
 
 /** Imagotipo: isotipo en squircle azul + «Atelier / Workshop» en Albert Sans ExtraBold. */
 @Composable
 fun AtelierLogo(modifier: Modifier = Modifier, name: String = "Atelier Workshop") {
-    val inkStyle = TextStyle(fontFamily = AlbertSans, fontSize = 16.sp, lineHeight = 16.sp)
+    val base = MaterialTheme.typography.titleMedium
+    val inkStyle = base.copy(fontFamily = AlbertSans, lineHeight = base.fontSize)
     Row(
         modifier = modifier.clearAndSetSemantics { contentDescription = name },
         horizontalArrangement = Arrangement.spacedBy(10.dp),

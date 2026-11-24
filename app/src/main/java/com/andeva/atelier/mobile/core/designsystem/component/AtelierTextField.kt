@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -50,7 +51,8 @@ import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.FieldShape
 
 /**
- * Campo de Atelier: etiqueta arriba, caja de 56 dp, error debajo. El borde pasa a azul con foco y a rojo con error.
+ * Campo de Atelier: etiqueta arriba, caja de 56 dp en pozo hundido ([AtelierColors.surfaceRecessed]) que
+ * sube a [AtelierColors.card] al enfocar con borde azul de 2 dp y ligero resplandor exterior.
  */
 @Composable
 fun AtelierTextField(
@@ -73,11 +75,16 @@ fun AtelierTextField(
     val atelier = AtelierTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val containerColor by animateColorAsState(
+        targetValue = if (focused) atelier.card else atelier.surfaceRecessed,
+        animationSpec = tween(160),
+        label = "fieldContainer"
+    )
     val borderColor by animateColorAsState(
         targetValue = when {
             isError -> atelier.bad
             focused -> scheme.primary
-            else -> scheme.outline
+            else -> atelier.outlineSoft
         },
         animationSpec = tween(160),
         label = "fieldBorder"
@@ -105,14 +112,22 @@ fun AtelierTextField(
                         .fillMaxWidth()
                         .heightIn(min = 56.dp)
                         .clip(FieldShape)
-                        .background(scheme.surface)
+                        .background(containerColor)
                         .border(if (focused || isError) 2.dp else 1.dp, borderColor, FieldShape)
                         .padding(start = 16.dp, end = if (trailing != null) 4.dp else 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (leadingIcon != null) {
-                        Icon(leadingIcon, contentDescription = null, tint = atelier.muted)
+                        Icon(
+                            imageVector = leadingIcon,
+                            contentDescription = null,
+                            tint = when {
+                                isError -> atelier.bad
+                                focused -> scheme.primary
+                                else -> atelier.muted
+                            }
+                        )
                     }
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty() && placeholder != null) {

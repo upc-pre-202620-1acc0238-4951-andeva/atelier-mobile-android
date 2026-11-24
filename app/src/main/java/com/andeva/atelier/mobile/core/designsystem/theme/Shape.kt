@@ -4,10 +4,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
-/** Tres radios y nada más (DESIGN.md → Shapes). Sin píldoras, salvo la excepción de [FloatingBarShape]. */
+/** Familia de formas de esquina redondeada (DESIGN.md → Shapes). */
 val PlateShape = RoundedCornerShape(6.dp)
 val ControlShape = RoundedCornerShape(12.dp)
 val PanelShape = RoundedCornerShape(16.dp)
+val CardLargeShape = RoundedCornerShape(18.dp)
+val HeroShape = RoundedCornerShape(20.dp)
+val SheetTopShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
 /** Única excepción a "sin píldoras": la barra inferior flotante y su botón de acción (DESIGN.md → Barra flotante). */
 val FloatingBarShape = RoundedCornerShape(percent = 50)

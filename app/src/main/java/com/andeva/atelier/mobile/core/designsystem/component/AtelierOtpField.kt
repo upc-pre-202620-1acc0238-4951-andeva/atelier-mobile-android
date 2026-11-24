@@ -29,12 +29,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.FieldShape
@@ -101,11 +99,9 @@ fun AtelierOtpField(
                     ) {
                         Text(
                             text = value.getOrNull(index)?.toString().orEmpty(),
-                            style = TextStyle(
+                            style = MaterialTheme.typography.headlineMedium.copy(
                                 fontFamily = Satoshi,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 28.sp,
-                                lineHeight = 36.sp
+                                fontWeight = FontWeight.Bold
                             ),
                             color = scheme.onSurface
                         )

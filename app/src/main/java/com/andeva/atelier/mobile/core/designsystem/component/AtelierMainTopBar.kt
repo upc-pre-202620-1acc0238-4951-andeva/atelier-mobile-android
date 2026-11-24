@@ -1,37 +1,46 @@
 package com.andeva.atelier.mobile.core.designsystem.component
 
+import android.content.res.Configuration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierBlue
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierError
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.PanelStatusBarEffect
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 
 /**
- * Barra azul de un destino de la barra inferior: título, y a la derecha lo pendiente de sincronizar
- * (solo si hay) y las notificaciones. Sin menú: "Más" es un destino.
+ * Cabecera limpia de un destino de la barra inferior: título en Satoshi Black sobre el lienzo, subtítulo
+ * opcional y acciones en medallones circulares elevados (sincronización pendiente, notificaciones y cuenta).
  */
 @Composable
 fun AtelierMainTopBar(
@@ -45,39 +54,47 @@ fun AtelierMainTopBar(
     onOpenProfile: (() -> Unit)? = null
 ) {
     val colors = AtelierTheme.colors
-    PanelStatusBarEffect()
-    Row(
+    val scheme = MaterialTheme.colorScheme
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .panelBleed(colors.panel)
-            .height(64.dp)
-            .padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(scheme.background)
+            .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.onPanel,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() }
-            )
-            if (!subtitle.isNullOrBlank()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(start = 16.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onPanel,
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = scheme.onBackground,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() }
                 )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.inkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+            PanelActions(onOpenNotifications, unreadNotificationsCount, onOpenSync, pendingSyncCount, onOpenProfile)
         }
-        PanelActions(onOpenNotifications, unreadNotificationsCount, onOpenSync, pendingSyncCount, onOpenProfile)
+        HorizontalDivider(thickness = 1.dp, color = colors.outlineSoft.copy(alpha = 0.50f))
     }
 }
 
-/** Acciones globales sobre un panel azul. Las comparten la Barra y el Parte. */
+/** Acciones globales de cabecera: sincronización pendiente, notificaciones y acceso a cuenta. */
 @Composable
 fun PanelActions(
     onOpenNotifications: (() -> Unit)?,
@@ -91,6 +108,7 @@ fun PanelActions(
             icon = Icons.Outlined.CloudOff,
             contentDescription = pluralStringResource(R.plurals.profile_pending_count, pendingSyncCount, pendingSyncCount),
             badgeCount = pendingSyncCount,
+            badgeColor = AtelierBlue,
             onClick = onOpenSync
         )
     }
@@ -99,6 +117,7 @@ fun PanelActions(
             icon = Icons.Outlined.Notifications,
             contentDescription = stringResource(R.string.notifications_title),
             badgeCount = unreadNotificationsCount,
+            badgeColor = AtelierError,
             onClick = onOpenNotifications
         )
     }
@@ -108,6 +127,7 @@ fun PanelActions(
             icon = Icons.Outlined.AccountCircle,
             contentDescription = stringResource(R.string.more_h_profile),
             badgeCount = 0,
+            badgeColor = AtelierBlue,
             onClick = onOpenProfile
         )
     }
@@ -118,21 +138,48 @@ private fun PanelIconButton(
     icon: ImageVector,
     contentDescription: String,
     badgeCount: Int,
+    badgeColor: Color,
     onClick: () -> Unit
 ) {
-    val colors = AtelierTheme.colors
-    IconButton(onClick = onClick) {
-        BadgedBox(
-            badge = {
-                // Blanco con tinta: sobre azul, un distintivo rojo no pasa contraste.
-                if (badgeCount > 0) {
-                    Badge(containerColor = colors.plate, contentColor = colors.onPlate) {
-                        Text(badgeCount.coerceAtMost(99).toString())
-                    }
-                }
-            }
-        ) {
-            Icon(imageVector = icon, contentDescription = contentDescription, tint = colors.onPanel)
-        }
-    }
+    AtelierCircularIconButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        badgeCount = badgeCount,
+        badgeColor = badgeColor
+    )
+}
+
+@Preview(name = "Barra principal · claro", widthDp = 390, showBackground = true, backgroundColor = 0xFFF8F8FA)
+@Composable
+private fun MainTopBarPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
+    AtelierMainTopBar(
+        title = "Taller Mecánico Norte",
+        subtitle = "Carlos Mendoza · Chorrillos",
+        onOpenNotifications = {},
+        unreadNotificationsCount = 3,
+        onOpenSync = {},
+        pendingSyncCount = 2,
+        onOpenProfile = {}
+    )
+}
+
+@Preview(
+    name = "Barra principal · oscuro",
+    widthDp = 390,
+    showBackground = true,
+    backgroundColor = 0xFF262626,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun MainTopBarPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
+    AtelierMainTopBar(
+        title = "Taller Mecánico Norte",
+        subtitle = "Carlos Mendoza · Chorrillos",
+        onOpenNotifications = {},
+        unreadNotificationsCount = 3,
+        onOpenSync = {},
+        pendingSyncCount = 2,
+        onOpenProfile = {}
+    )
 }

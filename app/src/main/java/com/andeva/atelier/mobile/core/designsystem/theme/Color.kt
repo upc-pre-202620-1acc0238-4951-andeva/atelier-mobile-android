@@ -15,11 +15,20 @@ val AtelierError = Color(0xFFFB2C36)
 val AtelierWarning = Color(0xFFF0B100)
 val AtelierInk = Color(0xFF262626)
 
+/** Neutros de marca (docs/branding/pallette.txt). */
+val AtelierSurfaceLight = Color(0xFFF8F8FA)
+val AtelierSurfaceDark = Color(0xFF262626)
+val AtelierCardLight = Color(0xFFFFFFFF)
+val AtelierCardDark = Color(0xFF272727)
+val AtelierBorderLight = Color(0xFFC6C6C6)
+val AtelierBorderDark = Color(0xFFEBEBEB)
+
 /**
  * Roles que Material 3 no tiene. Los estados traen su tinta (texto, pasa contraste) y su fondo tenue;
  * el tono de marca va solo en marcas y rellenos (`*Mark`).
  *
- * [panel], [decision] y [plate] valen lo mismo en claro y en oscuro: una señal no cambia de color de noche.
+ * Incluye los tokens de profundidad multi-plano, iluminación especular, tarjetas hero y decisiones
+ * refinadas de la evolución «Precisión Automotriz».
  */
 @Immutable
 data class AtelierColors(
@@ -58,14 +67,37 @@ data class AtelierColors(
     val onPlate: Color = AtelierInk,
     val okMark: Color = AtelierSuccess,
     val badMark: Color = AtelierError,
-    val warnMark: Color = AtelierWarning
+    val warnMark: Color = AtelierWarning,
+    /** Tokens de profundidad multi-plano e iluminación especular («Precisión Automotriz»). */
+    val isDark: Boolean = false,
+    val surfaceRecessed: Color = Color(0xFFECEFF4),
+    val surfaceElevated: Color = Color.White,
+    val surfaceFloating: Color = Color.White,
+    val specularTop: Color = Color.White.copy(alpha = 0.90f),
+    val specularBottom: Color = AtelierBorderLight.copy(alpha = 0.38f),
+    val shadowAmbient: Color = AtelierBlueDark.copy(alpha = 0.14f),
+    val shadowSpot: Color = AtelierBlueDark.copy(alpha = 0.20f),
+    val heroStart: Color = AtelierBlueDark,
+    val heroMid: Color = Color(0xFF08349C),
+    val heroEnd: Color = AtelierBlue,
+    val heroSpecular: Color = AtelierBlueSoft.copy(alpha = 0.30f),
+    val buttonTop: Color = Color(0xFF0E7FF5),
+    val buttonBottom: Color = Color(0xFF0062D1),
+    val destructiveTop: Color = Color(0xFFFF3B45),
+    val destructiveBottom: Color = Color(0xFFD91E29),
+    val plateBase: Color = Color(0xFFF1F3F7),
+    val decisionSurface: Color = Color(0xFFFFFBF4),
+    val decisionWash: Color = AtelierAccent.copy(alpha = 0.08f),
+    val decisionBorder: Color = AtelierAccent.copy(alpha = 0.38f),
+    val decisionAccent: Color = AtelierAmberDark,
+    val primaryGlow: Color = AtelierBlue.copy(alpha = 0.24f)
 )
 
 val DarkAtelierColors = AtelierColors(
-    card = Color(0xFF272727),
+    card = AtelierCardDark,
     cardHigh = Color(0xFF333333),
-    outlineSoft = Color(0x1FEBEBEB),
-    inkSecondary = Color(0xFFC6C6C6),
+    outlineSoft = AtelierBorderDark.copy(alpha = 0.12f),
+    inkSecondary = AtelierBorderLight,
     muted = Color(0xFFA3A3A3),
     primaryText = AtelierBlueSoft,
     ok = AtelierSuccess,
@@ -76,17 +108,29 @@ val DarkAtelierColors = AtelierColors(
     badContainer = Color(0x38FB2C36),
     info = AtelierBlueSoft,
     infoContainer = Color(0x3D0071EB),
-    idle = Color(0xFFC6C6C6),
+    idle = AtelierBorderLight,
     idleContainer = Color(0x14FFFFFF),
     warn = AtelierWarning,
     warnContainer = Color(0x29F0B100),
     fab = AtelierBlueSoft,
     onFab = AtelierBlueDark,
-    bone = Color(0x1FFFFFFF)
+    bone = Color(0x1FFFFFFF),
+    isDark = true,
+    surfaceRecessed = Color(0xFF1C1D20),
+    surfaceElevated = Color(0xFF2F3136),
+    surfaceFloating = Color(0xFF33363C),
+    specularTop = AtelierBorderDark.copy(alpha = 0.18f),
+    specularBottom = AtelierBorderDark.copy(alpha = 0.05f),
+    shadowAmbient = Color.Black.copy(alpha = 0.55f),
+    shadowSpot = Color.Black.copy(alpha = 0.70f),
+    decisionSurface = Color(0xFF2D2924),
+    decisionWash = AtelierAccent.copy(alpha = 0.14f),
+    decisionBorder = AtelierAmberSoft.copy(alpha = 0.32f),
+    decisionAccent = AtelierAmberSoft
 )
 
 val LightAtelierColors = AtelierColors(
-    card = Color(0xFFFFFFFF),
+    card = AtelierCardLight,
     cardHigh = Color(0xFFEEF0F4),
     outlineSoft = Color(0xFFE5E8EE),
     inkSecondary = Color(0xFF454B55),
@@ -106,5 +150,17 @@ val LightAtelierColors = AtelierColors(
     warnContainer = Color(0xFFFFF4CC),
     fab = AtelierBlueDark,
     onFab = Color.White,
-    bone = Color(0x14262626)
+    bone = Color(0x14262626),
+    isDark = false,
+    surfaceRecessed = Color(0xFFECEFF4),
+    surfaceElevated = Color.White,
+    surfaceFloating = Color.White,
+    specularTop = Color.White.copy(alpha = 0.90f),
+    specularBottom = AtelierBorderLight.copy(alpha = 0.38f),
+    shadowAmbient = AtelierBlueDark.copy(alpha = 0.14f),
+    shadowSpot = AtelierBlueDark.copy(alpha = 0.20f),
+    decisionSurface = Color(0xFFFFFBF4),
+    decisionWash = AtelierAccent.copy(alpha = 0.08f),
+    decisionBorder = AtelierAccent.copy(alpha = 0.38f),
+    decisionAccent = AtelierAmberDark
 )

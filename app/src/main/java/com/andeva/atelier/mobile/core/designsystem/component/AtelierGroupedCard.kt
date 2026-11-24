@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.core.designsystem.component
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,25 +18,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.core.designsystem.theme.ControlShape
 import com.andeva.atelier.mobile.core.designsystem.theme.PlateShape
 
 /**
- * Contenedor de tarjeta agrupada estilo Lemon Cash.
- *
- * Encapsula una lista de opciones relacionadas dentro de una tarjeta
- * blanca/surface con esquinas redondeadas (18.dp) y borde suave.
+ * Contenedor de tarjeta agrupada («Precisión Automotriz»): encapsula opciones relacionadas en
+ * [SurfaceTier.Card] con esquinas de 18 dp, sombra ambiental y bisel especular vertical.
  */
 @Composable
 fun AtelierGroupedCard(
@@ -59,11 +61,10 @@ fun AtelierGroupedCard(
             )
         }
 
-        Surface(
+        AtelierSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = CardShape,
-            color = atelier.card,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            tier = SurfaceTier.Card,
+            shape = CardLargeShape
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 content()
@@ -73,7 +74,8 @@ fun AtelierGroupedCard(
 }
 
 /**
- * Elemento de fila individual dentro de un [AtelierGroupedCard] estilo Lemon Cash.
+ * Elemento de fila individual dentro de un [AtelierGroupedCard] con medallón de ícono en plano
+ * hundido ([AtelierColors.surfaceRecessed]) y respuesta táctil con resorte ([springPressScale]).
  */
 @Composable
 fun AtelierGroupedRow(
@@ -91,11 +93,18 @@ fun AtelierGroupedRow(
 ) {
     val scheme = MaterialTheme.colorScheme
     val atelier = AtelierTheme.colors
+    val interaction = remember { MutableInteractionSource() }
 
     val rowModifier = if (onClick != null) {
         modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .springPressScale(interaction, pressed = 0.985f)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(),
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp)
     } else {
         modifier
@@ -113,7 +122,8 @@ fun AtelierGroupedRow(
                 Surface(
                     modifier = Modifier.size(38.dp),
                     shape = ControlShape,
-                    color = iconContainerColor ?: scheme.surfaceVariant.copy(alpha = 0.6f)
+                    color = iconContainerColor ?: atelier.surfaceRecessed,
+                    border = BorderStroke(1.dp, atelier.outlineSoft.copy(alpha = 0.65f))
                 ) {
                     Box(
                         modifier = Modifier.fillMaxWidth(),
@@ -138,7 +148,7 @@ fun AtelierGroupedRow(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = scheme.onSurface,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (!subtitle.isNullOrBlank()) {
@@ -180,7 +190,7 @@ fun AtelierGroupedRow(
 
         if (showDivider) {
             HorizontalDivider(
-                color = atelier.outlineSoft.copy(alpha = 0.4f),
+                color = atelier.outlineSoft.copy(alpha = 0.45f),
                 modifier = Modifier.padding(start = if (icon != null) 68.dp else 16.dp, end = 16.dp)
             )
         }

@@ -49,6 +49,8 @@
     <string name="cashier_err_no_series">La sede no tiene una serie activa para este tipo de comprobante. Actívala en Series de facturación.</string>
     <string name="cashier_err_outcome_unknown">No sabemos si el cobro se registró. Revisa los pagos del comprobante antes de volver a cobrar.</string>
     <string name="cashier_err_no_branch">Tu cuenta no tiene sede asignada. Pide a un administrador que te asigne una.</string>
+    <string name="cashier_err_legal_name">Ingresa la razón social o nombre completo del receptor.</string>
+    <string name="cashier_err_tenant_name">Ingresa la razón social o nombre comercial del taller.</string>
 
     <!-- Cobrar y entregar -->
     <string name="cashier_checkout_title">Cobrar y entregar</string>
@@ -69,7 +71,7 @@
     <string name="cashier_issue_document_number">Número de documento</string>
     <string name="cashier_issue_name_company">Razón social</string>
     <string name="cashier_issue_name_person">Nombre completo</string>
-    <string name="cashier_issue_address">Dirección fiscal (opcional)</string>
+    <string name="cashier_issue_address">Dirección fiscal</string>
     <string name="cashier_issue_lines">Detalle</string>
     <string name="cashier_issue_line_name">Nombre de la línea</string>
     <string name="cashier_issue_line_needs_name">Escribe qué se cobra en esta línea.</string>
@@ -89,7 +91,9 @@
     <string name="cashier_payment_amount">Monto a cobrar</string>
     <string name="cashier_payment_amount_error">Ingresa un monto válido, hasta el saldo.</string>
     <string name="cashier_payment_method">Medio de pago</string>
-    <string name="cashier_payment_reference">Referencia de la operación (opcional)</string>
+    <string name="cashier_payment_reference">Referencia de la operación</string>
+    <string name="cashier_payment_reference_hint">Ej. nro. de operación o voucher</string>
+    <string name="cashier_payment_reference_required">Obligatoria para pagos que no son en efectivo.</string>
     <string name="cashier_payment_irreversible">El cobro queda registrado y no se puede deshacer.</string>
     <string name="cashier_payment_confirm">Cobrar %1$s</string>
     <string name="cashier_payment_done">Cobro registrado.</string>
@@ -149,6 +153,9 @@
     <string name="cashier_series_activate_body">La sede volverá a emitir con esta serie.</string>
     <string name="cashier_series_updated">Serie actualizada.</string>
     <string name="cashier_series_no_access">Tu cuenta no puede configurar series de facturación.</string>
+    <string name="cashier_sunat_status_accepted_notice">Comprobante aceptado por SUNAT.</string>
+    <string name="cashier_sunat_status_rejected_notice">Comprobante rechazado por SUNAT.</string>
+    <string name="cashier_sunat_status_pending_pse_notice">Comprobante emitido y válido para cobro. El PSE del servidor opera en modo simulado y mantiene el estado Emitido sin constancia CDR.</string>
 
     <!-- Reportes -->
     <string name="reports_title">Reportes</string>
@@ -178,4 +185,9 @@
     <string name="reports_fleet_search_action">Buscar</string>
     <string name="reports_fleet_empty">No encontramos clientes con esa búsqueda.</string>
     <string name="reports_no_access">Tu cuenta no tiene acceso a reportes.</string>
+    <string name="reports_period_custom">Rango</string>
+    <string name="reports_open_pdf">Abrir PDF</string>
+    <string name="reports_share_pdf">Compartir PDF</string>
+    <string name="reports_fleet_scope_note">Incluye todos los vehículos registrados del cliente seleccionado.</string>
+    <string name="reports_h31_income_only_note">Muestra únicamente los cobros confirmados del periodo; egresos y cuentas por cobrar no se contabilizan en este resumen.</string>
 </resources>

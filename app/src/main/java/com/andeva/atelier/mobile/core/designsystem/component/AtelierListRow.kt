@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.core.designsystem.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -39,14 +42,25 @@ fun AtelierListRow(
     trailing: @Composable (() -> Unit)? = null
 ) {
     val stacked = trailing != null && LocalDensity.current.fontScale >= 1.15f
+    val interaction = remember { MutableInteractionSource() }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (subtitle != null) 72.dp else 64.dp)
                 .then(
-                    if (onClick != null && !loading) Modifier.clickable(role = Role.Button, onClick = onClick)
-                    else Modifier
+                    if (onClick != null && !loading) {
+                        Modifier
+                            .springPressScale(interaction, pressed = 0.985f)
+                            .clickable(
+                                interactionSource = interaction,
+                                indication = ripple(),
+                                role = Role.Button,
+                                onClick = onClick
+                            )
+                    } else {
+                        Modifier
+                    }
                 )
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -79,6 +93,6 @@ fun AtelierListRow(
             }
             if (!stacked && !loading) trailing?.invoke()
         }
-        if (showDivider) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (showDivider) HorizontalDivider(color = AtelierTheme.colors.outlineSoft.copy(alpha = 0.45f))
     }
 }

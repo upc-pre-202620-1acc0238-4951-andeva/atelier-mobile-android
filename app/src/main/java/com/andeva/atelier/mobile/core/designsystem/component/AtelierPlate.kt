@@ -2,12 +2,21 @@ package com.andeva.atelier.mobile.core.designsystem.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -15,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierBlueDark
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierInk
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.PlateShape
@@ -33,8 +44,8 @@ internal fun formatPlate(raw: String): String {
 }
 
 /**
- * La placa, firma del sistema: un vehículo se muestra siempre así, primero en la fila.
- * Es un objeto físico: blanca con tinta oscura en claro y en oscuro. Solo para placas.
+ * Insignia automotriz mecanizada: blanca metálica con franja superior peruana `#031A6B`, bisel sutil
+ * y texto Satoshi Black `tnum` en `#262626` en ambos temas.
  * TalkBack la deletrea ("placa B K L 4 8 2") en vez de leerla como palabra.
  */
 @Composable
@@ -46,20 +57,40 @@ fun AtelierPlate(
     val colors = AtelierTheme.colors
     val text = formatPlate(plate)
     val spoken = stringResource(R.string.plate_a11y, text.filter { it.isLetterOrDigit() }.toList().joinToString(" "))
-    Text(
-        text = text,
-        style = if (size == PlateSize.L) MaterialTheme.typography.titleLarge
-        else MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-        color = colors.onPlate,
-        maxLines = 1,
-        softWrap = false,
+    val plateGradient = remember(colors.plate, colors.plateBase) {
+        Brush.verticalGradient(listOf(colors.plate, colors.plateBase))
+    }
+
+    Box(
         modifier = modifier
             .clip(PlateShape)
-            .background(colors.plate)
-            .border(2.dp, colors.onPlate, PlateShape)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .clearAndSetSemantics { contentDescription = spoken }
-    )
+            .background(plateGradient)
+            .drawWithContent {
+                drawContent()
+                val stripeHeight = 2.5.dp.toPx()
+                drawRect(
+                    color = AtelierBlueDark,
+                    topLeft = Offset.Zero,
+                    size = Size(this.size.width, stripeHeight)
+                )
+            }
+            .border(1.dp, AtelierInk.copy(alpha = 0.22f), PlateShape)
+            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 2.dp)
+            .clearAndSetSemantics { contentDescription = spoken },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = if (size == PlateSize.L) {
+                MaterialTheme.typography.titleLarge
+            } else {
+                MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+            },
+            color = AtelierInk,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
 }
 
 @Preview(name = "Placa · claro", showBackground = true)

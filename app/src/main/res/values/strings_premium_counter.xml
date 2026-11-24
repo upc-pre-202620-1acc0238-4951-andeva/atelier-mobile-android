@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Recepción: selector segmentado de búsqueda -->
+    <string name="premium_search_mode_plate">Placa</string>
+    <string name="premium_search_mode_document">DNI / RUC</string>
+
+    <!-- Inventario: calibración de stock y valorización -->
+    <string name="premium_part_stock_level">Nivel de stock</string>
+    <string name="premium_part_stock_ratio">%1$s / mín. %2$s</string>
+    <string name="premium_part_stock_healthy">Sobre el mínimo</string>
+    <string name="premium_part_stock_low">En el mínimo o debajo</string>
+    <string name="premium_part_stock_out">Sin existencias</string>
+    <string name="premium_valuation_health_title">Salud del inventario</string>
+    <string name="premium_valuation_health_summary">%1$d con stock · %2$d en mínimo · %3$d agotados</string>
+    <string name="premium_valuation_category_min">Mínimo %1$s u.</string>
+
+    <!-- Caja: riel de progreso y desglose por método -->
+    <string name="premium_checkout_rail_voucher">Comprobante</string>
+    <string name="premium_checkout_rail_payment">Cobro</string>
+    <string name="premium_checkout_rail_pass">Pase</string>
+    <string name="premium_checkout_rail_delivery">Entrega</string>
+    <string name="premium_checkout_rail_done">Flujo completado</string>
+    <string name="premium_checkout_rail_step_of">Etapa %1$d de 4</string>
+    <string name="premium_daily_method_share">%1$d %%</string>
+</resources>
