@@ -4,6 +4,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -29,6 +30,9 @@ interface CustomerService {
     @POST("api/v1/customers/companies")
     suspend fun createCompany(@Body body: CreateCompanyCustomerRequestDto): Response<CustomerDto>
 
+    @PUT("api/v1/customers/{id}/contact")
+    suspend fun updateContact(@Path("id") id: String, @Body body: UpdateCustomerContactRequestDto): Response<CustomerDto>
+
     @GET("api/v1/customers/affiliation-lookup")
     suspend fun lookupAffiliation(@Query("email") email: String): Response<AffiliationLookupDto>
 
@@ -48,11 +52,28 @@ interface VehicleService {
     suspend fun create(@Body body: CreateVehicleRequestDto): Response<VehicleDto>
 }
 
-/** Citas de docs/api/crm.md. Agendar, confirmar, reprogramar y cancelar no tienen historia móvil. */
+/** Citas de docs/api/crm.md. */
 interface AppointmentService {
-    /** Agenda de una sede; `date` es el día de Lima (`yyyy-MM-dd`). */
+    /** Agenda de una sede; `date` para un día puntual o `from`+`to` para un rango de días de Lima (`yyyy-MM-dd`). */
     @GET("api/v1/appointments")
-    suspend fun getAppointments(@Query("branchId") branchId: String, @Query("date") date: String): Response<List<AppointmentDto>>
+    suspend fun getAppointments(
+        @Query("branchId") branchId: String,
+        @Query("date") date: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null
+    ): Response<List<AppointmentDto>>
+
+    @POST("api/v1/appointments")
+    suspend fun schedule(@Body body: ScheduleAppointmentRequestDto): Response<AppointmentDto>
+
+    @POST("api/v1/appointments/{id}/confirm")
+    suspend fun confirm(@Path("id") id: String): Response<AppointmentDto>
+
+    @POST("api/v1/appointments/{id}/reschedule")
+    suspend fun reschedule(@Path("id") id: String, @Body body: RescheduleAppointmentRequestDto): Response<AppointmentDto>
+
+    @POST("api/v1/appointments/{id}/cancel")
+    suspend fun cancel(@Path("id") id: String, @Body body: CancelAppointmentRequestDto): Response<AppointmentDto>
 
     /** Devuelve la cita; la orden en borrador se crea después, de forma asíncrona (H10). */
     @POST("api/v1/appointments/{id}/arrive")

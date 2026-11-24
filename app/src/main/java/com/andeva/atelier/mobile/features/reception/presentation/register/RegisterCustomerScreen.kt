@@ -1,13 +1,16 @@
 package com.andeva.atelier.mobile.features.reception.presentation.register
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,13 +38,20 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierPlateField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.bone
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.features.reception.domain.CustomerType
 import com.andeva.atelier.mobile.features.reception.domain.EngineType
@@ -55,9 +65,16 @@ fun RegisterCustomerScreen(
     viewModel: RegisterCustomerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = rememberAtelierHaptics()
 
     LaunchedEffect(state.done) {
-        if (state.done) onRegistered()
+        if (state.done) {
+            haptics.confirm()
+            onRegistered()
+        }
+    }
+    LaunchedEffect(state.error) {
+        if (state.error != null) haptics.reject()
     }
 
     RegisterCustomerContent(
@@ -116,7 +133,8 @@ internal fun RegisterCustomerContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         AtelierTopBar(
             title = stringResource(
@@ -127,6 +145,7 @@ internal fun RegisterCustomerContent(
         Column(
             modifier = Modifier
                 .weight(1f)
+                .floatingBarPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
@@ -148,66 +167,93 @@ internal fun RegisterCustomerContent(
 
             if (state.presetCustomerName == null) {
                 AtelierSectionHeader(stringResource(R.string.register_customer_section_customer))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    Choice(R.string.register_customer_individual, !company, customerEnabled, Modifier.weight(1f)) {
-                        actions.onKindChange(CustomerType.INDIVIDUAL)
-                    }
-                    Choice(R.string.register_customer_company, company, customerEnabled, Modifier.weight(1f)) {
-                        actions.onKindChange(CustomerType.COMPANY)
+                AtelierSurface(
+                    tier = SurfaceTier.Card,
+                    shape = CardLargeShape,
+                    contentPadding = PaddingValues(Spacing.md),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                            Choice(R.string.register_customer_individual, !company, customerEnabled, Modifier.weight(1f)) {
+                                actions.onKindChange(CustomerType.INDIVIDUAL)
+                            }
+                            Choice(R.string.register_customer_company, company, customerEnabled, Modifier.weight(1f)) {
+                                actions.onKindChange(CustomerType.COMPANY)
+                            }
+                        }
+                        if (company) {
+                            Field(R.string.register_customer_company_name, state.companyName, actions.onCompanyNameChange, customerEnabled,
+                                state.invalidField, "companyName", R.string.reception_field_company_name,
+                                capitalization = KeyboardCapitalization.Words)
+                        } else {
+                            Field(R.string.register_customer_first_name, state.firstName, actions.onFirstNameChange, customerEnabled,
+                                state.invalidField, "firstName", R.string.reception_field_first_name,
+                                capitalization = KeyboardCapitalization.Words)
+                            Field(R.string.register_customer_last_name, state.lastName, actions.onLastNameChange, customerEnabled,
+                                state.invalidField, "lastName", R.string.reception_field_last_name,
+                                capitalization = KeyboardCapitalization.Words)
+                        }
+                        Field(
+                            label = if (company) R.string.register_customer_tax_id_company else R.string.register_customer_tax_id_person,
+                            value = state.taxId, onChange = actions.onTaxIdChange, enabled = customerEnabled,
+                            invalidField = state.invalidField, field = "taxId",
+                            errorRes = if (company) R.string.reception_field_tax_id_company else R.string.reception_field_tax_id_person,
+                            keyboardType = KeyboardType.Number
+                        )
+                        Field(R.string.register_customer_email, state.email, actions.onEmailChange, customerEnabled,
+                            state.invalidField, "email", R.string.reception_field_email, KeyboardType.Email)
+                        Field(R.string.register_customer_phone, state.phone, actions.onPhoneChange, customerEnabled,
+                            state.invalidField, "phone", R.string.reception_field_phone, KeyboardType.Phone)
                     }
                 }
-                if (company) {
-                    Field(R.string.register_customer_company_name, state.companyName, actions.onCompanyNameChange, customerEnabled,
-                        state.invalidField, "companyName", R.string.reception_field_company_name,
-                        capitalization = KeyboardCapitalization.Words)
-                } else {
-                    Field(R.string.register_customer_first_name, state.firstName, actions.onFirstNameChange, customerEnabled,
-                        state.invalidField, "firstName", R.string.reception_field_first_name,
-                        capitalization = KeyboardCapitalization.Words)
-                    Field(R.string.register_customer_last_name, state.lastName, actions.onLastNameChange, customerEnabled,
-                        state.invalidField, "lastName", R.string.reception_field_last_name,
-                        capitalization = KeyboardCapitalization.Words)
-                }
-                Field(
-                    label = if (company) R.string.register_customer_tax_id_company else R.string.register_customer_tax_id_person,
-                    value = state.taxId, onChange = actions.onTaxIdChange, enabled = customerEnabled,
-                    invalidField = state.invalidField, field = "taxId",
-                    errorRes = if (company) R.string.reception_field_tax_id_company else R.string.reception_field_tax_id_person,
-                    keyboardType = KeyboardType.Number
-                )
-                Field(R.string.register_customer_email, state.email, actions.onEmailChange, customerEnabled,
-                    state.invalidField, "email", R.string.reception_field_email, KeyboardType.Email)
-                Field(R.string.register_customer_phone, state.phone, actions.onPhoneChange, customerEnabled,
-                    state.invalidField, "phone", R.string.reception_field_phone, KeyboardType.Phone)
             }
 
             AtelierSectionHeader(stringResource(R.string.register_customer_section_vehicle))
-            Field(R.string.register_vehicle_plate, state.plate, { actions.onPlateChange(it.uppercase()) }, vehicleEnabled,
-                state.invalidField, "plate", R.string.reception_field_plate,
-                capitalization = KeyboardCapitalization.Characters)
-            Field(R.string.register_vehicle_brand, state.brand, actions.onBrandChange, vehicleEnabled,
-                state.invalidField, "brand", R.string.reception_field_brand,
-                capitalization = KeyboardCapitalization.Words)
-            Field(R.string.register_vehicle_model, state.model, actions.onModelChange, vehicleEnabled,
-                state.invalidField, "model", R.string.reception_field_model,
-                capitalization = KeyboardCapitalization.Words)
-            AtelierSectionHeader(stringResource(R.string.register_vehicle_engine))
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                EngineType.entries.chunked(2).forEach { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                        pair.forEach { engine ->
-                            Choice(engine.labelRes(), state.engineType == engine, vehicleEnabled, Modifier.weight(1f)) {
-                                actions.onEngineTypeChange(engine)
+            AtelierSurface(
+                tier = SurfaceTier.Card,
+                shape = CardLargeShape,
+                contentPadding = PaddingValues(Spacing.md),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    AtelierPlateField(
+                        label = stringResource(R.string.register_vehicle_plate),
+                        value = state.plate,
+                        onValueChange = actions.onPlateChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bone(loading = false),
+                        enabled = vehicleEnabled,
+                        isError = state.invalidField == "plate",
+                        errorText = if (state.invalidField == "plate") stringResource(R.string.reception_field_plate) else null,
+                        imeAction = ImeAction.Next
+                    )
+                    Field(R.string.register_vehicle_brand, state.brand, actions.onBrandChange, vehicleEnabled,
+                        state.invalidField, "brand", R.string.reception_field_brand,
+                        capitalization = KeyboardCapitalization.Words)
+                    Field(R.string.register_vehicle_model, state.model, actions.onModelChange, vehicleEnabled,
+                        state.invalidField, "model", R.string.reception_field_model,
+                        capitalization = KeyboardCapitalization.Words)
+                    AtelierSectionHeader(stringResource(R.string.register_vehicle_engine))
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        EngineType.entries.chunked(2).forEach { pair ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                                pair.forEach { engine ->
+                                    Choice(engine.labelRes(), state.engineType == engine, vehicleEnabled, Modifier.weight(1f)) {
+                                        actions.onEngineTypeChange(engine)
+                                    }
+                                }
                             }
                         }
                     }
+                    Field(R.string.register_vehicle_vin, state.vin, { actions.onVinChange(it.uppercase()) }, vehicleEnabled,
+                        state.invalidField, "vin", R.string.reception_field_vin,
+                        capitalization = KeyboardCapitalization.Characters)
+                    Field(R.string.register_vehicle_year, state.year, actions.onYearChange, vehicleEnabled,
+                        state.invalidField, "year", R.string.reception_field_year, KeyboardType.Number, ImeAction.Done)
                 }
             }
-            Field(R.string.register_vehicle_vin, state.vin, { actions.onVinChange(it.uppercase()) }, vehicleEnabled,
-                state.invalidField, "vin", R.string.reception_field_vin,
-                capitalization = KeyboardCapitalization.Characters)
-            Field(R.string.register_vehicle_year, state.year, actions.onYearChange, vehicleEnabled,
-                state.invalidField, "year", R.string.reception_field_year, KeyboardType.Number, ImeAction.Done)
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -279,12 +325,22 @@ private fun RegisterPreview(state: RegisterCustomerUiState, dark: Boolean) = Ate
     RegisterCustomerContent(state = state, onBack = {}, actions = previewActions)
 }
 
-@Preview(name = "Registrar · persona · oscuro", widthDp = 390, heightDp = 844, showBackground = true)
+@Preview(name = "Registrar · persona · claro", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun RegisterPreviewPersonLight() = RegisterPreview(
+    RegisterCustomerUiState(
+        firstName = "Ana", lastName = "Torres Quispe", taxId = "45678912", phone = "987654321",
+        plate = "BKR-418", brand = "Toyota", model = "Yaris", canRegister = true
+    ),
+    dark = false
+)
+
+@Preview(name = "Registrar · persona · oscuro", widthDp = 390, heightDp = 844, showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RegisterPreviewPerson() = RegisterPreview(
     RegisterCustomerUiState(
         firstName = "Ana", lastName = "Torres Quispe", taxId = "45678912", phone = "987654321",
-        plate = "BKR418", brand = "Toyota", model = "Yaris", canRegister = true
+        plate = "BKR-418", brand = "Toyota", model = "Yaris", canRegister = true
     ),
     dark = true
 )

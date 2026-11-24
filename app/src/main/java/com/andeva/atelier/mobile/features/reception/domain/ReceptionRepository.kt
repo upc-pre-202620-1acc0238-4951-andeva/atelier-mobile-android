@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.features.reception.domain
 
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 import java.time.LocalDate
 
 /**
@@ -50,8 +51,33 @@ interface ReceptionRepository {
     /** Recarga la agenda de la sede de la sesión para [date] (día de Lima) y los vehículos y clientes que falten. */
     suspend fun refreshAppointments(date: LocalDate): Result<Unit>
 
+    suspend fun refreshAppointments(from: LocalDate, to: LocalDate): Result<Unit> = refreshAppointments(from)
+
     fun observeAppointments(date: LocalDate): Flow<List<Appointment>>
+
+    fun observeAppointments(from: LocalDate, to: LocalDate): Flow<List<Appointment>> = observeAppointments(from)
 
     /** `POST /appointments/{id}/arrive`: devuelve la cita en `ARRIVED` (la orden se crea aparte, H10). */
     suspend fun markArrived(id: String): Result<Appointment>
+
+    /** `POST /appointments`: agenda una nueva cita en la sede de la sesión. En línea. */
+    suspend fun createAppointment(
+        customerId: String,
+        vehicleId: String,
+        scheduledAt: Instant,
+        estimatedDurationMinutes: Int? = null,
+        reason: String? = null
+    ): Result<Appointment>
+
+    /** `POST /appointments/{id}/confirm`: confirma una cita pendiente. En línea. */
+    suspend fun confirmAppointment(id: String): Result<Appointment>
+
+    /** `POST /appointments/{id}/reschedule`: reprograma una cita existente. En línea. */
+    suspend fun rescheduleAppointment(id: String, newScheduledAt: Instant): Result<Appointment>
+
+    /** `POST /appointments/{id}/cancel`: cancela una cita registrando motivo. En línea. */
+    suspend fun cancelAppointment(id: String, cancellationReason: String): Result<Appointment>
+
+    /** `PUT /customers/{id}/contact`: actualiza teléfono y correo del cliente. En línea. */
+    suspend fun updateCustomerContact(id: String, email: String?, phone: String?): Result<Customer>
 }

@@ -2,10 +2,15 @@ package com.andeva.atelier.mobile.features.reception.presentation.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
+import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.BusinessTime
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
+import com.andeva.atelier.mobile.features.reception.application.CancelAppointmentUseCase
+import com.andeva.atelier.mobile.features.reception.application.ConfirmAppointmentUseCase
+import com.andeva.atelier.mobile.features.reception.application.CreateAppointmentUseCase
 import com.andeva.atelier.mobile.features.reception.application.FindVehicleByPlateUseCase
 import com.andeva.atelier.mobile.features.reception.application.GetCustomerVehiclesUseCase
 import com.andeva.atelier.mobile.features.reception.application.MarkAppointmentArrivedUseCase
@@ -14,22 +19,32 @@ import com.andeva.atelier.mobile.features.reception.application.ObserveCustomers
 import com.andeva.atelier.mobile.features.reception.application.ObserveWorkshopVehiclesUseCase
 import com.andeva.atelier.mobile.features.reception.application.RefreshAppointmentsUseCase
 import com.andeva.atelier.mobile.features.reception.application.RefreshCustomersUseCase
+import com.andeva.atelier.mobile.features.reception.application.RescheduleAppointmentUseCase
 import com.andeva.atelier.mobile.features.reception.application.SearchCustomersUseCase
+import com.andeva.atelier.mobile.features.reception.application.UpdateCustomerContactUseCase
 import com.andeva.atelier.mobile.features.reception.domain.Customer
 import com.andeva.atelier.mobile.features.reception.domain.CustomerType
+import com.andeva.atelier.mobile.features.reception.domain.InvalidReceptionInputException
 import com.andeva.atelier.mobile.features.reception.domain.ReceptionValidation
+import com.andeva.atelier.mobile.features.reception.presentation.invalidReceptionField
 import com.andeva.atelier.mobile.features.reception.presentation.toReceptionUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZonedDateTime
 import javax.inject.Inject
 
-/** US11: buscar la unidad por placa o el cliente por documento, atender las citas del día y consultar cartera de clientes y vehículos. */
+/** US11: buscar la unidad por placa o el cliente por documento, atender/agendar citas del día y editar contacto. */
 @HiltViewModel
 class VehicleSearchViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
@@ -43,7 +58,12 @@ class VehicleSearchViewModel @Inject constructor(
     private val refreshCustomers: RefreshCustomersUseCase? = null,
     observeCustomers: ObserveCustomersUseCase? = null,
     observeWorkshopVehicles: ObserveWorkshopVehiclesUseCase? = null,
-    connectivity: ConnectivityObserver? = null
+    connectivity: ConnectivityObserver? = null,
+    private val createAppointment: CreateAppointmentUseCase? = null,
+    private val confirmAppointment: ConfirmAppointmentUseCase? = null,
+    private val rescheduleAppointment: RescheduleAppointmentUseCase? = null,
+    private val cancelAppointment: CancelAppointmentUseCase? = null,
+    private val updateCustomerContact: UpdateCustomerContactUseCase? = null
 ) : ViewModel() {
 
     constructor(
@@ -70,6 +90,7 @@ class VehicleSearchViewModel @Inject constructor(
     )
 
     private val today = BusinessTime.limaDate(clock.instant())
+    private val selectedRange = MutableStateFlow(AppointmentRange.TODAY)
 
     private val _uiState = MutableStateFlow(VehicleSearchUiState())
     val uiState: StateFlow<VehicleSearchUiState> = _uiState.asStateFlow()
@@ -88,7 +109,9 @@ class VehicleSearchViewModel @Inject constructor(
                     it.copy(
                         canSearch = session?.has(Permission.VEHICLES_READ) == true && canReadCustomers,
                         canReadCustomers = canReadCustomers,
+                        canUpdateCustomer = session?.has(Permission.CUSTOMERS_UPDATE) == true,
                         canViewAppointments = canViewAppointments,
+                        canCreateAppointments = session?.has(Permission.APPOINTMENTS_CREATE) == true,
                         canMarkArrival = session?.has(Permission.APPOINTMENTS_UPDATE) == true,
                         canRegister = session?.has(Permission.CUSTOMERS_CREATE) == true && canCreateVehicles,
                         canCreateVehicles = canCreateVehicles,
@@ -105,8 +128,17 @@ class VehicleSearchViewModel @Inject constructor(
                 }
             }
         }
+        @OptIn(ExperimentalCoroutinesApi::class)
         viewModelScope.launch {
-            observeAppointments(today).collect { list -> _uiState.update { it.copy(appointments = list) } }
+            selectedRange
+                .flatMapLatest { range ->
+                    if (range == AppointmentRange.TODAY) {
+                        observeAppointments(today)
+                    } else {
+                        observeAppointments(today, range.endDate(today))
+                    }
+                }
+                .collect { list -> _uiState.update { it.copy(appointments = list) } }
         }
         if (connectivity != null) {
             viewModelScope.launch {
@@ -127,7 +159,6 @@ class VehicleSearchViewModel @Inject constructor(
             viewModelScope.launch {
                 observeWorkshopVehicles().collect { vehicles ->
                     _uiState.update { state ->
-                        // Si el usuario buscó una placa que no existía y acaba de registrarla, se sincroniza de inmediato.
                         val autoMatched = if (state.searched && state.mode == SearchMode.PLATE && state.vehicleResult == null && state.query.isNotBlank()) {
                             val normalized = runCatching { ReceptionValidation.normalizePlate(state.query) }.getOrNull()
                             vehicles.firstOrNull { it.vehicle.plate.equals(normalized, ignoreCase = true) }
@@ -150,7 +181,7 @@ class VehicleSearchViewModel @Inject constructor(
     }
 
     fun onSectionChange(section: ReceptionSection) {
-        _uiState.update { it.copy(section = section, error = null) }
+        _uiState.update { it.copy(section = section, error = null, notice = null) }
         if (section == ReceptionSection.CUSTOMERS && _uiState.value.portfolioCustomers.isEmpty()) {
             refreshCustomerPortfolio(force = true)
         }
@@ -211,13 +242,29 @@ class VehicleSearchViewModel @Inject constructor(
         }
     }
 
-    /** Recarga la agenda de hoy. Sin red se sigue con la caché; sin permiso de lectura no se llama. */
-    fun refresh() {
+    /** Cambia el horizonte de la agenda (Hoy / 7 días / 30 días) y recarga desde el backend. */
+    fun onAppointmentRangeChange(range: AppointmentRange) {
+        if (_uiState.value.appointmentRange == range) return
+        _uiState.update { it.copy(appointmentRange = range, error = null) }
+        selectedRange.value = range
+        refreshRange(force = true)
+    }
+
+    /** Recarga la agenda para el rango activo. Sin red se sigue con la caché; sin permiso de lectura no se llama. */
+    fun refresh() = refreshRange(force = false)
+
+    private fun refreshRange(force: Boolean) {
         val state = _uiState.value
-        if (!state.canViewAppointments || state.isRefreshingAppointments) return
+        if (!state.canViewAppointments || (!force && state.isRefreshingAppointments)) return
+        val range = state.appointmentRange
         _uiState.update { it.copy(isRefreshingAppointments = true) }
         viewModelScope.launch {
-            val failure = refreshAppointments(today).exceptionOrNull()?.takeUnless { it is IOException }
+            val result = if (range == AppointmentRange.TODAY) {
+                refreshAppointments(today)
+            } else {
+                refreshAppointments(today, range.endDate(today))
+            }
+            val failure = result.exceptionOrNull()?.takeUnless { it is IOException }
             _uiState.update {
                 it.copy(isRefreshingAppointments = false, error = failure?.toReceptionUiText() ?: it.error)
             }
@@ -234,7 +281,7 @@ class VehicleSearchViewModel @Inject constructor(
 
     private fun clearedSearch(state: VehicleSearchUiState) = state.copy(
         searched = false, vehicleResult = null, customers = emptyList(), selectedCustomer = null,
-        customerVehicles = emptyList(), error = null
+        customerVehicles = emptyList(), error = null, notice = null
     )
 
     fun onSearch() {
@@ -273,7 +320,8 @@ class VehicleSearchViewModel @Inject constructor(
                 selectedCustomer = customer,
                 customerVehicles = cachedVehicles,
                 isLoadingVehicles = true,
-                error = null
+                error = null,
+                notice = null
             )
         }
         viewModelScope.launch {
@@ -283,15 +331,370 @@ class VehicleSearchViewModel @Inject constructor(
         }
     }
 
+    // --- Hoja de acciones de cita: Confirmar, Llegada (H10), Reprogramar y Cancelar ---
+
+    fun onOpenAppointmentActions(appointmentId: String) {
+        _uiState.update { it.copy(actionAppointmentId = appointmentId, error = null, notice = null) }
+    }
+
+    fun onDismissAppointmentActions() {
+        val state = _uiState.value
+        if (state.arrivingId != null || state.updatingAppointmentId != null) return
+        _uiState.update { it.copy(actionAppointmentId = null, error = null) }
+    }
+
     /** `POST /appointments/{id}/arrive` (US11 E1). En línea. La orden en borrador puede tardar (H10). */
     fun onMarkArrived(appointmentId: String) {
         val state = _uiState.value
-        if (!state.canMarkArrival || state.arrivingId != null) return
-        _uiState.update { it.copy(arrivingId = appointmentId, arrival = null, error = null) }
+        if (!state.canMarkArrival || state.arrivingId != null || state.updatingAppointmentId != null) return
+        _uiState.update { it.copy(arrivingId = appointmentId, arrival = null, error = null, notice = null) }
         viewModelScope.launch {
             markArrived(appointmentId)
-                .onSuccess { result -> _uiState.update { it.copy(arrivingId = null, arrival = result) } }
+                .onSuccess { result ->
+                    _uiState.update { it.copy(arrivingId = null, actionAppointmentId = null, arrival = result) }
+                }
                 .onFailure { e -> _uiState.update { it.copy(arrivingId = null, error = e.toReceptionUiText()) } }
         }
     }
+
+    /** `POST /appointments/{id}/confirm`. En línea. */
+    fun onConfirmAppointment(appointmentId: String) {
+        val confirm = confirmAppointment ?: return
+        val state = _uiState.value
+        if (!state.canMarkArrival || !state.isOnline || state.updatingAppointmentId != null) return
+        _uiState.update { it.copy(updatingAppointmentId = appointmentId, error = null, notice = null) }
+        viewModelScope.launch {
+            confirm(appointmentId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            updatingAppointmentId = null,
+                            actionAppointmentId = null,
+                            notice = UiText.Resource(R.string.reception_appointment_confirmed_notice)
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(updatingAppointmentId = null, error = e.toReceptionUiText()) }
+                }
+        }
+    }
+
+    /** `POST /appointments/{id}/reschedule`. En línea. */
+    fun onRescheduleAppointment(appointmentId: String, dateText: String, timeText: String) {
+        val reschedule = rescheduleAppointment ?: return
+        val state = _uiState.value
+        if (!state.canMarkArrival || !state.isOnline || state.updatingAppointmentId != null) return
+        val newInstant = parseLimaDateTime(dateText, timeText)
+        if (newInstant == null) {
+            _uiState.update { it.copy(error = UiText.Resource(R.string.reception_appointment_invalid_datetime)) }
+            return
+        }
+        _uiState.update { it.copy(updatingAppointmentId = appointmentId, error = null, notice = null) }
+        viewModelScope.launch {
+            reschedule(appointmentId, newInstant)
+                .onSuccess {
+                    refresh()
+                    _uiState.update {
+                        it.copy(
+                            updatingAppointmentId = null,
+                            actionAppointmentId = null,
+                            notice = UiText.Resource(R.string.reception_appointment_rescheduled_notice)
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(updatingAppointmentId = null, error = e.toReceptionUiText()) }
+                }
+        }
+    }
+
+    /** `POST /appointments/{id}/cancel`. En línea. */
+    fun onCancelAppointment(appointmentId: String, reason: String) {
+        val cancel = cancelAppointment ?: return
+        val state = _uiState.value
+        if (!state.canMarkArrival || !state.isOnline || state.updatingAppointmentId != null) return
+        _uiState.update { it.copy(updatingAppointmentId = appointmentId, error = null, notice = null) }
+        viewModelScope.launch {
+            cancel(appointmentId, reason)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            updatingAppointmentId = null,
+                            actionAppointmentId = null,
+                            notice = UiText.Resource(R.string.reception_appointment_canceled_notice)
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    val message = if (e is InvalidReceptionInputException) {
+                        UiText.Resource(R.string.reception_appointment_invalid_cancel_reason)
+                    } else {
+                        e.toReceptionUiText()
+                    }
+                    _uiState.update { it.copy(updatingAppointmentId = null, error = message) }
+                }
+        }
+    }
+
+    // --- Nueva cita (`POST /appointments`, `APPOINTMENTS_CREATE`) ---
+
+    fun onOpenCreateAppointment() {
+        val state = _uiState.value
+        if (!state.canCreateAppointments || !state.isOnline) return
+        val preselectedCustomer = state.selectedCustomer ?: state.vehicleResult?.owner
+        val preselectedVehicle = state.vehicleResult?.vehicle
+        val initialVehicles = when {
+            preselectedCustomer != null && preselectedCustomer.id == state.selectedCustomer?.id && state.customerVehicles.isNotEmpty() ->
+                state.customerVehicles
+            preselectedVehicle != null -> listOf(preselectedVehicle)
+            else -> emptyList()
+        }
+        _uiState.update {
+            it.copy(
+                createAppointmentForm = CreateAppointmentForm(
+                    selectedCustomer = preselectedCustomer,
+                    vehicles = initialVehicles,
+                    selectedVehicleId = preselectedVehicle?.id ?: initialVehicles.firstOrNull()?.id,
+                    dateText = today.toString()
+                ),
+                error = null,
+                notice = null
+            )
+        }
+        if (preselectedCustomer != null && initialVehicles.isEmpty()) {
+            loadVehiclesForAppointmentCustomer(preselectedCustomer.id)
+        }
+        if (state.portfolioCustomers.isEmpty() && state.canReadCustomers) {
+            refreshCustomerPortfolio(force = false)
+        }
+    }
+
+    fun onDismissCreateAppointment() = _uiState.update {
+        if (it.createAppointmentForm?.isSaving == true) it
+        else it.copy(createAppointmentForm = null, error = null)
+    }
+
+    fun onAppointmentCustomerQueryChange(query: String) = editAppointmentForm {
+        it.copy(customerQuery = query)
+    }
+
+    fun onClearAppointmentCustomer() = editAppointmentForm {
+        it.copy(selectedCustomer = null, vehicles = emptyList(), selectedVehicleId = null, invalidField = null)
+    }
+
+    fun onSelectAppointmentCustomer(customer: Customer) {
+        editAppointmentForm {
+            it.copy(
+                selectedCustomer = customer,
+                vehicles = emptyList(),
+                isLoadingVehicles = true,
+                selectedVehicleId = null,
+                invalidField = null
+            )
+        }
+        loadVehiclesForAppointmentCustomer(customer.id)
+    }
+
+    private fun loadVehiclesForAppointmentCustomer(customerId: String) {
+        viewModelScope.launch {
+            getCustomerVehicles(customerId)
+                .onSuccess { list ->
+                    _uiState.update { state ->
+                        val form = state.createAppointmentForm ?: return@update state
+                        if (form.selectedCustomer?.id != customerId) return@update state
+                        state.copy(
+                            createAppointmentForm = form.copy(
+                                vehicles = list,
+                                isLoadingVehicles = false,
+                                selectedVehicleId = form.selectedVehicleId ?: list.firstOrNull()?.id
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { state ->
+                        val form = state.createAppointmentForm ?: return@update state
+                        state.copy(
+                            createAppointmentForm = form.copy(isLoadingVehicles = false),
+                            error = e.toReceptionUiText()
+                        )
+                    }
+                }
+        }
+    }
+
+    fun onSelectAppointmentVehicle(vehicleId: String) = editAppointmentForm {
+        it.copy(selectedVehicleId = vehicleId, invalidField = null)
+    }
+
+    fun onAppointmentDateChange(dateText: String) = editAppointmentForm {
+        it.copy(dateText = dateText, invalidField = null)
+    }
+
+    fun onAppointmentTimeChange(timeText: String) = editAppointmentForm {
+        it.copy(timeText = timeText, invalidField = null)
+    }
+
+    fun onAppointmentDurationChange(durationText: String) = editAppointmentForm {
+        it.copy(durationText = durationText.filter(Char::isDigit), invalidField = null)
+    }
+
+    fun onAppointmentReasonChange(reason: String) = editAppointmentForm {
+        it.copy(reason = reason, invalidField = null)
+    }
+
+    fun onSelectAppointmentQuickDate(daysFromToday: Long) = editAppointmentForm {
+        it.copy(dateText = today.plusDays(daysFromToday).toString(), invalidField = null)
+    }
+
+    private fun editAppointmentForm(change: (CreateAppointmentForm) -> CreateAppointmentForm) = _uiState.update { state ->
+        val form = state.createAppointmentForm ?: return@update state
+        if (form.isSaving) state else state.copy(createAppointmentForm = change(form), error = null)
+    }
+
+    fun onConfirmCreateAppointment() {
+        val create = createAppointment ?: return
+        val state = _uiState.value
+        val form = state.createAppointmentForm ?: return
+        if (!state.canCreateAppointments || !state.isOnline || form.isSaving) return
+
+        val customerId = form.selectedCustomer?.id
+        val vehicleId = form.selectedVehicleId
+        if (customerId.isNullOrBlank()) {
+            _uiState.update { it.copy(createAppointmentForm = form.copy(invalidField = "customerId")) }
+            return
+        }
+        if (vehicleId.isNullOrBlank()) {
+            _uiState.update { it.copy(createAppointmentForm = form.copy(invalidField = "vehicleId")) }
+            return
+        }
+        val scheduledAt = parseLimaDateTime(form.dateText, form.timeText)
+        if (scheduledAt == null) {
+            _uiState.update {
+                it.copy(
+                    createAppointmentForm = form.copy(invalidField = "scheduledAt"),
+                    error = UiText.Resource(R.string.reception_appointment_invalid_datetime)
+                )
+            }
+            return
+        }
+        val duration = form.durationText.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+        if (form.durationText.isNotBlank() && duration == null) {
+            _uiState.update {
+                it.copy(
+                    createAppointmentForm = form.copy(invalidField = "estimatedDurationMinutes"),
+                    error = UiText.Resource(R.string.reception_appointment_invalid_duration)
+                )
+            }
+            return
+        }
+
+        _uiState.update { it.copy(createAppointmentForm = form.copy(isSaving = true, invalidField = null), error = null) }
+        viewModelScope.launch {
+            create(
+                customerId = customerId,
+                vehicleId = vehicleId,
+                scheduledAt = scheduledAt,
+                estimatedDurationMinutes = duration,
+                reason = form.reason.trim().ifBlank { null }
+            )
+                .onSuccess {
+                    refresh()
+                    _uiState.update {
+                        it.copy(
+                            createAppointmentForm = null,
+                            notice = UiText.Resource(R.string.reception_appointment_scheduled_notice)
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    val field = e.invalidReceptionField()
+                    val errorMsg = if (field == "estimatedDurationMinutes") {
+                        UiText.Resource(R.string.reception_appointment_invalid_duration)
+                    } else {
+                        e.toReceptionUiText()
+                    }
+                    _uiState.update {
+                        it.copy(
+                            createAppointmentForm = it.createAppointmentForm?.copy(isSaving = false, invalidField = field),
+                            error = errorMsg
+                        )
+                    }
+                }
+        }
+    }
+
+    // --- Editar contacto del cliente (`PUT /customers/{id}/contact`, `CUSTOMERS_UPDATE`) ---
+
+    fun onOpenEditContact(customer: Customer) {
+        val state = _uiState.value
+        if (!state.canUpdateCustomer || !state.isOnline) return
+        _uiState.update {
+            it.copy(
+                editContactForm = EditContactForm(
+                    customerId = customer.id,
+                    customerName = customer.displayName,
+                    email = customer.email.orEmpty(),
+                    phone = customer.phone.orEmpty()
+                ),
+                error = null,
+                notice = null
+            )
+        }
+    }
+
+    fun onDismissEditContact() = _uiState.update {
+        if (it.editContactForm?.isSaving == true) it
+        else it.copy(editContactForm = null, error = null)
+    }
+
+    fun onEditContactEmailChange(email: String) = _uiState.update { state ->
+        val form = state.editContactForm ?: return@update state
+        if (form.isSaving) state else state.copy(editContactForm = form.copy(email = email, invalidField = null), error = null)
+    }
+
+    fun onEditContactPhoneChange(phone: String) = _uiState.update { state ->
+        val form = state.editContactForm ?: return@update state
+        if (form.isSaving) state else state.copy(editContactForm = form.copy(phone = phone, invalidField = null), error = null)
+    }
+
+    fun onConfirmEditContact() {
+        val updateContact = updateCustomerContact ?: return
+        val state = _uiState.value
+        val form = state.editContactForm ?: return
+        if (!state.canUpdateCustomer || !state.isOnline || form.isSaving) return
+
+        _uiState.update { it.copy(editContactForm = form.copy(isSaving = true, invalidField = null), error = null) }
+        viewModelScope.launch {
+            updateContact(form.customerId, form.email.trim().ifBlank { null }, form.phone.trim().ifBlank { null })
+                .onSuccess { updated ->
+                    _uiState.update { current ->
+                        current.copy(
+                            editContactForm = null,
+                            selectedCustomer = if (current.selectedCustomer?.id == updated.id) updated else current.selectedCustomer,
+                            customers = current.customers.map { if (it.id == updated.id) updated else it },
+                            vehicleResult = current.vehicleResult?.let { vr ->
+                                if (vr.owner?.id == updated.id) vr.copy(owner = updated) else vr
+                            },
+                            notice = UiText.Resource(R.string.reception_edit_contact_notice)
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            editContactForm = it.editContactForm?.copy(isSaving = false, invalidField = e.invalidReceptionField()),
+                            error = e.toReceptionUiText()
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun parseLimaDateTime(dateText: String, timeText: String): Instant? = runCatching {
+        val date = LocalDate.parse(dateText.trim())
+        val time = LocalTime.parse(timeText.trim())
+        ZonedDateTime.of(date, time, BusinessTime.ZONE).toInstant()
+    }.getOrNull()
 }

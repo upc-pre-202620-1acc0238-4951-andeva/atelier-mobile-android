@@ -38,7 +38,8 @@ data class AppointmentDto(
     @SerializedName("scheduledAt") val scheduledAt: String,
     @SerializedName("estimatedDurationMinutes") val estimatedDurationMinutes: Int?,
     @SerializedName("reason") val reason: String?,
-    @SerializedName("status") val status: String?
+    @SerializedName("status") val status: String?,
+    @SerializedName("cancellationReason") val cancellationReason: String? = null
 )
 
 /** Respuesta de `GET /customers/affiliation-lookup`. */
@@ -89,4 +90,30 @@ data class CreateVehicleRequestDto(
     @SerializedName("customerId") val customerId: String?,
     @SerializedName("vin") val vin: String?,
     @SerializedName("year") val year: Int?
+)
+
+/** `ScheduleAppointmentResource` de docs/api/crm.md. */
+data class ScheduleAppointmentRequestDto(
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("customerId") val customerId: String,
+    @SerializedName("vehicleId") val vehicleId: String,
+    @SerializedName("scheduledAt") val scheduledAt: String,
+    @SerializedName("estimatedDurationMinutes") val estimatedDurationMinutes: Int? = null,
+    @SerializedName("reason") val reason: String? = null
+)
+
+/** `RescheduleAppointmentResource` de docs/api/crm.md. */
+data class RescheduleAppointmentRequestDto(
+    @SerializedName("newScheduledAt") val newScheduledAt: String
+)
+
+/** `CancelAppointmentResource` de docs/api/crm.md. */
+data class CancelAppointmentRequestDto(
+    @SerializedName("cancellationReason") val cancellationReason: String
+)
+
+/** `UpdateCustomerContactResource` de docs/api/crm.md. */
+data class UpdateCustomerContactRequestDto(
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("phone") val phone: String? = null
 )
