@@ -6,28 +6,44 @@ import com.andeva.atelier.mobile.core.data.remote.apiCall
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataDao
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataEntity
 import com.andeva.atelier.mobile.core.domain.ApiException
+import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.media.StoragePaths
 import com.andeva.atelier.mobile.core.media.SupabaseUploader
 import com.andeva.atelier.mobile.features.inventory.domain.Batch
+import com.andeva.atelier.mobile.features.inventory.domain.BatchRestoreResult
 import com.andeva.atelier.mobile.features.inventory.domain.InventoryRepository
 import com.andeva.atelier.mobile.features.inventory.domain.InventoryValidation
 import com.andeva.atelier.mobile.features.inventory.domain.InventoryValuation
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.domain.Part
 import com.andeva.atelier.mobile.features.inventory.domain.PartDetail
+import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
 import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrder
+import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderLineInput
 import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderStatus
 import com.andeva.atelier.mobile.features.inventory.domain.StockAlert
+import com.andeva.atelier.mobile.features.inventory.domain.StockAllocation
+import com.andeva.atelier.mobile.features.inventory.domain.Supplier
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchDao
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.BatchEntity
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.PartDao
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.toDomain
 import com.andeva.atelier.mobile.features.inventory.infrastructure.local.toEntity
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.CancelPurchaseOrderRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.CreatePartRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.CreatePurchaseOrderItemRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.CreatePurchaseOrderRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.DispatchBatchFifoRequestDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.InventoryService
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.PartDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.ReceiveBatchRequestDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.ReceivePurchaseOrderRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.RegisterSupplierRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.RestoreBatchRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.UpdatePartRequestDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.UpdateSupplierRequestDto
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -41,7 +57,7 @@ import javax.inject.Inject
 
 /**
  * Offline-first para leer (docs/06-offline-sync.md §4): el catálogo y los lotes se guardan en `parts` y `batches` y la
- * UI observa Room. Recibir una compra es en línea (06 §2): la foto del comprobante se sube directo, sin la cola.
+ * UI observa Room. Las mutaciones y compras son en línea (06 §2): la foto del comprobante se sube directo, sin la cola.
  */
 class InventoryRepositoryImpl @Inject constructor(
     private val inventoryService: InventoryService,
@@ -126,6 +142,47 @@ class InventoryRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun createPart(
+        name: String,
+        sku: String,
+        category: ItemCategory,
+        basePrice: BigDecimal,
+        minimumStock: BigDecimal,
+        unitOfMeasure: String?
+    ): Result<Part> {
+        val body = CreatePartRequestDto(
+            name = name.trim(),
+            sku = InventoryValidation.normalizeSku(sku),
+            category = category.name,
+            basePrice = basePrice,
+            minimumStock = minimumStock,
+            unitOfMeasure = unitOfMeasure?.trim()?.ifEmpty { null } ?: "UNIT"
+        )
+        return apiCall(gson, { inventoryService.createItem(body) }) { it }
+            .map { dto -> savePartsFromServer(listOf(dto)).single() }
+    }
+
+    override suspend fun updatePart(
+        id: String,
+        name: String,
+        category: ItemCategory,
+        basePrice: BigDecimal,
+        minimumStock: BigDecimal,
+        status: PartStatus?,
+        unitOfMeasure: String?
+    ): Result<Part> {
+        val body = UpdatePartRequestDto(
+            name = name.trim(),
+            category = category.name,
+            basePrice = basePrice,
+            minimumStock = minimumStock,
+            status = status?.name,
+            unitOfMeasure = unitOfMeasure?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.updateItem(id, body) }) { it }
+            .map { dto -> savePartsFromServer(listOf(dto)).single() }
+    }
+
     override suspend fun refreshBatches(itemId: String, force: Boolean): Result<Unit> {
         if (sessionManager.getSession()?.has(Permission.BATCHES_READ) != true) return Result.success(Unit)
         val now = clock.millis()
@@ -137,6 +194,60 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override fun observeBatches(itemId: String): Flow<List<Batch>> =
         batchDao.observeForItem(itemId).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun receiveDirectBatch(
+        itemId: String,
+        batchNumber: String,
+        quantity: BigDecimal,
+        unitCost: BigDecimal,
+        arrivalDate: Instant?,
+        supplierId: String?
+    ): Result<Batch> {
+        val body = ReceiveBatchRequestDto(
+            itemId = itemId,
+            batchNumber = batchNumber.trim(),
+            quantity = quantity,
+            unitCost = unitCost,
+            arrivalDate = arrivalDate?.toString(),
+            supplierId = supplierId?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.receiveBatch(body) }) { it.toDomain(itemId) }
+            .onSuccess { syncPartAndBatches(itemId) }
+    }
+
+    override suspend fun dispatchFifoBatch(
+        itemId: String,
+        quantity: BigDecimal,
+        workOrderId: String?,
+        taskId: String?
+    ): Result<StockAllocation> {
+        val body = DispatchBatchFifoRequestDto(
+            itemId = itemId,
+            quantity = quantity,
+            taskId = taskId?.trim()?.ifEmpty { null },
+            workOrderId = workOrderId?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.dispatchBatchFifo(body) }) { it.toDomain() }
+            .onSuccess { syncPartAndBatches(itemId) }
+    }
+
+    override suspend fun restoreBatch(
+        itemId: String,
+        quantity: BigDecimal,
+        batchId: String?,
+        reason: String?,
+        workOrderId: String?
+    ): Result<BatchRestoreResult> {
+        val body = RestoreBatchRequestDto(
+            itemId = itemId,
+            quantity = quantity,
+            batchId = batchId?.trim()?.ifEmpty { null },
+            reason = reason?.trim()?.ifEmpty { null },
+            workOrderId = workOrderId?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.restoreBatch(body) }) { it.toDomain() }
+            .onSuccess { syncPartAndBatches(itemId) }
+    }
 
     override suspend fun getStockAlerts(): Result<List<StockAlert>> {
         val result = apiCall(gson, { inventoryService.getAlerts() }) { dtos -> dtos.map { it.toDomain() } }
@@ -151,11 +262,97 @@ class InventoryRepositoryImpl @Inject constructor(
             InventoryValuation(Money(it.valuation ?: BigDecimal.ZERO, Money.PEN))
         }
 
+    override suspend fun getSuppliers(search: String?, status: String?): Result<List<Supplier>> =
+        apiCall(gson, {
+            inventoryService.getSuppliers(
+                search = search?.trim()?.ifEmpty { null },
+                status = status?.trim()?.ifEmpty { null }
+            )
+        }) { dtos -> dtos.map { it.toDomain() } }
+
+    override suspend fun createSupplier(
+        businessName: String,
+        taxId: String,
+        contactName: String?,
+        phone: String?,
+        email: String?,
+        address: String?
+    ): Result<Supplier> {
+        val body = RegisterSupplierRequestDto(
+            businessName = businessName.trim(),
+            taxId = InventoryValidation.normalizeTaxId(taxId),
+            contactName = contactName?.trim()?.ifEmpty { null },
+            phone = phone?.trim()?.ifEmpty { null },
+            email = email?.trim()?.ifEmpty { null },
+            address = address?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.createSupplier(body) }) { it.toDomain() }
+    }
+
+    override suspend fun updateSupplier(
+        id: String,
+        businessName: String?,
+        contactName: String?,
+        phone: String?,
+        email: String?,
+        address: String?,
+        active: Boolean?
+    ): Result<Supplier> {
+        val body = UpdateSupplierRequestDto(
+            businessName = businessName?.trim()?.ifEmpty { null },
+            contactName = contactName?.trim()?.ifEmpty { null },
+            phone = phone?.trim()?.ifEmpty { null },
+            email = email?.trim()?.ifEmpty { null },
+            address = address?.trim()?.ifEmpty { null },
+            active = active
+        )
+        return apiCall(gson, { inventoryService.updateSupplier(id, body) }) { it.toDomain() }
+    }
+
     override suspend fun getPurchaseOrders(status: PurchaseOrderStatus?): Result<List<PurchaseOrder>> =
         apiCall(gson, { inventoryService.getPurchaseOrders(status?.name) }) { dtos -> dtos.map { it.toDomain() } }
 
     override suspend fun getPurchaseOrder(id: String): Result<PurchaseOrder> =
         apiCall(gson, { inventoryService.getPurchaseOrder(id) }) { it.toDomain() }
+
+    override suspend fun createPurchaseOrder(
+        supplierId: String,
+        items: List<PurchaseOrderLineInput>,
+        orderNumber: String?,
+        expectedDeliveryDate: String?,
+        notes: String?
+    ): Result<PurchaseOrder> {
+        val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
+        val branchId = session.branchId ?: return Result.failure(MissingBranchException())
+        val body = CreatePurchaseOrderRequestDto(
+            branchId = branchId,
+            supplierId = supplierId,
+            items = items.map { CreatePurchaseOrderItemRequestDto(it.itemId, it.quantity, it.unitCost) },
+            orderNumber = orderNumber?.trim()?.ifEmpty { null },
+            expectedDeliveryDate = expectedDeliveryDate?.trim()?.ifEmpty { null },
+            notes = notes?.trim()?.ifEmpty { null }
+        )
+        return apiCall(gson, { inventoryService.createPurchaseOrder(body) }) { it.toDomain() }
+    }
+
+    override suspend fun addPurchaseOrderItem(
+        purchaseOrderId: String,
+        itemId: String,
+        quantity: BigDecimal,
+        unitCost: BigDecimal
+    ): Result<PurchaseOrder> {
+        val body = CreatePurchaseOrderItemRequestDto(itemId = itemId, quantity = quantity, unitCost = unitCost)
+        return apiCall(gson, { inventoryService.addPurchaseOrderItem(purchaseOrderId, body) }) { it.toDomain() }
+    }
+
+    override suspend fun issuePurchaseOrder(id: String): Result<PurchaseOrder> =
+        apiCall(gson, { inventoryService.issuePurchaseOrder(id) }) { it.toDomain() }
+
+    override suspend fun cancelPurchaseOrder(id: String, reason: String?): Result<PurchaseOrder> {
+        val trimmed = reason?.trim()?.ifEmpty { null }
+        val body = CancelPurchaseOrderRequestDto(trimmed)
+        return apiCall(gson, { inventoryService.cancelPurchaseOrder(id, body) }) { it.toDomain() }
+    }
 
     /**
      * H15 de docs/03-traceability.md: el backend responde 400 a todo y no es idempotente. Se lee la orden antes de subir
@@ -196,6 +393,10 @@ class InventoryRepositoryImpl @Inject constructor(
     private suspend fun afterReceive(order: PurchaseOrder) {
         refreshCatalog(force = true)
         order.lines.map { it.itemId }.distinct().forEach { refreshBatches(it, force = true) }
+    }
+
+    private suspend fun syncPartAndBatches(itemId: String) {
+        runCatching { getPartDetail(itemId) }
     }
 
     private suspend fun savePartsFromServer(dtos: List<PartDto>): List<Part> {

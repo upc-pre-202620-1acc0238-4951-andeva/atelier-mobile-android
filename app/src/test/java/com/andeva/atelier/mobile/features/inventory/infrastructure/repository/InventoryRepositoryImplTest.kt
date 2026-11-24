@@ -1,8 +1,11 @@
 package com.andeva.atelier.mobile.features.inventory.infrastructure.repository
 
 import com.andeva.atelier.mobile.core.domain.ApiException
+import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
+import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
+import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderLineInput
 import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderStatus
 import com.andeva.atelier.mobile.features.inventory.infrastructure.InventoryTestEnv
 import kotlinx.coroutines.flow.first
@@ -246,5 +249,78 @@ class InventoryRepositoryImplTest {
         val orders = repository.getPurchaseOrders(PurchaseOrderStatus.ISSUED).getOrThrow()
         assertTrue(orders.single().canBeReceived)
         assertEquals("ISSUED", env.requested("GET", "/api/v1/inventory/purchase-orders").single().requestUrl!!.queryParameter("status"))
+    }
+
+    @Test
+    fun `crear y editar repuesto actualiza la cache local de Room`() = runTest {
+        env.signIn(listOf(Permission.PARTS_READ, Permission.PARTS_MANAGE))
+        env.responses["POST /api/v1/inventory/items"] = env.json(env.part("p9", "Bujía NGK", "ngk-01", stock = 0.0), 201)
+        env.responses["PUT /api/v1/inventory/items/p9"] = env.json(env.part("p9", "Bujía NGK Iridium", "NGK-01", stock = 0.0))
+
+        val created = repository.createPart("Bujía NGK", "ngk-01", ItemCategory.ENGINE, BigDecimal("42.00"), BigDecimal("4")).getOrThrow()
+        assertEquals("p9", created.id)
+        assertEquals("Bujía NGK", repository.observePart("p9").first()!!.name)
+
+        val updated = repository.updatePart("p9", "Bujía NGK Iridium", ItemCategory.ENGINE, BigDecimal("48.00"), BigDecimal("6"), PartStatus.ACTIVE).getOrThrow()
+        assertEquals("Bujía NGK Iridium", updated.name)
+        assertEquals("Bujía NGK Iridium", repository.observePart("p9").first()!!.name)
+    }
+
+    @Test
+    fun `proveedores listar crear y editar contra el backend`() = runTest {
+        env.signIn(listOf(Permission.SUPPLIERS_MANAGE))
+        val supplierJson = mapOf(
+            "id" to "s1", "tenantId" to "t1", "businessName" to "AutoPartes SAC", "taxId" to "20512345678",
+            "contactName" to "Luis", "phone" to "999888777", "email" to "ventas@autopartes.pe", "address" to "Lima", "active" to true
+        )
+        env.responses["GET /api/v1/inventory/suppliers"] = env.json(listOf(supplierJson))
+        env.responses["POST /api/v1/inventory/suppliers"] = env.json(supplierJson, 201)
+        env.responses["PUT /api/v1/inventory/suppliers/s1"] = env.json(supplierJson + ("active" to false))
+
+        assertEquals(1, repository.getSuppliers("Auto").getOrThrow().size)
+        assertEquals("AutoPartes SAC", repository.createSupplier("AutoPartes SAC", "20512345678").getOrThrow().businessName)
+        assertFalse(repository.updateSupplier("s1", active = false).getOrThrow().active)
+    }
+
+    @Test
+    fun `ciclo completo de orden de compra y lotes directos FIFO`() = runTest {
+        env.signIn(
+            listOf(
+                Permission.PARTS_READ, Permission.BATCHES_READ, Permission.PURCHASE_ORDERS_READ,
+                Permission.PURCHASE_ORDERS_CREATE, Permission.BATCHES_RECEIVE,
+                Permission.BATCHES_DISPATCH_FIFO, Permission.BATCHES_RESTORE
+            )
+        )
+        assertTrue(repository.createPurchaseOrder("s1", emptyList()).exceptionOrNull() is MissingBranchException)
+
+        env.sessionManager.selectBranch("b1")
+        env.responses["POST /api/v1/inventory/purchase-orders"] = env.json(env.purchaseOrder("po2", "DRAFT"), 201)
+        env.responses["POST /api/v1/inventory/purchase-orders/po2/items"] = env.json(env.purchaseOrder("po2", "DRAFT"))
+        env.responses["PUT /api/v1/inventory/purchase-orders/po2/issue"] = env.json(env.purchaseOrder("po2", "ISSUED"))
+        env.responses["PUT /api/v1/inventory/purchase-orders/po2/cancel"] = env.json(env.purchaseOrder("po2", "CANCELED"))
+
+        val draft = repository.createPurchaseOrder("s1", listOf(PurchaseOrderLineInput("p1", BigDecimal("4"), BigDecimal("25.00")))).getOrThrow()
+        assertEquals(PurchaseOrderStatus.DRAFT, draft.status)
+        assertTrue(env.requested("POST", "/api/v1/inventory/purchase-orders").single().body.readUtf8().contains("\"branchId\":\"b1\""))
+
+        assertEquals(PurchaseOrderStatus.DRAFT, repository.addPurchaseOrderItem("po2", "p1", BigDecimal("2"), BigDecimal("30.00")).getOrThrow().status)
+        assertEquals(PurchaseOrderStatus.ISSUED, repository.issuePurchaseOrder("po2").getOrThrow().status)
+        assertEquals(PurchaseOrderStatus.CANCELED, repository.cancelPurchaseOrder("po2", "Proveedor sin stock").getOrThrow().status)
+
+        env.responses["GET /api/v1/inventory/items/p1"] = env.json(env.part())
+        env.responses["POST /api/v1/inventory/batches/receive"] = env.json(env.batch("b10", "2026-10-24T14:00:00Z", 5.0), 201)
+        env.responses["POST /api/v1/inventory/batches/dispatch"] = env.json(
+            mapOf(
+                "allocationId" to "al1", "allocatedQuantity" to 2.0, "totalCogs" to 80.0,
+                "deductions" to listOf(mapOf("batchId" to "b10", "quantityDeducted" to 2.0, "unitCost" to 40.0, "subtotal" to 80.0))
+            )
+        )
+        env.responses["POST /api/v1/inventory/batches/restore"] = env.json(
+            mapOf("status" to "RESTORED", "message" to "OK", "batchId" to "b10", "restoredQuantity" to 1.0)
+        )
+
+        assertEquals("b10", repository.receiveDirectBatch("p1", "L-10", BigDecimal("5"), BigDecimal("40")).getOrThrow().id)
+        assertEquals(0, BigDecimal("2").compareTo(repository.dispatchFifoBatch("p1", BigDecimal("2")).getOrThrow().allocatedQuantity))
+        assertEquals(0, BigDecimal("1").compareTo(repository.restoreBatch("p1", BigDecimal("1"), "b10", "Sobrante").getOrThrow().restoredQuantity))
     }
 }

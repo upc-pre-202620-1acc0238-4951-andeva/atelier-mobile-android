@@ -7,6 +7,7 @@ import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
+import com.andeva.atelier.mobile.features.inventory.application.CreatePartUseCase
 import com.andeva.atelier.mobile.features.inventory.application.ObservePartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.RefreshPartsCatalogUseCase
 import com.andeva.atelier.mobile.features.inventory.application.SearchPartsCatalogUseCase
@@ -60,7 +61,8 @@ class PartsCatalogViewModelTest {
             ObservePartsCatalogUseCase(repository),
             RefreshPartsCatalogUseCase(repository),
             SearchPartsCatalogUseCase(repository),
-            connectivity
+            connectivity,
+            CreatePartUseCase(repository)
         )
     }
 
@@ -231,5 +233,42 @@ class PartsCatalogViewModelTest {
 
         assertFalse(vm.uiState.value.showingCache)
         coVerify(exactly = 2) { repository.refreshCatalog(false) }
+    }
+
+    @Test
+    fun `solo con parts manage habilita creacion y valida antes de llamar al backend`() = runTest(mainRule.dispatcher) {
+        conCatalogo(repuesto("1", "10"))
+        coEvery { repository.refreshCatalog(false) } returns Result.success(Unit)
+        coEvery {
+            repository.createPart("Bujía Iridium", "SPK-01", ItemCategory.ENGINE, BigDecimal("45.00"), BigDecimal("4"), "UNIT")
+        } returns Result.success(repuesto("9", "0"))
+        val vm = viewModel(listOf(Permission.PARTS_READ, Permission.PARTS_MANAGE))
+        settle()
+
+        assertTrue(vm.uiState.value.canManage)
+        vm.onOpenCreateSheet()
+        vm.onFormNameChange(" ")
+        vm.onFormSkuChange("ab")
+        vm.onFormBasePriceChange("-1")
+        vm.onFormMinimumStockChange("-2")
+        vm.onCreatePart()
+        settle()
+
+        assertTrue(vm.uiState.value.nameError != null)
+        assertTrue(vm.uiState.value.skuError != null)
+        assertTrue(vm.uiState.value.priceError != null)
+        assertTrue(vm.uiState.value.minStockError != null)
+        coVerify(exactly = 0) { repository.createPart(any(), any(), any(), any(), any(), any()) }
+
+        vm.onFormNameChange("Bujía Iridium")
+        vm.onFormSkuChange("SPK-01")
+        vm.onFormCategoryChange(ItemCategory.ENGINE)
+        vm.onFormBasePriceChange("45.00")
+        vm.onFormMinimumStockChange("4")
+        vm.onCreatePart()
+        settle()
+
+        assertFalse(vm.uiState.value.createSheetOpen)
+        assertTrue(vm.uiState.value.bannerMessage != null)
     }
 }

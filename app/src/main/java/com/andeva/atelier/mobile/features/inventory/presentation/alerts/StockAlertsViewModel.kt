@@ -24,14 +24,16 @@ data class StockAlertsUiState(
     val isRefreshing: Boolean = true,
     val isOnline: Boolean = true,
     val error: UiText? = null,
-    val canRead: Boolean = true
+    val canRead: Boolean = true,
+    val canCreatePurchaseOrder: Boolean = false
 ) {
     val outOfStockCount: Int get() = alerts.count { it.currentStock <= BigDecimal.ZERO }
 }
 
 /**
  * US34 E1: bandeja de alertas de reposición. Room pinta primero (alertas derivadas de la caché `parts`) y
- * `GET /inventory/alerts` las reemplaza. `resolve` no se usa: no cambia nada en el backend (H13).
+ * `GET /inventory/alerts` las reemplaza. `resolve` no se usa: no cambia nada en el backend (H13); en su lugar
+ * se ofrece ir a órdenes de compra (`PURCHASE_ORDERS_CREATE`).
  */
 @HiltViewModel
 class StockAlertsViewModel @Inject constructor(
@@ -50,7 +52,12 @@ class StockAlertsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeSession().collect { session ->
-                _uiState.update { it.copy(canRead = session?.has(Permission.ALERTS_READ) == true) }
+                _uiState.update {
+                    it.copy(
+                        canRead = session?.has(Permission.ALERTS_READ) == true,
+                        canCreatePurchaseOrder = session?.has(Permission.PURCHASE_ORDERS_CREATE) == true
+                    )
+                }
             }
         }
         viewModelScope.launch {
