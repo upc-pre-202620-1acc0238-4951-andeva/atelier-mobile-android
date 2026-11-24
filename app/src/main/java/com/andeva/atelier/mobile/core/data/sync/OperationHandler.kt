@@ -15,6 +15,9 @@ import java.io.IOException
  */
 interface OperationHandler {
     suspend fun send(operation: PendingOperationEntity): OperationResult
+
+    /** Limpieza opcional de filas optimistas locales cuando el usuario descarta la operación en cola. */
+    suspend fun onDiscard(operation: PendingOperationEntity) = Unit
 }
 
 sealed interface OperationResult {

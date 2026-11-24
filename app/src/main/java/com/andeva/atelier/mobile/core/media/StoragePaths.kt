@@ -10,8 +10,10 @@ object StoragePaths {
     fun intake(tenantId: String, workOrderId: String, photoId: String = newId()) =
         "$tenantId/work-orders/$workOrderId/intake/$photoId.jpg"
 
-    fun taskEvidence(tenantId: String, workOrderId: String, taskId: String, photoId: String = newId()) =
-        "$tenantId/work-orders/$workOrderId/tasks/$taskId/$photoId.jpg"
+    fun taskEvidence(tenantId: String, workOrderId: String, taskId: String, photoId: String = newId()): String {
+        val orderSegment = workOrderId.trim().ifEmpty { "order" }
+        return "$tenantId/work-orders/$orderSegment/tasks/$taskId/$photoId.jpg"
+    }
 
     fun proposal(tenantId: String, workOrderId: String, photoId: String = newId()) =
         "$tenantId/work-orders/$workOrderId/proposals/$photoId.jpg"

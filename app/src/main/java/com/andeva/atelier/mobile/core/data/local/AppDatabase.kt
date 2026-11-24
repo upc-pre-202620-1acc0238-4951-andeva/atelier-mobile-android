@@ -50,7 +50,7 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOr
         PartEntity::class, BatchEntity::class, VoucherEntity::class,
         TelemetryReadingEntity::class, VehicleFaultEntity::class, PredictiveAlertEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

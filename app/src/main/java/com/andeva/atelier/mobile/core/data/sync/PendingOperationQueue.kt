@@ -24,7 +24,8 @@ class PendingOperationQueue @Inject constructor(
         dedupeKey: String,
         dependsOn: String? = null,
         id: String = UUID.randomUUID().toString(),
-        nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = System.currentTimeMillis(),
+        triggerSync: Boolean = true
     ): String? {
         val session = checkNotNull(sessionManager.getSession()) { "No se puede encolar sin sesión" }
         val inserted = dao.enqueue(
@@ -41,7 +42,7 @@ class PendingOperationQueue @Inject constructor(
             )
         )
         if (inserted == -1L) return null
-        syncScheduler.requestSync()
+        if (triggerSync) syncScheduler.requestSync()
         return id
     }
 }

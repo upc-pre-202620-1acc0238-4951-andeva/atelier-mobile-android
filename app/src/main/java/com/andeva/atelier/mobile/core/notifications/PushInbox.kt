@@ -55,6 +55,12 @@ class PushInbox @Inject constructor() {
 
     fun consume(): PushDestination? = _pending.value.also { _pending.value = null }
 
+    /** Limpia historial y destino pendiente al cerrar sesión (US04). */
+    fun clear() {
+        _history.value = emptyList()
+        _pending.value = null
+    }
+
     private fun defaultTitleFor(destination: PushDestination): String = when (destination) {
         is PushDestination.TaskDetail -> "Actualización de tarea"
         is PushDestination.TaskSuspensionReview -> "Pausa de tarea por revisar"

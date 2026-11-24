@@ -11,4 +11,15 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-val AppMigrations: Array<Migration> = arrayOf(MIGRATION_1_2)
+/**
+ * Versión 3: fecha de solicitud de suspensión en `tasks` (`INTEGER` epoch ms UTC, US29) y propietario `user_id`
+ * en `telemetry_readings` para aislar lecturas en fosa entre usuarios de un terminal compartido (US19).
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE tasks ADD COLUMN pending_suspension_requested_at INTEGER")
+        connection.execSQL("ALTER TABLE telemetry_readings ADD COLUMN user_id TEXT")
+    }
+}
+
+val AppMigrations: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
