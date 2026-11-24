@@ -1,5 +1,6 @@
 package com.andeva.atelier.mobile.features.diagnostics.infrastructure.local
 
+import com.andeva.atelier.mobile.features.diagnostics.domain.ConvertedAppointment
 import com.andeva.atelier.mobile.features.diagnostics.domain.DeviceInstallation
 import com.andeva.atelier.mobile.features.diagnostics.domain.DeviceStatus
 import com.andeva.atelier.mobile.features.diagnostics.domain.Dtc
@@ -8,6 +9,7 @@ import com.andeva.atelier.mobile.features.diagnostics.domain.FaultSeverity
 import com.andeva.atelier.mobile.features.diagnostics.domain.HealthDiagnosis
 import com.andeva.atelier.mobile.features.diagnostics.domain.HealthReport
 import com.andeva.atelier.mobile.features.diagnostics.domain.HealthReportDetail
+import com.andeva.atelier.mobile.features.diagnostics.domain.LatestVehicleTelemetry
 import com.andeva.atelier.mobile.features.diagnostics.domain.ObdDevice
 import com.andeva.atelier.mobile.features.diagnostics.domain.PredictiveAlert
 import com.andeva.atelier.mobile.features.diagnostics.domain.PredictiveAlertStatus
@@ -15,14 +17,18 @@ import com.andeva.atelier.mobile.features.diagnostics.domain.PredictiveAlertType
 import com.andeva.atelier.mobile.features.diagnostics.domain.PredictiveRisk
 import com.andeva.atelier.mobile.features.diagnostics.domain.RecommendedServiceAction
 import com.andeva.atelier.mobile.features.diagnostics.domain.SubsystemEvaluation
+import com.andeva.atelier.mobile.features.diagnostics.domain.TelemetryHistoryBucket
 import com.andeva.atelier.mobile.features.diagnostics.domain.VehicleFault
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.ConvertedAppointmentDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.DeviceInstallationDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.HealthReportCreatedDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.HealthReportDetailDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.ObdDeviceDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.PredictiveAlertDto
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.TelemetryHistoryBucketDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.TelemetryReadingItemDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.VehicleFaultDto
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.VehicleLatestTelemetryDto
 import java.time.Instant
 
 /** Instantes del backend en ISO-8601 UTC (docs/api/README.md §6); Room los guarda como epoch ms. */
@@ -145,4 +151,36 @@ fun HealthReportDetailDto.toDomain() = HealthReportDetail(
             dtcCorrelations = ai.dtcCorrelations.orEmpty().map { DtcCorrelation(it.dtcCode, it.correlatedSensorReading, it.anomalyExplanation) }
         )
     }
+)
+
+fun ConvertedAppointmentDto.toDomain() = ConvertedAppointment(
+    appointmentId = appointmentId,
+    vehicleId = vehicleId.orEmpty(),
+    customerId = customerId.orEmpty(),
+    scheduledAt = scheduledAt.toInstantOrNull(),
+    status = status,
+    notes = notes
+)
+
+fun VehicleLatestTelemetryDto.toDomain(fallbackVehicleId: String) = LatestVehicleTelemetry(
+    vehicleId = vehicleId ?: fallbackVehicleId,
+    timestamp = timestamp.toInstantOrNull(),
+    latitude = latitude,
+    longitude = longitude,
+    speedKmh = speedKmh,
+    engineTempCelsius = engineTempCelsius,
+    engineRpm = engineRpm,
+    batteryVoltage = batteryVoltage,
+    fuelPercentage = fuelPercentage
+)
+
+fun TelemetryHistoryBucketDto.toDomain(fallbackVehicleId: String) = TelemetryHistoryBucket(
+    bucketTime = bucketTime.toInstantOrNull(),
+    vehicleId = vehicleId ?: fallbackVehicleId,
+    avgSpeedKmh = avgSpeedKmh,
+    avgEngineTempCelsius = avgEngineTempCelsius,
+    avgEngineRpm = avgEngineRpm,
+    avgFuelPercentage = avgFuelPercentage,
+    avgBatteryVoltage = avgBatteryVoltage,
+    sampleCount = sampleCount ?: 0
 )

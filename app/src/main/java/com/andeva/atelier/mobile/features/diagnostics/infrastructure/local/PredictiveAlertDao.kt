@@ -26,4 +26,7 @@ abstract class PredictiveAlertDao {
 
     @Query("SELECT * FROM predictive_alerts WHERE vehicle_id = :vehicleId ORDER BY created_at DESC")
     abstract fun observeForVehicle(vehicleId: String): Flow<List<PredictiveAlertEntity>>
+
+    @Query("SELECT * FROM predictive_alerts ORDER BY created_at DESC")
+    abstract fun observeAll(): Flow<List<PredictiveAlertEntity>>
 }

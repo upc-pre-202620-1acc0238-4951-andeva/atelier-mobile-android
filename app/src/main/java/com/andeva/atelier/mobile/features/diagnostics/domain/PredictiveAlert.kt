@@ -28,3 +28,13 @@ data class PredictiveAlert(
     val recommendedServiceId: String?,
     val createdAt: Instant?
 )
+
+/** Cita preventiva creada a partir de una alerta predictiva (`AppointmentResponse` de `docs/api/iot.md`). */
+data class ConvertedAppointment(
+    val appointmentId: String,
+    val vehicleId: String,
+    val customerId: String,
+    val scheduledAt: Instant?,
+    val status: String?,
+    val notes: String?
+)

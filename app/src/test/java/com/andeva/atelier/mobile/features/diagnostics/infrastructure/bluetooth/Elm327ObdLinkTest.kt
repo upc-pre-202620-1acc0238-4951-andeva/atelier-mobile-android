@@ -100,7 +100,7 @@ class Elm327ObdLinkTest {
         link.connect("AA").getOrThrow()
         assertNull(link.readFreezeFrame().getOrThrow())
 
-        transport.responses["0202"] = "4202000300\r>"
+        transport.responses["020200"] = "4202000300\r>"
         transport.responses["020500"] = "4205007B\r>"
         transport.responses["020C00"] = "420C001AF8\r>"
         val frame = link.readFreezeFrame().getOrThrow()!!

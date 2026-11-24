@@ -191,3 +191,46 @@ data class PredictiveAlertDto(
 data class AcknowledgeAlertRequestDto(
     @SerializedName("acknowledgedBy") val acknowledgedBy: String? = null
 )
+
+/** `ConvertAlertToAppointmentRequest` (opcional): fecha, hora, duración, sede y motivo acordados con el cliente. */
+data class ConvertAlertToAppointmentRequestDto(
+    @SerializedName("branchId") val branchId: String? = null,
+    @SerializedName("scheduledAt") val scheduledAt: String? = null,
+    @SerializedName("estimatedDurationMinutes") val estimatedDurationMinutes: Int? = null,
+    @SerializedName("reason") val reason: String? = null
+)
+
+/** `AppointmentResponse` de `POST /iot/alerts/{id}/convert-to-appointment` (docs/api/iot.md). */
+data class ConvertedAppointmentDto(
+    @SerializedName("appointmentId") val appointmentId: String,
+    @SerializedName("vehicleId") val vehicleId: String?,
+    @SerializedName("customerId") val customerId: String?,
+    @SerializedName("scheduledAt") val scheduledAt: String?,
+    @SerializedName("status") val status: String?,
+    @SerializedName("notes") val notes: String?
+)
+
+/** `VehicleLatestTelemetryResponse` de `GET /iot/telemetry/vehicle/{vehicleId}/latest` (docs/api/iot.md). */
+data class VehicleLatestTelemetryDto(
+    @SerializedName("vehicleId") val vehicleId: String?,
+    @SerializedName("timestamp") val timestamp: String?,
+    @SerializedName("latitude") val latitude: Double?,
+    @SerializedName("longitude") val longitude: Double?,
+    @SerializedName("speedKmh") val speedKmh: Int?,
+    @SerializedName("engineTempCelsius") val engineTempCelsius: Double?,
+    @SerializedName("engineRpm") val engineRpm: Int?,
+    @SerializedName("batteryVoltage") val batteryVoltage: Double?,
+    @SerializedName("fuelPercentage") val fuelPercentage: Double?
+)
+
+/** `TelemetryHistoryBucketResponse` de `GET /iot/telemetry/vehicle/{vehicleId}/history` (docs/api/iot.md). */
+data class TelemetryHistoryBucketDto(
+    @SerializedName("bucketTime") val bucketTime: String?,
+    @SerializedName("vehicleId") val vehicleId: String?,
+    @SerializedName("avgSpeedKmh") val avgSpeedKmh: Int?,
+    @SerializedName("avgEngineTempCelsius") val avgEngineTempCelsius: Double?,
+    @SerializedName("avgEngineRpm") val avgEngineRpm: Int?,
+    @SerializedName("avgFuelPercentage") val avgFuelPercentage: Double?,
+    @SerializedName("avgBatteryVoltage") val avgBatteryVoltage: Double?,
+    @SerializedName("sampleCount") val sampleCount: Int?
+)

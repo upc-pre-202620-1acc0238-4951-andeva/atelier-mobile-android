@@ -14,11 +14,19 @@ class ObdResponseParserTest {
     fun `modo 03 sin CAN trae tres pares por linea y rellena con ceros`() {
         assertEquals(listOf("P0133"), codes("43 01 33 00 00 00 00\r\r>"))
         assertEquals(listOf("P0133", "P0300", "C0035"), codes("43013303004035\r"))
+        assertEquals(
+            listOf("P0201", "P0300"),
+            ObdResponseParser.dtcs("43 02 01 03 00 00 00", isCanProtocol = false).map { it.code }
+        )
     }
 
     @Test
     fun `modo 03 en CAN antepone la cantidad de codigos`() {
         assertEquals(listOf("P0133", "B0134"), codes("43 02 01 33 81 34"))
+        assertEquals(
+            listOf("P0133", "B0134"),
+            ObdResponseParser.dtcs("43 02 01 33 81 34", isCanProtocol = true).map { it.code }
+        )
         assertEquals(emptyList<String>(), codes("4300"))
     }
 

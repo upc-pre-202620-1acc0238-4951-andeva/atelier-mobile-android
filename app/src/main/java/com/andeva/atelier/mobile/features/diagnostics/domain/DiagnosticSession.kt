@@ -12,7 +12,14 @@ interface DiagnosticSession {
     /** Id de la conexión actual, para la `dedupe_key` de `REGISTER_FAULT`; null sin conexión. */
     val sessionId: String?
 
+    /** Vehículo cuya telemetría se está transmitiendo en vivo actualmente; null si no hay stream activo. */
+    val activeVehicleId: String?
+        get() = state.value.takeIf { it.state == ObdLinkState.STREAMING || it.state == ObdLinkState.RECONNECTING }?.vehicleId
+
     suspend fun connect(address: String): Result<ObdConnectionInfo>
+
+    /** Reconecta sobre el último adaptador Bluetooth enlazado cuando la sesión cayó a [ObdLinkState.LOST]. */
+    suspend fun reconnect(): Result<ObdConnectionInfo> = Result.failure(ObdNotConnectedException())
 
     /** Muestreo cada 2 s del vehículo [vehicleId] (US18 E1, US19 E1). */
     suspend fun startStreaming(vehicleId: String): Result<Unit>

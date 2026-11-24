@@ -204,4 +204,73 @@ class DiagnosticsRepositoryImplTest {
         assertEquals("s1", alert.recommendedServiceId)
         assertEquals("ACKNOWLEDGED", repository.observePredictiveAlerts("v1").first().first { it.id == "a1" }.status?.name)
     }
+
+    @Test
+    fun `alertas del taller y convertir alerta en cita preventiva`() = runTest {
+        env.responses["GET /api/v1/iot/alerts/tenant"] = env.json(listOf(env.alert("a1"), env.alert("a2")))
+        val alerts = repository.getTenantPredictiveAlerts().getOrThrow()
+        assertEquals(2, alerts.size)
+        assertEquals(2, repository.observeAllPredictiveAlerts().first().size)
+
+        env.responses["POST /api/v1/iot/alerts/a1/convert-to-appointment"] = env.json(
+            mapOf(
+                "appointmentId" to "apt-1",
+                "vehicleId" to "v1",
+                "customerId" to "c1",
+                "scheduledAt" to "2026-10-25T15:00:00Z",
+                "status" to "PENDING",
+                "notes" to "Revisar sistema de refrigeración"
+            )
+        )
+        val appointment = repository.convertAlertToAppointment("a1").getOrThrow()
+        assertEquals("apt-1", appointment.appointmentId)
+        assertEquals("v1", appointment.vehicleId)
+        assertEquals(Instant.parse("2026-10-25T15:00:00Z"), appointment.scheduledAt)
+        assertEquals("Revisar sistema de refrigeración", appointment.notes)
+    }
+
+    @Test
+    fun `telemetria remota latest e historial por bucket`() = runTest {
+        assertNull(repository.getLatestVehicleTelemetry("v1").getOrThrow())
+
+        env.responses["GET /api/v1/iot/telemetry/vehicle/v1/latest"] = env.json(
+            mapOf(
+                "vehicleId" to "v1",
+                "timestamp" to "2026-10-24T13:55:00Z",
+                "speedKmh" to 42,
+                "engineTempCelsius" to 92.5,
+                "engineRpm" to 2100,
+                "batteryVoltage" to 13.8,
+                "fuelPercentage" to 64.0
+            )
+        )
+        val latest = repository.getLatestVehicleTelemetry("v1").getOrThrow()!!
+        assertEquals(42, latest.speedKmh)
+        assertEquals(92.5, latest.engineTempCelsius!!, 0.0)
+        assertEquals(2100, latest.engineRpm)
+
+        env.responses["GET /api/v1/iot/telemetry/vehicle/v1/history"] = env.json(
+            listOf(
+                mapOf(
+                    "bucketTime" to "2026-10-24T13:00:00Z",
+                    "vehicleId" to "v1",
+                    "avgSpeedKmh" to 38,
+                    "avgEngineTempCelsius" to 90.0,
+                    "avgEngineRpm" to 1950,
+                    "avgFuelPercentage" to 65.0,
+                    "avgBatteryVoltage" to 13.9,
+                    "sampleCount" to 120
+                )
+            )
+        )
+        val from = Instant.parse("2026-10-24T12:00:00Z")
+        val to = Instant.parse("2026-10-24T14:00:00Z")
+        val history = repository.getVehicleTelemetryHistory("v1", from, to, "1 hour").getOrThrow()
+        assertEquals(1, history.size)
+        assertEquals(120, history.single().sampleCount)
+        val url = env.requested("GET", "/api/v1/iot/telemetry/vehicle/v1/history").single().requestUrl!!
+        assertEquals("2026-10-24T12:00:00Z", url.queryParameter("from"))
+        assertEquals("2026-10-24T14:00:00Z", url.queryParameter("to"))
+        assertEquals("1 hour", url.queryParameter("bucket"))
+    }
 }

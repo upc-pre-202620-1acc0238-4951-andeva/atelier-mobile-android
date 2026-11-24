@@ -13,7 +13,9 @@ data class TelemetrySample(
     val speedKmh: Int?,
     val batteryVoltage: Double?,
     val fuelPercentage: Double?,
-    val intakePressureKpa: Int?
+    val intakePressureKpa: Int?,
+    val engineLoadPercentage: Double? = null,
+    val throttlePositionPercentage: Double? = null
 ) {
     val canBeSent: Boolean get() = engineTempCelsius != null
 }
@@ -51,3 +53,28 @@ data class DiagnosticsSyncState(
 ) {
     val isSynced: Boolean get() = pendingReadings == 0 && pendingFaults == 0
 }
+
+/** Última lectura remota registrada en TimescaleDB (`VehicleLatestTelemetryResponse`, `iot:telemetry:read`). */
+data class LatestVehicleTelemetry(
+    val vehicleId: String,
+    val timestamp: Instant?,
+    val latitude: Double?,
+    val longitude: Double?,
+    val speedKmh: Int?,
+    val engineTempCelsius: Double?,
+    val engineRpm: Int?,
+    val batteryVoltage: Double?,
+    val fuelPercentage: Double?
+)
+
+/** Ventana histórica agregada (`TelemetryHistoryBucketResponse`, `iot:telemetry:read`). */
+data class TelemetryHistoryBucket(
+    val bucketTime: Instant?,
+    val vehicleId: String,
+    val avgSpeedKmh: Int?,
+    val avgEngineTempCelsius: Double?,
+    val avgEngineRpm: Int?,
+    val avgFuelPercentage: Double?,
+    val avgBatteryVoltage: Double?,
+    val sampleCount: Int
+)

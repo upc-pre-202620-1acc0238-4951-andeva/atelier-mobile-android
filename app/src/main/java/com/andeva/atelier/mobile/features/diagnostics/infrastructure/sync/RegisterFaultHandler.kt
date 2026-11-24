@@ -40,6 +40,10 @@ class RegisterFaultHandler @Inject constructor(
         return outcome
     }
 
+    override suspend fun onDiscard(operation: PendingOperationEntity) {
+        faultDao.deleteById(VehicleFault.LOCAL_PREFIX + operation.id)
+    }
+
     companion object {
         const val TYPE = "REGISTER_FAULT"
     }
