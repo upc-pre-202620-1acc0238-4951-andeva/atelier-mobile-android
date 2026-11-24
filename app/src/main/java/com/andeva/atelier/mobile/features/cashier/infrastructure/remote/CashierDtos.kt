@@ -136,3 +136,17 @@ data class ConfigureSeriesRequestDto(
 
 /** `UpdateSeriesStatusRequest`. */
 data class UpdateSeriesStatusRequestDto(@SerializedName("active") val active: Boolean)
+
+/** `VoidVoucherRequest` de docs/api/invoicing.md. */
+data class VoidVoucherRequestDto(@SerializedName("reason") val reason: String)
+
+/** `IssueCreditNoteRequest` de docs/api/invoicing.md. */
+data class IssueCreditNoteRequestDto(
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("customerId") val customerId: String,
+    @SerializedName("lines") val lines: List<VoucherLineRequestDto>,
+    @SerializedName("reason") val reason: String,
+    @SerializedName("reasonDescription") val reasonDescription: String,
+    @SerializedName("referenceVoucherId") val referenceVoucherId: String,
+    @SerializedName("serie") val serie: String
+)

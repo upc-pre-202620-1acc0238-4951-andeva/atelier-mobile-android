@@ -93,3 +93,131 @@ data class ReceivePurchaseOrderRequestDto(
     @SerializedName("receiptNumber") val receiptNumber: String,
     @SerializedName("receivedAt") val receivedAt: String?
 )
+
+/** `CreatePartResource` de docs/api/inventory.md. */
+data class CreatePartRequestDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("sku") val sku: String,
+    @SerializedName("category") val category: String,
+    @SerializedName("basePrice") val basePrice: BigDecimal,
+    @SerializedName("minimumStock") val minimumStock: BigDecimal,
+    @SerializedName("unitOfMeasure") val unitOfMeasure: String? = null
+)
+
+/** `UpdatePartResource` de docs/api/inventory.md. */
+data class UpdatePartRequestDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("category") val category: String,
+    @SerializedName("basePrice") val basePrice: BigDecimal,
+    @SerializedName("minimumStock") val minimumStock: BigDecimal,
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("unitOfMeasure") val unitOfMeasure: String? = null
+)
+
+/** `SupplierResource` de docs/api/inventory.md. */
+data class SupplierDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("tenantId") val tenantId: String?,
+    @SerializedName("businessName") val businessName: String?,
+    @SerializedName("taxId") val taxId: String?,
+    @SerializedName("contactName") val contactName: String?,
+    @SerializedName("phone") val phone: String?,
+    @SerializedName("email") val email: String?,
+    @SerializedName("address") val address: String?,
+    @SerializedName("active") val active: Boolean?
+)
+
+/** `RegisterSupplierResource` de docs/api/inventory.md. */
+data class RegisterSupplierRequestDto(
+    @SerializedName("businessName") val businessName: String,
+    @SerializedName("taxId") val taxId: String,
+    @SerializedName("contactName") val contactName: String? = null,
+    @SerializedName("phone") val phone: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("address") val address: String? = null
+)
+
+/** `UpdateSupplierResource` de docs/api/inventory.md. */
+data class UpdateSupplierRequestDto(
+    @SerializedName("businessName") val businessName: String? = null,
+    @SerializedName("contactName") val contactName: String? = null,
+    @SerializedName("phone") val phone: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("address") val address: String? = null,
+    @SerializedName("active") val active: Boolean? = null
+)
+
+/** `CreatePurchaseOrderItemResource` de docs/api/inventory.md. */
+data class CreatePurchaseOrderItemRequestDto(
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("quantity") val quantity: BigDecimal,
+    @SerializedName("unitCost") val unitCost: BigDecimal
+)
+
+/** `CreatePurchaseOrderResource` de docs/api/inventory.md. */
+data class CreatePurchaseOrderRequestDto(
+    @SerializedName("branchId") val branchId: String,
+    @SerializedName("supplierId") val supplierId: String,
+    @SerializedName("items") val items: List<CreatePurchaseOrderItemRequestDto>,
+    @SerializedName("orderNumber") val orderNumber: String? = null,
+    @SerializedName("expectedDeliveryDate") val expectedDeliveryDate: String? = null,
+    @SerializedName("notes") val notes: String? = null
+)
+
+/** `CancelPurchaseOrderResource` de docs/api/inventory.md. */
+data class CancelPurchaseOrderRequestDto(
+    @SerializedName("reason") val reason: String? = null
+)
+
+/** `ReceiveBatchResource` de docs/api/inventory.md. */
+data class ReceiveBatchRequestDto(
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("batchNumber") val batchNumber: String,
+    @SerializedName("quantity") val quantity: BigDecimal,
+    @SerializedName("unitCost") val unitCost: BigDecimal,
+    @SerializedName("arrivalDate") val arrivalDate: String? = null,
+    @SerializedName("purchaseOrderId") val purchaseOrderId: String? = null,
+    @SerializedName("receiptImageUrl") val receiptImageUrl: String? = null,
+    @SerializedName("supplierId") val supplierId: String? = null
+)
+
+/** `DispatchBatchFifoResource` de docs/api/inventory.md. */
+data class DispatchBatchFifoRequestDto(
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("quantity") val quantity: BigDecimal,
+    @SerializedName("taskId") val taskId: String? = null,
+    @SerializedName("workOrderId") val workOrderId: String? = null
+)
+
+/** `BatchDeductionResource` de docs/api/inventory.md. */
+data class BatchDeductionDto(
+    @SerializedName("batchId") val batchId: String,
+    @SerializedName("quantityDeducted") val quantityDeducted: BigDecimal?,
+    @SerializedName("unitCost") val unitCost: BigDecimal?,
+    @SerializedName("subtotal") val subtotal: BigDecimal?
+)
+
+/** `StockAllocationResource` de docs/api/inventory.md. */
+data class StockAllocationDto(
+    @SerializedName("allocationId") val allocationId: String,
+    @SerializedName("allocatedQuantity") val allocatedQuantity: BigDecimal?,
+    @SerializedName("totalCogs") val totalCogs: BigDecimal?,
+    @SerializedName("deductions") val deductions: List<BatchDeductionDto>?
+)
+
+/** `RestoreBatchResource` de docs/api/inventory.md. */
+data class RestoreBatchRequestDto(
+    @SerializedName("itemId") val itemId: String,
+    @SerializedName("quantity") val quantity: BigDecimal,
+    @SerializedName("batchId") val batchId: String? = null,
+    @SerializedName("reason") val reason: String? = null,
+    @SerializedName("workOrderId") val workOrderId: String? = null
+)
+
+/** Respuesta 200 de `POST /api/v1/inventory/batches/restore`. */
+data class RestoreBatchResponseDto(
+    @SerializedName("status") val status: String?,
+    @SerializedName("message") val message: String?,
+    @SerializedName("batchId") val batchId: String?,
+    @SerializedName("restoredQuantity") val restoredQuantity: BigDecimal?
+)

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.domain.Session
+import com.andeva.atelier.mobile.core.notifications.AuthDeepLink
+import com.andeva.atelier.mobile.core.notifications.AuthDeepLinkInbox
 import com.andeva.atelier.mobile.core.notifications.PushDestination
 import com.andeva.atelier.mobile.core.notifications.PushInbox
 import com.andeva.atelier.mobile.features.main.application.ObservePendingOperationCountUseCase
@@ -29,10 +31,11 @@ sealed interface SessionState {
 class AppNavHostViewModel @Inject constructor(
     sessionManager: SessionManager,
     observePendingCount: ObservePendingOperationCountUseCase? = null,
-    private val pushInbox: PushInbox? = null
+    private val pushInbox: PushInbox? = null,
+    private val authDeepLinkInbox: AuthDeepLinkInbox? = null
 ) : ViewModel() {
 
-    constructor(sessionManager: SessionManager) : this(sessionManager, null, null)
+    constructor(sessionManager: SessionManager) : this(sessionManager, null, null, null)
 
     val sessionFlow: StateFlow<Session?> = sessionManager.session
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -40,8 +43,12 @@ class AppNavHostViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
     val pendingPush: StateFlow<PushDestination?> = pushInbox?.pending
         ?: kotlinx.coroutines.flow.MutableStateFlow(null)
+    val pendingAuthDeepLink: StateFlow<AuthDeepLink?> = authDeepLinkInbox?.pending
+        ?: kotlinx.coroutines.flow.MutableStateFlow(null)
 
     fun consumePush(): PushDestination? = pushInbox?.consume()
+
+    fun consumeAuthDeepLink(): AuthDeepLink? = authDeepLinkInbox?.consume()
 
     /** Cuando el refresh falla la sesión se borra y esto vuelve a [SessionState.SignedOut]. */
     val sessionState: StateFlow<SessionState> = sessionManager.session

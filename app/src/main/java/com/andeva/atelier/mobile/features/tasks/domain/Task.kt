@@ -26,7 +26,8 @@ data class Task(
     val missingItemDescription: String?,
     val pendingSuspensionReason: String?,
     val startedAt: Instant?,
-    val totalPausedSeconds: Long
+    val totalPausedSeconds: Long,
+    val pendingSuspensionRequestedAt: Instant? = null
 ) {
     /** En pausa por refrigerio o fin de turno: el mecánico la reanuda con `StartTaskUseCase`. */
     val isPausedByMechanic: Boolean get() = isPausedByMechanic(status, holdReason)
@@ -35,7 +36,7 @@ data class Task(
     val isSuspended: Boolean get() = isSuspended(status, holdReason)
 
     /** Solicitud de suspensión enviada, a la espera de que un supervisor la apruebe o rechace. */
-    val hasPendingSuspension: Boolean get() = pendingSuspensionReason != null
+    val hasPendingSuspension: Boolean get() = pendingSuspensionRequestedAt != null || !pendingSuspensionReason.isNullOrBlank()
 }
 
 internal fun isPausedByMechanic(status: TaskStatus?, holdReason: HoldReason?) =

@@ -24,6 +24,13 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkO
 import java.math.BigDecimal
 import java.time.Instant
 
+private val AppointmentUuidSuffixRegex =
+    Regex("""\s*:\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*$""")
+
+/** Quita el `: <uuid>` técnico que el backend concatena al crear una orden desde una cita (H10). */
+fun String?.cleanDiagnosticSummary(): String? =
+    this?.replace(AppointmentUuidSuffixRegex, "")?.trim()?.takeIf { it.isNotEmpty() }
+
 /** Room guarda los montos como texto decimal (docs/06-offline-sync.md §5); sin moneda se asume PEN. */
 fun WorkOrderDto.toEntity(syncedAt: Long) = WorkOrderEntity(
     id = id,
@@ -34,7 +41,7 @@ fun WorkOrderDto.toEntity(syncedAt: Long) = WorkOrderEntity(
     currentBayId = currentBayId,
     bayName = bayName,
     status = status.orEmpty(),
-    diagnosticSummary = diagnosticSummary,
+    diagnosticSummary = diagnosticSummary.cleanDiagnosticSummary(),
     mileageIn = mileageIn,
     subtotal = subtotal?.toPlainString(),
     taxAmount = taxAmount?.toPlainString(),
@@ -52,7 +59,7 @@ fun WorkOrderEntity.toDomain(plate: String? = null, customerName: String? = null
     currentBayId = currentBayId,
     bayName = bayName,
     status = status.toEnum<WorkOrderStatus>(),
-    diagnosticSummary = diagnosticSummary,
+    diagnosticSummary = diagnosticSummary.cleanDiagnosticSummary(),
     mileageIn = mileageIn,
     subtotal = money(subtotal?.toBigDecimalOrNull(), currency),
     taxAmount = money(taxAmount?.toBigDecimalOrNull(), currency),

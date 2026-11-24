@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.tasks.application
 import com.andeva.atelier.mobile.features.tasks.domain.EvidenceKind
 import com.andeva.atelier.mobile.features.tasks.domain.InvalidTaskInputException
 import com.andeva.atelier.mobile.features.tasks.domain.Task
+import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskRepository
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
@@ -27,6 +28,14 @@ class TaskUseCasesTest {
 
     private fun field(result: Result<*>) = (result.exceptionOrNull() as InvalidTaskInputException).field
 
+    private fun detail(status: TaskStatus = TaskStatus.ASSIGNED) = TaskDetail(
+        id = id, workOrderId = "wo1", serviceId = "s1", serviceName = "Frenos", mechanicId = "m1", mechanicName = null,
+        status = status, description = "Cambio de pastillas", price = null, holdReason = null,
+        missingItemDescription = null, totalPausedSeconds = 0, startedAt = null, completedAt = null,
+        pendingSuspensionReason = null, pendingSuspensionRequestedAt = null, products = emptyList(),
+        evidenceImages = emptyList()
+    )
+
     @Test
     fun `datos invalidos no llegan al backend`() = runTest {
         assertEquals("actualLaborHours", field(CompleteTaskUseCase(repository)(id, BigDecimal("-1"))))
@@ -40,6 +49,7 @@ class TaskUseCasesTest {
         )
         coVerify(exactly = 0) { repository.complete(any(), any(), any()) }
         coVerify(exactly = 0) { repository.attachEvidence(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { repository.requestSuspension(any(), any(), any()) }
     }
 
     @Test
@@ -63,5 +73,32 @@ class TaskUseCasesTest {
 
         assertEquals(BigDecimal("2.00"), suggest(task))
         assertNull(suggest(task.copy(startedAt = null)))
+    }
+
+    @Test
+    fun `reabrir tarea recorta el motivo y envia null si esta vacio`() = runTest {
+        coEvery { repository.reopen(id, "Revisar torque") } returns Result.success(detail(TaskStatus.ASSIGNED))
+        coEvery { repository.reopen(id, null) } returns Result.success(detail(TaskStatus.ASSIGNED))
+
+        val withReason = ReopenTaskUseCase(repository)(id, "  Revisar torque  ")
+        val withoutReason = ReopenTaskUseCase(repository)(id, "   ")
+
+        assertTrue(withReason.isSuccess)
+        assertTrue(withoutReason.isSuccess)
+        coVerify(exactly = 1) { repository.reopen(id, "Revisar torque") }
+        coVerify(exactly = 1) { repository.reopen(id, null) }
+    }
+
+    @Test
+    fun `casos de uso de suspension delegan en el repositorio`() = runTest {
+        coEvery { repository.requestSuspension(id, "Falta retén", "part-1") } returns Result.success(detail(TaskStatus.IN_PROGRESS))
+        coEvery { repository.approveSuspension(id) } returns Result.success(detail(TaskStatus.ON_HOLD))
+        coEvery { repository.rejectSuspension(id) } returns Result.success(detail(TaskStatus.IN_PROGRESS))
+        coEvery { repository.resume(id) } returns Result.success(detail(TaskStatus.IN_PROGRESS))
+
+        assertTrue(RequestSuspensionUseCase(repository)(id, "Falta retén", "part-1").isSuccess)
+        assertTrue(ApproveSuspensionUseCase(repository)(id).isSuccess)
+        assertTrue(RejectSuspensionUseCase(repository)(id).isSuccess)
+        assertTrue(ResumeSuspendedTaskUseCase(repository)(id).isSuccess)
     }
 }

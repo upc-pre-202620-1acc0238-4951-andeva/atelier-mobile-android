@@ -27,7 +27,7 @@ data class TaskDetail(
 ) {
     val isPausedByMechanic: Boolean get() = isPausedByMechanic(status, holdReason)
     val isSuspended: Boolean get() = isSuspended(status, holdReason)
-    val hasPendingSuspension: Boolean get() = pendingSuspensionReason != null
+    val hasPendingSuspension: Boolean get() = pendingSuspensionRequestedAt != null || !pendingSuspensionReason.isNullOrBlank()
 }
 
 /** Repuesto imputado a la tarea (`TaskProductResource`). El precio queda fijo al imputar (US35 E3). */

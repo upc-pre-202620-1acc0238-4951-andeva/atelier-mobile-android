@@ -10,6 +10,12 @@ interface BayRepository {
 
     suspend fun reassignBay(workOrderId: String, bayId: String): Result<Unit>
 
+    suspend fun releaseBay(workOrderId: String): Result<Unit>
+
+    suspend fun setBayMaintenance(bayId: String, reason: String): Result<WorkBay>
+
+    suspend fun restoreBay(bayId: String): Result<WorkBay>
+
     suspend fun reassignMechanic(taskId: String, mechanicId: String): Result<Unit>
 
     suspend fun createBay(name: String, bayType: BayType): Result<WorkBay>

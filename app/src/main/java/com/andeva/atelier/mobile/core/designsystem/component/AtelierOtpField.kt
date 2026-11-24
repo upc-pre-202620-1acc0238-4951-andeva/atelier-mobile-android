@@ -29,16 +29,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.FieldShape
-import com.andeva.atelier.mobile.core.designsystem.theme.JetBrainsMono
+import com.andeva.atelier.mobile.core.designsystem.theme.Satoshi
 
 /**
  * Código de [length] dígitos. Es un solo campo de texto (acepta pegar y el código del SMS/correo)
@@ -96,16 +94,14 @@ fun AtelierOtpField(
                             .height(64.dp)
                             .clip(FieldShape)
                             .background(scheme.surface)
-                            .border(1.5.dp, border, FieldShape),
+                            .border(if (active || isError) 2.dp else 1.dp, border, FieldShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = value.getOrNull(index)?.toString().orEmpty(),
-                            style = TextStyle(
-                                fontFamily = JetBrainsMono,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 28.sp,
-                                lineHeight = 36.sp
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontFamily = Satoshi,
+                                fontWeight = FontWeight.Bold
                             ),
                             color = scheme.onSurface
                         )

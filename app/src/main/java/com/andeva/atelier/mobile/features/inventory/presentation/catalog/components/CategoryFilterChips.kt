@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.andeva.atelier.mobile.core.designsystem.theme.ControlShape
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.presentation.labelRes
 
@@ -28,7 +29,8 @@ internal fun CategoryFilterChips(
             FilterChip(
                 selected = category == selected,
                 onClick = { onClick(category) },
-                label = { Text(stringResource(category.labelRes())) }
+                label = { Text(stringResource(category.labelRes())) },
+                shape = ControlShape
             )
         }
     }

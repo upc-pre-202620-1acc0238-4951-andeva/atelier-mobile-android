@@ -146,7 +146,7 @@ fun VoucherDraft.toRequest(branchId: String, serie: String) = IssueVoucherReques
         documentType = customerInfo.documentType?.name,
         taxId = customerInfo.taxId,
         legalName = customerInfo.legalName,
-        fiscalAddress = customerInfo.fiscalAddress
+        fiscalAddress = customerInfo.fiscalAddress?.takeIf { it.isNotBlank() } ?: "-"
     ),
     lines = lines.map {
         VoucherLineRequestDto(

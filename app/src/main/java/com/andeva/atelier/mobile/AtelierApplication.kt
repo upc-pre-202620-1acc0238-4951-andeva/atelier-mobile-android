@@ -5,9 +5,15 @@ import android.app.Application
 import android.os.Bundle
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.data.sync.SyncScheduler
+import com.andeva.atelier.mobile.core.data.sync.WorkshopCacheEvent
+import com.andeva.atelier.mobile.core.data.sync.WorkshopCacheEventBus
+import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.notifications.NotificationChannels
+import com.andeva.atelier.mobile.features.bays.domain.BayRepository
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +29,10 @@ class AtelierApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var syncScheduler: SyncScheduler
     @Inject lateinit var connectivityObserver: ConnectivityObserver
+    @Inject lateinit var cacheEventBus: WorkshopCacheEventBus
+    @Inject lateinit var sessionManager: SessionManager
+    @Inject lateinit var workOrderRepository: WorkOrderRepository
+    @Inject lateinit var bayRepository: BayRepository
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -37,6 +47,25 @@ class AtelierApplication : Application(), Configuration.Provider {
         syncScheduler.schedulePeriodic()
         appScope.launch {
             connectivityObserver.isOnline.drop(1).filter { it }.collect { syncScheduler.requestSync() }
+        }
+        // Invalidación de cachés entre features en ámbito de aplicación (sobrevive a navegación inmediata).
+        appScope.launch(Dispatchers.IO) {
+            cacheEventBus.events.collect { event ->
+                val session = runCatching { sessionManager.getSession() }.getOrNull() ?: return@collect
+                when (event) {
+                    is WorkshopCacheEvent.WorkOrderMutated -> {
+                        if (session.has(Permission.WORK_ORDERS_READ)) {
+                            runCatching { workOrderRepository.getDetail(event.workOrderId) }
+                            runCatching { workOrderRepository.refreshBranchWorkOrders() }
+                        }
+                    }
+                    is WorkshopCacheEvent.VehicleDelivered -> {
+                        if (session.has(Permission.BAYS_READ)) {
+                            runCatching { bayRepository.refreshBranchBays() }
+                        }
+                    }
+                }
+            }
         }
         registerActivityLifecycleCallbacks(ForegroundTrigger { syncScheduler.requestSync() })
     }

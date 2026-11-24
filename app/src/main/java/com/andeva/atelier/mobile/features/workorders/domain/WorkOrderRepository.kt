@@ -2,6 +2,7 @@ package com.andeva.atelier.mobile.features.workorders.domain
 
 import kotlinx.coroutines.flow.Flow
 import java.io.File
+import java.math.BigDecimal
 
 /**
  * Órdenes de trabajo (US12–US15, US22, US24, US25, US36, US33 E2, US35 E2). La UI observa la caché `work_orders`
@@ -30,7 +31,28 @@ interface WorkOrderRepository {
 
     suspend fun updateTask(workOrderId: String, taskId: String, changes: WorkOrderTaskChanges): Result<WorkOrderDetail>
 
+    suspend fun removeTask(workOrderId: String, taskId: String): Result<WorkOrderDetail>
+
     suspend fun getServiceCatalog(): Result<List<ServiceOption>>
+
+    suspend fun refreshServiceCatalog(): Result<List<ServiceOption>>
+
+    suspend fun createService(
+        name: String,
+        basePrice: BigDecimal,
+        currency: String,
+        estimatedMinutes: Int
+    ): Result<ServiceOption>
+
+    suspend fun updateService(
+        serviceId: String,
+        name: String,
+        basePrice: BigDecimal,
+        currency: String,
+        estimatedMinutes: Int
+    ): Result<ServiceOption>
+
+    suspend fun deleteService(serviceId: String): Result<Unit>
 
     suspend fun getBranchMechanics(): Result<List<MechanicOption>>
 

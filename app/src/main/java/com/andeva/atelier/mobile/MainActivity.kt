@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.notifications.AuthDeepLinkInbox
 import com.andeva.atelier.mobile.core.notifications.PushInbox
 import com.andeva.atelier.mobile.core.notifications.PushRouter
 import com.andeva.atelier.mobile.navigation.AppNavHost
@@ -16,11 +17,15 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var pushInbox: PushInbox
+    @Inject lateinit var authDeepLinkInbox: AuthDeepLinkInbox
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) handlePush(intent)
+        if (savedInstanceState == null) {
+            handlePush(intent)
+            authDeepLinkInbox.postFromUri(intent?.data)
+        }
         setContent {
             AtelierWorkshopTheme {
                 AppNavHost()
@@ -31,6 +36,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handlePush(intent)
+        authDeepLinkInbox.postFromUri(intent.data)
     }
 
     /** Push tocado: los extras traen `data` del mensaje (`type` + ids). */

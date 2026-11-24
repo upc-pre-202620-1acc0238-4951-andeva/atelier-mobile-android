@@ -15,7 +15,7 @@ interface PendingOperationDao {
 
     @Query(
         "SELECT * FROM pending_operations WHERE user_id = :userId AND status = 'PENDING' " +
-            "AND next_attempt_at <= :now ORDER BY created_at"
+            "AND next_attempt_at <= :now ORDER BY CASE WHEN depends_on IS NULL THEN 0 ELSE 1 END, created_at"
     )
     suspend fun nextBatch(userId: String, now: Long): List<PendingOperationEntity>
 
@@ -91,6 +91,10 @@ interface PendingOperationDao {
 
     @Query("SELECT COUNT(*) FROM pending_operations WHERE user_id = :userId")
     fun countPending(userId: String): Flow<Int>
+
+    /** Conteo neutro a nivel de dispositivo para advertir en Login sin exponer detalles de usuarios (US04). */
+    @Query("SELECT COUNT(*) FROM pending_operations")
+    suspend fun countAll(): Int
 
     @Query("SELECT * FROM pending_operations WHERE user_id = :userId ORDER BY created_at")
     fun observeForUser(userId: String): Flow<List<PendingOperationEntity>>

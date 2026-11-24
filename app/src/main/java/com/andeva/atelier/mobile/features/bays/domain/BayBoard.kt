@@ -11,7 +11,8 @@ data class BayOccupant(
     val internalNumber: Int?,
     val plate: String?,
     val mechanicIds: List<String>,
-    val laborElapsed: Duration?
+    val laborElapsed: Duration?,
+    val tasks: List<TaskDetail> = emptyList()
 )
 
 /** Una fila del tablero de bahías: la bahía y, si está ocupada, quién la ocupa. */

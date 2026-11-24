@@ -192,6 +192,31 @@ class PendingOperationRepositoryImplTest {
         assertNotNull(dao.findById("theirs"))
     }
 
+    @Test
+    fun `descartar invoca onDiscard del handler registrado`() = runTest {
+        val discarded = mutableListOf<String>()
+        val customHandler = object : com.andeva.atelier.mobile.core.data.sync.OperationHandler {
+            override suspend fun send(operation: PendingOperationEntity) =
+                com.andeva.atelier.mobile.core.data.sync.OperationResult.Applied
+            override suspend fun onDiscard(operation: PendingOperationEntity) {
+                discarded += operation.id
+            }
+        }
+        val repoWithHandlers = PendingOperationRepositoryImpl(
+            dao = dao,
+            uploadDao = uploadDao,
+            sessionManager = sessionManager,
+            syncScheduler = syncScheduler,
+            gson = gson,
+            handlers = mapOf("TELEMETRY_BATCH" to customHandler)
+        )
+        dao.enqueue(op("batch-1", type = "TELEMETRY_BATCH"))
+
+        assertTrue(repoWithHandlers.discard("batch-1"))
+        assertEquals(listOf("batch-1"), discarded)
+        assertNull(dao.findById("batch-1"))
+    }
+
     private class FakePendingUploadDao : PendingUploadDao {
         private val rows = mutableMapOf<String, PendingUploadEntity>()
 

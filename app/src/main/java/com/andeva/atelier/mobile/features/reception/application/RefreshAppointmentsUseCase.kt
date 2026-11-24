@@ -12,4 +12,6 @@ class RefreshAppointmentsUseCase @Inject constructor(
     private val receptionRepository: ReceptionRepository
 ) {
     suspend operator fun invoke(date: LocalDate): Result<Unit> = receptionRepository.refreshAppointments(date)
+
+    suspend operator fun invoke(from: LocalDate, to: LocalDate): Result<Unit> = receptionRepository.refreshAppointments(from, to)
 }

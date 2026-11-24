@@ -10,8 +10,26 @@ import retrofit2.http.Query
 
 /** Comprobantes, pagos y series de docs/api/invoicing.md. */
 interface CashierService {
+    @GET("api/v1/invoicing/vouchers")
+    suspend fun getVouchers(
+        @Query("branchId") branchId: String? = null,
+        @Query("voucherType") voucherType: String? = null,
+        @Query("status") status: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null
+    ): Response<List<ElectronicVoucherDto>>
+
     @POST("api/v1/invoicing/vouchers")
     suspend fun issueVoucher(@Body body: IssueVoucherRequestDto): Response<ElectronicVoucherDto>
+
+    @POST("api/v1/invoicing/vouchers/{id}/void")
+    suspend fun voidVoucher(
+        @Path("id") id: String,
+        @Body body: VoidVoucherRequestDto
+    ): Response<ElectronicVoucherDto>
+
+    @POST("api/v1/invoicing/vouchers/credit-notes")
+    suspend fun issueCreditNote(@Body body: IssueCreditNoteRequestDto): Response<ElectronicVoucherDto>
 
     @GET("api/v1/invoicing/vouchers/{id}")
     suspend fun getVoucher(@Path("id") id: String): Response<ElectronicVoucherDto>

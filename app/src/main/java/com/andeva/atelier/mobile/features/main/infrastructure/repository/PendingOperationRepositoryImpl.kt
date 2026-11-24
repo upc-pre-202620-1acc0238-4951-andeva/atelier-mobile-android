@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.features.main.infrastructure.repository
 
 import com.andeva.atelier.mobile.core.data.local.SessionManager
+import com.andeva.atelier.mobile.core.data.sync.OperationHandler
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationEntity
 import com.andeva.atelier.mobile.core.data.sync.PendingUploadDao
@@ -31,7 +32,8 @@ class PendingOperationRepositoryImpl @Inject constructor(
     private val uploadDao: PendingUploadDao,
     private val sessionManager: SessionManager,
     private val syncScheduler: SyncScheduler,
-    private val gson: Gson
+    private val gson: Gson,
+    private val handlers: Map<String, @JvmSuppressWildcards OperationHandler> = emptyMap()
 ) : PendingOperationRepository {
 
     /** Cambia sola al cambiar de usuario: nunca se ve la cola de otro (06 §3, "Cambio de usuario"). */
@@ -91,6 +93,7 @@ class PendingOperationRepositoryImpl @Inject constructor(
         // Primero la cola (si el worker ya tenía la operación en su lote, actualizar una fila ausente no hace nada),
         // después las subidas y al final los archivos
         dao.deleteAll(ids)
+        operations.forEach { op -> runCatching { handlers[op.type]?.onDiscard(op) } }
         uploads.forEach { uploadDao.delete(it.id) }
         uploads.forEach { File(it.localFilePath).delete() }
         return true

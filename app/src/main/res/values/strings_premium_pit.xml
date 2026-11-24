@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Radar de geocerca en AttendanceScreen -->
+    <string name="pit_geofence_locating">Calibrando señal GPS…</string>
+
+    <!-- Barra de avance estimado en FloorHubScreen -->
+    <string name="pit_task_progress_label">Avance estimado</string>
+    <string name="pit_task_elapsed_vs_est">%1$dh %2$dm / %3$s h</string>
+
+    <!-- Dock elevado de control de labor en TaskDetailScreen -->
+    <string name="pit_dock_running">Labor en curso</string>
+    <string name="pit_dock_paused">Labor en pausa</string>
+    <string name="pit_dock_ready">Lista para iniciar</string>
+
+    <!-- Arco de salud IA en AiHealthReportScreen -->
+    <string name="pit_report_score_max">/ 100</string>
+    <string name="pit_report_score_cd">Puntaje de salud vehicular: %1$d de 100</string>
+</resources>

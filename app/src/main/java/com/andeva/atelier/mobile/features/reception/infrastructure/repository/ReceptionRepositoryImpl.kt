@@ -25,12 +25,17 @@ import com.andeva.atelier.mobile.features.reception.infrastructure.local.Vehicle
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.toDomain
 import com.andeva.atelier.mobile.features.reception.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.AffiliateCustomerRequestDto
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.AppointmentDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.AppointmentService
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CancelAppointmentRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CreateCompanyCustomerRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CreateIndividualCustomerRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CreateVehicleRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CustomerDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.CustomerService
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.RescheduleAppointmentRequestDto
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.ScheduleAppointmentRequestDto
+import com.andeva.atelier.mobile.features.reception.infrastructure.remote.UpdateCustomerContactRequestDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleDto
 import com.andeva.atelier.mobile.features.reception.infrastructure.remote.VehicleService
 import com.google.gson.Gson
@@ -43,6 +48,7 @@ import kotlinx.coroutines.flow.map
 import retrofit2.Response
 import java.io.IOException
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -136,22 +142,26 @@ class ReceptionRepositoryImpl @Inject constructor(
             .map { dtos -> dtos.map { saveVehicle(it) } }
 
     override suspend fun registerIndividual(customer: NewIndividualCustomer): Result<Customer> {
+        val email = customer.email.blankToNull()
+        val phone = customer.phone.blankToNull() ?: if (email == null) DEFAULT_CONTACT_PHONE else null
         val body = CreateIndividualCustomerRequestDto(
             firstName = customer.firstName.trim(),
             lastName = customer.lastName.trim(),
             taxId = customer.taxId.trim(),
-            email = customer.email.blankToNull(),
-            phone = customer.phone.blankToNull()
+            email = email,
+            phone = phone
         )
         return apiCall(gson, { customerService.createIndividual(body) }) { it }.map { saveCustomer(it) }
     }
 
     override suspend fun registerCompany(customer: NewCompanyCustomer): Result<Customer> {
+        val email = customer.email.blankToNull()
+        val phone = customer.phone.blankToNull() ?: if (email == null) DEFAULT_CONTACT_PHONE else null
         val body = CreateCompanyCustomerRequestDto(
             companyName = customer.companyName.trim(),
             taxId = customer.taxId.trim(),
-            email = customer.email.blankToNull(),
-            phone = customer.phone.blankToNull()
+            email = email,
+            phone = phone
         )
         return apiCall(gson, { customerService.createCompany(body) }) { it }.map { saveCustomer(it) }
     }
@@ -164,7 +174,7 @@ class ReceptionRepositoryImpl @Inject constructor(
             engineType = vehicle.engineType.name,
             customerId = vehicle.customerId,
             vin = vehicle.vin.blankToNull(),
-            year = vehicle.year
+            year = vehicle.year ?: LocalDate.now(BusinessTime.ZONE).year
         )
         return apiCall(gson, { vehicleService.create(body) }) { it }.map { saveVehicle(it) }
     }
@@ -180,38 +190,95 @@ class ReceptionRepositoryImpl @Inject constructor(
             .onSuccess { customer -> getCustomerVehicles(customer.id) }
     }
 
-    override suspend fun refreshAppointments(date: LocalDate): Result<Unit> {
+    override suspend fun refreshAppointments(date: LocalDate): Result<Unit> = refreshAppointments(date, date)
+
+    override suspend fun refreshAppointments(from: LocalDate, to: LocalDate): Result<Unit> {
         val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
         val branchId = session.branchId ?: return Result.failure(MissingBranchException())
         if (!session.has(Permission.APPOINTMENTS_READ)) return Result.success(Unit)
         val now = clock.millis()
-        val (from, to) = dayRange(date)
-        return apiCall(gson, { appointmentService.getAppointments(branchId, date.toString()) }) { it }
+        val (rangeStart, rangeEnd) = dateRange(from, to)
+        val singleDay = from == to
+        return apiCall(
+            gson,
+            {
+                appointmentService.getAppointments(
+                    branchId = branchId,
+                    date = if (singleDay) from.toString() else null,
+                    from = if (singleDay) null else from.toString(),
+                    to = if (singleDay) null else to.toString()
+                )
+            }
+        ) { it }
             .mapCatching { dtos ->
                 val rows = dtos.map { it.toEntity(now) }
-                appointmentDao.replaceDay(branchId, from, to, rows)
-                cacheMetadataDao.upsert(CacheMetadataEntity(ReceptionCachePolicy.appointmentsScope(branchId, date), now, rows.size))
+                appointmentDao.replaceDay(branchId, rangeStart, rangeEnd, rows)
+                cacheMetadataDao.upsert(CacheMetadataEntity(ReceptionCachePolicy.appointmentsScope(branchId, from), now, rows.size))
                 rows
             }
             .onSuccess { rows -> enrich(rows.map { it.vehicleId }, rows.map { it.customerId }, session, now) }
             .map { }
     }
 
-    override fun observeAppointments(date: LocalDate): Flow<List<Appointment>> = sessionManager.session
+    override fun observeAppointments(date: LocalDate): Flow<List<Appointment>> = observeAppointments(date, date)
+
+    override fun observeAppointments(from: LocalDate, to: LocalDate): Flow<List<Appointment>> = sessionManager.session
         .map { it?.branchId }
         .distinctUntilChanged()
         .flatMapLatest { branchId ->
             if (branchId == null) return@flatMapLatest flowOf(emptyList())
-            val (from, to) = dayRange(date)
-            appointmentDao.observeDay(branchId, from, to).map { rows -> rows.map { it.toDomain() } }
+            val (rangeStart, rangeEnd) = dateRange(from, to)
+            appointmentDao.observeDay(branchId, rangeStart, rangeEnd).map { rows -> rows.map { it.toDomain() } }
         }
 
     override suspend fun markArrived(id: String): Result<Appointment> =
-        apiCall(gson, { appointmentService.arrive(id) }) { it }.map { dto ->
-            val row = dto.toEntity(clock.millis())
-            appointmentDao.upsert(row)
-            row.toDomain()
-        }
+        apiCall(gson, { appointmentService.arrive(id) }) { it }.map { saveAppointment(it) }
+
+    override suspend fun createAppointment(
+        customerId: String,
+        vehicleId: String,
+        scheduledAt: Instant,
+        estimatedDurationMinutes: Int?,
+        reason: String?
+    ): Result<Appointment> {
+        val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
+        val branchId = session.branchId ?: return Result.failure(MissingBranchException())
+        val body = ScheduleAppointmentRequestDto(
+            branchId = branchId,
+            customerId = customerId,
+            vehicleId = vehicleId,
+            scheduledAt = scheduledAt.toString(),
+            estimatedDurationMinutes = estimatedDurationMinutes,
+            reason = reason.blankToNull()
+        )
+        return apiCall(gson, { appointmentService.schedule(body) }) { it }.map { saveAppointment(it) }
+    }
+
+    override suspend fun confirmAppointment(id: String): Result<Appointment> =
+        apiCall(gson, { appointmentService.confirm(id) }) { it }.map { saveAppointment(it) }
+
+    override suspend fun rescheduleAppointment(id: String, newScheduledAt: Instant): Result<Appointment> {
+        val body = RescheduleAppointmentRequestDto(newScheduledAt = newScheduledAt.toString())
+        return apiCall(gson, { appointmentService.reschedule(id, body) }) { it }.map { saveAppointment(it) }
+    }
+
+    override suspend fun cancelAppointment(id: String, cancellationReason: String): Result<Appointment> {
+        val body = CancelAppointmentRequestDto(cancellationReason = cancellationReason.trim())
+        return apiCall(gson, { appointmentService.cancel(id, body) }) { it }.map { saveAppointment(it) }
+    }
+
+    override suspend fun updateCustomerContact(id: String, email: String?, phone: String?): Result<Customer> {
+        val body = UpdateCustomerContactRequestDto(email = email.blankToNull(), phone = phone.blankToNull())
+        return apiCall(gson, { customerService.updateContact(id, body) }) { it }.map { saveCustomer(it) }
+    }
+
+    private suspend fun saveAppointment(dto: AppointmentDto): Appointment {
+        val row = dto.toEntity(clock.millis())
+        appointmentDao.upsert(row)
+        val plate = vehicleDao.findById(dto.vehicleId)?.plate
+        val customerName = customerDao.findById(dto.customerId)?.displayName
+        return row.toDomain(plate = plate, customerName = customerName)
+    }
 
     private suspend fun saveVehicle(dto: VehicleDto): Vehicle {
         val now = clock.millis()
@@ -261,8 +328,12 @@ class ReceptionRepositoryImpl @Inject constructor(
         return now - lastSyncedAt >= ttlMillis
     }
 
-    private fun dayRange(date: LocalDate): Pair<Long, Long> =
-        BusinessTime.startOfDay(date).toEpochMilli() to BusinessTime.startOfDay(date.plusDays(1)).toEpochMilli()
+    private fun dateRange(from: LocalDate, to: LocalDate): Pair<Long, Long> =
+        BusinessTime.startOfDay(from).toEpochMilli() to BusinessTime.startOfDay(to.plusDays(1)).toEpochMilli()
 
     private fun String?.blankToNull() = this?.trim()?.takeIf { it.isNotEmpty() }
+
+    private companion object {
+        const val DEFAULT_CONTACT_PHONE = "900000000"
+    }
 }

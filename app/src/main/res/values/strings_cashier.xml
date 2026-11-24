@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Caja: vocabulario común -->
+    <string name="cashier_method_cash">Efectivo</string>
+    <string name="cashier_method_credit_card">Tarjeta de crédito</string>
+    <string name="cashier_method_debit_card">Tarjeta de débito</string>
+    <string name="cashier_method_bank_transfer">Transferencia</string>
+    <string name="cashier_method_yape">Yape</string>
+    <string name="cashier_method_plin">Plin</string>
+    <string name="cashier_method_unknown">Otro medio</string>
+
+    <string name="cashier_type_factura">Factura</string>
+    <string name="cashier_type_boleta">Boleta</string>
+    <string name="cashier_type_credit_note">Nota de crédito</string>
+    <string name="cashier_type_unknown">Comprobante</string>
+
+    <string name="cashier_doc_ruc">RUC</string>
+    <string name="cashier_doc_dni">DNI</string>
+    <string name="cashier_doc_ce">CE</string>
+    <string name="cashier_doc_passport">Pasaporte</string>
+
+    <string name="cashier_vstatus_draft">Borrador</string>
+    <string name="cashier_vstatus_issued">Emitido</string>
+    <string name="cashier_vstatus_accepted">Aceptado por SUNAT</string>
+    <string name="cashier_vstatus_rejected">Rechazado por SUNAT</string>
+    <string name="cashier_vstatus_voided">Anulado</string>
+    <string name="cashier_vstatus_unknown">Sin estado</string>
+
+    <string name="cashier_pstatus_pending">Sin cobrar</string>
+    <string name="cashier_pstatus_partial">Cobro parcial</string>
+    <string name="cashier_pstatus_paid">Pagado</string>
+
+    <string name="cashier_subtotal">Subtotal</string>
+    <string name="cashier_igv">IGV (%1$d %%)</string>
+    <string name="cashier_total">Total</string>
+    <string name="cashier_collected">Cobrado</string>
+    <string name="cashier_balance">Saldo</string>
+    <string name="cashier_voucher_name">%1$s %2$s</string>
+
+    <!-- Errores de caja -->
+    <string name="cashier_err_lines">Falta el nombre de alguna línea del comprobante.</string>
+    <string name="cashier_err_tax_id">Revisa el documento del cliente: la factura pide un RUC de 11 dígitos.</string>
+    <string name="cashier_err_serie">La serie debe tener 4 caracteres: la factura empieza con F y la boleta con B.</string>
+    <string name="cashier_err_initial">El correlativo inicial no puede ser negativo.</string>
+    <string name="cashier_err_amount">El monto debe ser de al menos 0.01, con dos decimales como máximo, y no superar el saldo.</string>
+    <string name="cashier_err_reference">La referencia admite hasta 100 caracteres.</string>
+    <string name="cashier_err_status">Este comprobante ya no admite cobros.</string>
+    <string name="cashier_err_input">Revisa los datos ingresados.</string>
+    <string name="cashier_err_no_series">La sede no tiene una serie activa para este tipo de comprobante. Actívala en Series de facturación.</string>
+    <string name="cashier_err_outcome_unknown">No sabemos si el cobro se registró. Revisa los pagos del comprobante antes de volver a cobrar.</string>
+    <string name="cashier_err_no_branch">Tu cuenta no tiene sede asignada. Pide a un administrador que te asigne una.</string>
+    <string name="cashier_err_legal_name">Ingresa la razón social o nombre completo del receptor.</string>
+    <string name="cashier_err_tenant_name">Ingresa la razón social o nombre comercial del taller.</string>
+
+    <!-- Cobrar y entregar -->
+    <string name="cashier_checkout_title">Cobrar y entregar</string>
+    <string name="cashier_checkout_no_access">Tu cuenta no tiene acceso a cobros ni a entregas.</string>
+    <string name="cashier_order_number">Orden %1$d</string>
+    <string name="cashier_step_title">%1$d. %2$s</string>
+    <string name="cashier_step_voucher">Comprobante</string>
+    <string name="cashier_step_payments">Cobros</string>
+    <string name="cashier_step_exit_pass">Pase de salida</string>
+    <string name="cashier_step_delivery">Entrega</string>
+
+    <string name="cashier_voucher_prepare">Preparar comprobante</string>
+    <string name="cashier_voucher_empty">Esta orden aún no tiene comprobante.</string>
+    <string name="cashier_voucher_needs_completed">La orden debe estar completada para emitir el comprobante.</string>
+    <string name="cashier_issue_title">Emitir comprobante</string>
+    <string name="cashier_issue_type">Tipo de comprobante</string>
+    <string name="cashier_issue_document">Documento del cliente</string>
+    <string name="cashier_issue_document_number">Número de documento</string>
+    <string name="cashier_issue_name_company">Razón social</string>
+    <string name="cashier_issue_name_person">Nombre completo</string>
+    <string name="cashier_issue_address">Dirección fiscal</string>
+    <string name="cashier_issue_lines">Detalle</string>
+    <string name="cashier_issue_line_name">Nombre de la línea</string>
+    <string name="cashier_issue_line_needs_name">Escribe qué se cobra en esta línea.</string>
+    <string name="cashier_issue_line_detail">%1$s × %2$s</string>
+    <string name="cashier_issue_document_error">Revisa el número de documento.</string>
+    <string name="cashier_issue_name_error">Falta el nombre del cliente.</string>
+    <string name="cashier_issue_irreversible">Al emitir, el comprobante se envía a SUNAT y no se puede deshacer.</string>
+    <string name="cashier_issue_confirm">Emitir %1$s por %2$s</string>
+    <string name="cashier_issue_done">Comprobante emitido.</string>
+    <string name="cashier_issue_already">La orden ya tenía un comprobante vigente; no se emitió otro.</string>
+    <string name="cashier_issue_details_pending">El comprobante se emitió. Falta leer su detalle: actualiza en un momento.</string>
+
+    <string name="cashier_payments_empty">Todavía no hay cobros de este comprobante.</string>
+    <string name="cashier_payments_needs_voucher">Emite el comprobante para poder cobrar.</string>
+    <string name="cashier_payment_register">Registrar cobro</string>
+    <string name="cashier_payment_title">Registrar cobro</string>
+    <string name="cashier_payment_amount">Monto a cobrar</string>
+    <string name="cashier_payment_amount_error">Ingresa un monto válido, hasta el saldo.</string>
+    <string name="cashier_payment_method">Medio de pago</string>
+    <string name="cashier_payment_reference">Referencia de la operación</string>
+    <string name="cashier_payment_reference_hint">Ej. nro. de operación o voucher</string>
+    <string name="cashier_payment_reference_required">Obligatoria para pagos que no son en efectivo.</string>
+    <string name="cashier_payment_irreversible">El cobro queda registrado y no se puede deshacer.</string>
+    <string name="cashier_payment_confirm">Cobrar %1$s</string>
+    <string name="cashier_payment_done">Cobro registrado.</string>
+    <string name="cashier_payment_time">%1$s · %2$s</string>
+    <string name="cashier_mark_paid">Marcar orden como pagada</string>
+    <string name="cashier_mark_paid_done">La orden quedó pagada.</string>
+
+    <string name="cashier_exit_pass_download">Descargar pase de salida</string>
+    <string name="cashier_exit_pass_needs_paid">Disponible cuando la orden esté pagada.</string>
+    <string name="cashier_exit_pass_chooser">Compartir pase de salida</string>
+    <string name="cashier_exit_pass_no_app">No hay una app para abrir el PDF.</string>
+
+    <string name="cashier_deliver_action">Entregar vehículo</string>
+    <string name="cashier_deliver_title">Entregar vehículo</string>
+    <string name="cashier_deliver_body">Confirma que el cliente se lleva el vehículo. La bahía se libera y no se puede deshacer.</string>
+    <string name="cashier_deliver_confirm">Entregar</string>
+    <string name="cashier_deliver_needs_paid">Disponible cuando la orden esté pagada.</string>
+    <string name="cashier_deliver_done">Vehículo entregado.</string>
+    <string name="cashier_delivered">Entregado</string>
+
+    <!-- Caja del día -->
+    <string name="cashier_daily_title">Caja del día</string>
+    <string name="cashier_daily_context">Caja de la sede · %1$s</string>
+    <string name="cashier_daily_caption">cobrado</string>
+    <plurals name="cashier_daily_payments">
+        <item quantity="one">cobro</item>
+        <item quantity="other">cobros</item>
+    </plurals>
+    <string name="cashier_daily_by_method">Por medio de pago</string>
+    <string name="cashier_daily_payments_header">Cobros</string>
+    <string name="cashier_daily_empty">No hay cobros registrados este día.</string>
+    <string name="cashier_daily_previous">Día anterior</string>
+    <string name="cashier_daily_next">Día siguiente</string>
+    <string name="cashier_daily_today">Hoy</string>
+    <string name="cashier_daily_no_access">Tu cuenta no puede ver la caja del día.</string>
+
+    <!-- Series de facturación -->
+    <string name="cashier_series_title">Series de facturación</string>
+    <string name="cashier_series_hint">Series de la sede para emitir facturas y boletas electrónicas.</string>
+    <string name="cashier_series_empty">La sede aún no tiene series. Agrega una para poder emitir comprobantes.</string>
+    <string name="cashier_series_add">Agregar serie</string>
+    <string name="cashier_series_correlative">Último número: %1$d</string>
+    <string name="cashier_series_active">Activa</string>
+    <string name="cashier_series_inactive">Inactiva</string>
+    <string name="cashier_series_new_title">Nueva serie</string>
+    <string name="cashier_series_type">Tipo de comprobante</string>
+    <string name="cashier_series_serie">Serie (4 caracteres)</string>
+    <string name="cashier_series_serie_error">Factura: F y 3 caracteres. Boleta: B y 3 caracteres.</string>
+    <string name="cashier_series_initial">Correlativo inicial (opcional)</string>
+    <string name="cashier_series_initial_error">Ingresa un número entero.</string>
+    <string name="cashier_series_save">Guardar serie</string>
+    <string name="cashier_series_saved">Serie guardada.</string>
+    <string name="cashier_series_detail_title">Serie %1$s</string>
+    <string name="cashier_series_deactivate">Desactivar serie</string>
+    <string name="cashier_series_activate">Activar serie</string>
+    <string name="cashier_series_deactivate_body">Mientras esté inactiva, la sede no podrá emitir con esta serie.</string>
+    <string name="cashier_series_activate_body">La sede volverá a emitir con esta serie.</string>
+    <string name="cashier_series_updated">Serie actualizada.</string>
+    <string name="cashier_series_no_access">Tu cuenta no puede configurar series de facturación.</string>
+    <string name="cashier_sunat_status_accepted_notice">Comprobante aceptado por SUNAT.</string>
+    <string name="cashier_sunat_status_rejected_notice">Comprobante rechazado por SUNAT.</string>
+    <string name="cashier_sunat_status_pending_pse_notice">Comprobante emitido y válido para cobro. El PSE del servidor opera en modo simulado y mantiene el estado Emitido sin constancia CDR.</string>
+
+    <!-- Reportes -->
+    <string name="reports_title">Reportes</string>
+    <string name="reports_context">Reporte del taller</string>
+    <string name="reports_scope_note">El reporte suma todas las sedes del taller, no solo la tuya.</string>
+    <string name="reports_legend_caption">cobrado en el periodo</string>
+    <string name="reports_period_month">Este mes</string>
+    <string name="reports_period_previous_month">Mes pasado</string>
+    <string name="reports_period_year">Este año</string>
+    <string name="reports_period_range">%1$s al %2$s</string>
+    <plurals name="reports_movements_label">
+        <item quantity="one">movimiento</item>
+        <item quantity="other">movimientos</item>
+    </plurals>
+    <string name="reports_movements_header">Movimientos</string>
+    <string name="reports_movements_empty">No hay movimientos en este periodo.</string>
+    <string name="reports_movement_detail">%1$s · %2$s</string>
+    <string name="reports_downloads_header">Descargas</string>
+    <string name="reports_download_cashflow">Descargar PDF de flujo de caja</string>
+    <string name="reports_download_fleet">PDF de salud de flota</string>
+    <string name="reports_pdf_chooser">Compartir reporte</string>
+    <string name="reports_pdf_no_app">No hay una app para abrir el PDF.</string>
+    <string name="reports_fleet_locked">La salud de flota con IA no está incluida en el plan de tu taller.</string>
+    <string name="reports_fleet_title">Salud de flota</string>
+    <string name="reports_fleet_hint">Elige al cliente cuyo informe quieres descargar.</string>
+    <string name="reports_fleet_search">Buscar cliente por nombre o documento</string>
+    <string name="reports_fleet_search_action">Buscar</string>
+    <string name="reports_fleet_empty">No encontramos clientes con esa búsqueda.</string>
+    <string name="reports_no_access">Tu cuenta no tiene acceso a reportes.</string>
+    <string name="reports_period_custom">Rango</string>
+    <string name="reports_open_pdf">Abrir PDF</string>
+    <string name="reports_share_pdf">Compartir PDF</string>
+    <string name="reports_fleet_scope_note">Incluye todos los vehículos registrados del cliente seleccionado.</string>
+    <string name="reports_h31_income_only_note">Muestra únicamente los cobros confirmados del periodo; egresos y cuentas por cobrar no se contabilizan en este resumen.</string>
+</resources>

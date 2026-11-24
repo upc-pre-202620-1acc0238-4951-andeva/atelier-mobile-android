@@ -2,6 +2,8 @@ package com.andeva.atelier.mobile.features.inventory.infrastructure.local
 
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.inventory.domain.Batch
+import com.andeva.atelier.mobile.features.inventory.domain.BatchDeduction
+import com.andeva.atelier.mobile.features.inventory.domain.BatchRestoreResult
 import com.andeva.atelier.mobile.features.inventory.domain.ItemCategory
 import com.andeva.atelier.mobile.features.inventory.domain.Part
 import com.andeva.atelier.mobile.features.inventory.domain.PartStatus
@@ -9,10 +11,15 @@ import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrder
 import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderLine
 import com.andeva.atelier.mobile.features.inventory.domain.PurchaseOrderStatus
 import com.andeva.atelier.mobile.features.inventory.domain.StockAlert
+import com.andeva.atelier.mobile.features.inventory.domain.StockAllocation
+import com.andeva.atelier.mobile.features.inventory.domain.Supplier
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.BatchDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.PartDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.PurchaseOrderDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.RestoreBatchResponseDto
 import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.StockAlertDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.StockAllocationDto
+import com.andeva.atelier.mobile.features.inventory.infrastructure.remote.SupplierDto
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -102,6 +109,38 @@ fun PurchaseOrderDto.toDomain() = PurchaseOrder(
     lines = items.orEmpty().map {
         PurchaseOrderLine(it.id, it.itemId, it.quantity ?: BigDecimal.ZERO, money(it.unitCost), money(it.totalCost))
     }
+)
+
+fun SupplierDto.toDomain() = Supplier(
+    id = id,
+    businessName = businessName.orEmpty(),
+    taxId = taxId.orEmpty(),
+    contactName = contactName?.takeIf { it.isNotBlank() },
+    phone = phone?.takeIf { it.isNotBlank() },
+    email = email?.takeIf { it.isNotBlank() },
+    address = address?.takeIf { it.isNotBlank() },
+    active = active ?: true
+)
+
+fun StockAllocationDto.toDomain() = StockAllocation(
+    allocationId = allocationId,
+    allocatedQuantity = allocatedQuantity ?: BigDecimal.ZERO,
+    totalCogs = money(totalCogs),
+    deductions = deductions.orEmpty().map {
+        BatchDeduction(
+            batchId = it.batchId,
+            quantityDeducted = it.quantityDeducted ?: BigDecimal.ZERO,
+            unitCost = money(it.unitCost),
+            subtotal = money(it.subtotal)
+        )
+    }
+)
+
+fun RestoreBatchResponseDto.toDomain() = BatchRestoreResult(
+    status = status,
+    message = message,
+    batchId = batchId,
+    restoredQuantity = restoredQuantity ?: BigDecimal.ZERO
 )
 
 private inline fun <reified T : Enum<T>> String?.toEnum(): T? = enumValues<T>().firstOrNull { it.name == this }

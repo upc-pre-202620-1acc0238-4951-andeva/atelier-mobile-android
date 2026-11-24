@@ -25,7 +25,7 @@ class SyncScheduler @Inject constructor(
 
     fun requestSync() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(connected).build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
     /** Reintento tras el backoff. Usa otro nombre para no bloquear un envío inmediato con KEEP. */

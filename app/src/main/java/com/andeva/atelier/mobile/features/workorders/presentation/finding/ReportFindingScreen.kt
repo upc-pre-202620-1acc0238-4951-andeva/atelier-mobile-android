@@ -1,23 +1,25 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.finding
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,23 +37,30 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
 import com.andeva.atelier.mobile.features.workorders.domain.PendingProposal
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalSeverity
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
+import com.andeva.atelier.mobile.features.workorders.presentation.components.ChoiceChip
 import com.andeva.atelier.mobile.features.workorders.presentation.components.SubmittableSeverities
 import com.andeva.atelier.mobile.features.workorders.presentation.components.chipKind
 import com.andeva.atelier.mobile.features.workorders.presentation.components.labelRes
 import com.andeva.atelier.mobile.features.workorders.presentation.components.rememberPhotoCapture
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.PickRow
 import java.time.Instant
 
-/** US14: reporte técnico de un imprevisto encontrado en el foso o la bahía. */
+/**
+ * US14: reporte técnico de un imprevisto encontrado en el foso o la bahía. Funciona sin red: el hallazgo se encola
+ * y sale como "pendiente de sincronizar" hasta que el backend lo recibe.
+ */
 @Composable
 fun ReportFindingScreen(
     onBack: () -> Unit,
@@ -74,6 +83,7 @@ fun ReportFindingScreen(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ReportFindingContent(
     state: ReportFindingUiState,
@@ -86,32 +96,43 @@ internal fun ReportFindingContent(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        AtelierTopBar(title = stringResource(R.string.finding_title), onBack = onBack)
+    Scaffold(
+        modifier = modifier.imePadding(),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { AtelierTopBar(title = stringResource(R.string.finding_title), onBack = onBack) },
+        bottomBar = {
+            if (state.canCreate) {
+                AtelierButton(
+                    text = stringResource(R.string.finding_submit),
+                    onClick = onSubmit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                    enabled = state.canSubmit,
+                    loading = state.isSaving
+                )
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxSize()
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!state.canCreate) {
+                AtelierNoPermissionState(text = stringResource(R.string.reception_no_permission))
+                return@Column
+            }
             Text(
                 text = stringResource(R.string.finding_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = AtelierTheme.colors.inkSecondary
             )
-            if (!state.canCreate) {
-                AtelierBanner(
-                    message = stringResource(R.string.reception_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
-            }
             if (state.saved) {
                 AtelierBanner(
                     message = stringResource(R.string.finding_saved),
@@ -120,15 +141,14 @@ internal fun ReportFindingContent(
                 )
             }
 
-            SectionLabel(R.string.finding_severity)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            AtelierSectionHeader(title = stringResource(R.string.finding_severity))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SubmittableSeverities.forEach { severity ->
-                    AtelierButton(
-                        text = stringResource(severity.labelRes()),
-                        onClick = { onSeverityChange(severity) },
-                        modifier = Modifier.weight(1f),
-                        style = if (state.severity == severity) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-                        enabled = !state.isSaving
+                    ChoiceChip(
+                        label = stringResource(severity.labelRes()),
+                        selected = state.severity == severity,
+                        enabled = !state.isSaving,
+                        onClick = { onSeverityChange(severity) }
                     )
                 }
             }
@@ -143,25 +163,15 @@ internal fun ReportFindingContent(
                 errorText = if (state.invalidField == "description") stringResource(R.string.finding_field_description) else null
             )
 
-            SectionLabel(R.string.finding_photo)
+            AtelierSectionHeader(title = stringResource(R.string.finding_photo))
             PhotoArea(state, onTakePhoto)
 
             Services(state, onServiceChange, onRetryServices)
 
-            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Filled.Error) }
+            state.error?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
 
             PendingList(state.pending)
         }
-
-        AtelierButton(
-            text = stringResource(R.string.finding_submit),
-            onClick = onSubmit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-            enabled = state.canSubmit,
-            loading = state.isSaving
-        )
     }
 }
 
@@ -181,7 +191,7 @@ private fun PhotoArea(state: ReportFindingUiState, onTakePhoto: () -> Unit) {
         Text(
             text = stringResource(R.string.finding_photo_required),
             style = MaterialTheme.typography.bodyMedium,
-            color = AtelierTheme.colors.muted
+            color = if (state.invalidField == "photo") AtelierTheme.colors.bad else AtelierTheme.colors.inkSecondary
         )
     } else {
         AsyncImage(
@@ -190,7 +200,7 @@ private fun PhotoArea(state: ReportFindingUiState, onTakePhoto: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(4f / 3f)
-                .clip(CardShape),
+                .clip(MaterialTheme.shapes.small),
             contentScale = ContentScale.Crop
         )
         AtelierButton(
@@ -208,29 +218,29 @@ private fun Services(state: ReportFindingUiState, onServiceChange: (String?) -> 
     if (state.isLoadingServices) return
     if (state.services.isEmpty()) {
         AtelierButton(
-            text = stringResource(R.string.branch_retry),
+            text = stringResource(R.string.common_retry),
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth(),
             style = AtelierButtonStyle.Text
         )
         return
     }
-    SectionLabel(R.string.finding_service)
-    AtelierButton(
-        text = stringResource(R.string.finding_service_none),
-        onClick = { onServiceChange(null) },
-        modifier = Modifier.fillMaxWidth(),
-        style = if (state.suggestedServiceId == null) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-        enabled = !state.isSaving
-    )
-    state.services.forEach { service ->
-        AtelierButton(
-            text = service.name,
-            onClick = { onServiceChange(service.id) },
-            modifier = Modifier.fillMaxWidth(),
-            style = if (state.suggestedServiceId == service.id) AtelierButtonStyle.Tonal else AtelierButtonStyle.Outlined,
-            enabled = !state.isSaving
+    AtelierSectionHeader(title = stringResource(R.string.finding_service))
+    Column {
+        PickRow(
+            title = stringResource(R.string.finding_service_none),
+            selected = state.suggestedServiceId == null,
+            enabled = !state.isSaving,
+            onClick = { onServiceChange(null) }
         )
+        state.services.forEach { service ->
+            PickRow(
+                title = service.name,
+                selected = state.suggestedServiceId == service.id,
+                enabled = !state.isSaving,
+                onClick = { onServiceChange(service.id) }
+            )
+        }
     }
 }
 
@@ -238,64 +248,60 @@ private fun Services(state: ReportFindingUiState, onServiceChange: (String?) -> 
 @Composable
 private fun PendingList(pending: List<PendingProposal>) {
     if (pending.isEmpty()) return
-    SectionLabel(R.string.finding_pending_title)
-    pending.forEach { proposal ->
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(AtelierTheme.colors.card)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                proposal.severity?.let { AtelierChip(text = stringResource(it.labelRes()), kind = it.chipKind()) }
-                AtelierChip(
-                    text = stringResource(if (proposal.status == "FAILED") R.string.gallery_status_failed else R.string.gallery_status_queued),
-                    kind = if (proposal.status == "FAILED") ChipKind.Bad else ChipKind.Wait
-                )
-            }
-            Text(
-                text = proposal.description,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+    AtelierSectionHeader(title = stringResource(R.string.finding_pending_title), count = pending.size)
+    Column {
+        pending.forEach { proposal ->
+            val failed = proposal.status == "FAILED"
+            AtelierListRow(
+                title = proposal.description,
+                subtitle = proposal.severity?.let { stringResource(it.labelRes()) },
+                trailing = {
+                    AtelierChip(
+                        text = stringResource(if (failed) R.string.gallery_status_failed else R.string.gallery_status_queued),
+                        kind = if (failed) ChipKind.Bad else ChipKind.Wait
+                    )
+                }
             )
         }
     }
 }
 
-@Composable
-private fun SectionLabel(textRes: Int) = Text(
-    text = stringResource(textRes),
-    style = MaterialTheme.typography.titleMedium,
-    color = MaterialTheme.colorScheme.onBackground
+// region Previews
+
+private val previewState = ReportFindingUiState(
+    description = "Fuga de aceite en el cárter", severity = ProposalSeverity.CRITICAL,
+    services = listOf(
+        ServiceOption("s1", "Cambio de empaque del cárter", null, 90),
+        ServiceOption("s2", "Limpieza de motor", null, 45)
+    ),
+    suggestedServiceId = "s1", isLoadingServices = false, canCreate = true,
+    pending = listOf(
+        PendingProposal("p1", null, "", "Disco de freno delantero desgastado", ProposalSeverity.CRITICAL, "PENDING", null, Instant.EPOCH)
+    ),
+    saved = true
 )
 
-@Preview(name = "Hallazgo · formulario · oscuro", widthDp = 360, heightDp = 1100, showBackground = true)
 @Composable
-private fun ReportFindingPreviewForm() = AtelierWorkshopTheme(darkTheme = true) {
+private fun PreviewContent(state: ReportFindingUiState) {
     ReportFindingContent(
-        state = ReportFindingUiState(
-            description = "Fuga de aceite en el cárter", severity = ProposalSeverity.CRITICAL,
-            services = listOf(ServiceOption("s1", "Cambio de empaque", null, 90)),
-            isLoadingServices = false, canCreate = true
-        ),
+        state = state,
         onBack = {}, onDescriptionChange = {}, onSeverityChange = {}, onServiceChange = {},
         onTakePhoto = {}, onRetryServices = {}, onSubmit = {}
     )
 }
 
-@Preview(name = "Hallazgo · guardado · claro", widthDp = 360, heightDp = 1100, showBackground = true)
+@Preview(name = "Hallazgo · claro", widthDp = 390, heightDp = 844)
 @Composable
-private fun ReportFindingPreviewSaved() = AtelierWorkshopTheme(darkTheme = false) {
-    ReportFindingContent(
-        state = ReportFindingUiState(
-            saved = true, isLoadingServices = false, canCreate = true,
-            pending = listOf(
-                PendingProposal("p1", null, "", "Fuga de aceite en el cárter", ProposalSeverity.CRITICAL, "PENDING", null, Instant.EPOCH)
-            )
-        ),
-        onBack = {}, onDescriptionChange = {}, onSeverityChange = {}, onServiceChange = {},
-        onTakePhoto = {}, onRetryServices = {}, onSubmit = {}
-    )
+private fun ReportFindingPreviewLight() = AtelierWorkshopTheme(darkTheme = false) { PreviewContent(previewState) }
+
+@Preview(name = "Hallazgo · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ReportFindingPreviewDark() = AtelierWorkshopTheme(darkTheme = true) { PreviewContent(previewState) }
+
+@Preview(name = "Hallazgo · sin permiso", widthDp = 390, heightDp = 844)
+@Composable
+private fun ReportFindingPreviewNoPermission() = AtelierWorkshopTheme(darkTheme = false) {
+    PreviewContent(ReportFindingUiState(isLoadingServices = false))
 }
+
+// endregion

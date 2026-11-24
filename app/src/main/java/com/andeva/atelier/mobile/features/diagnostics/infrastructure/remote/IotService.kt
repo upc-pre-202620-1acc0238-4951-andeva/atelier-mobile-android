@@ -11,9 +11,8 @@ import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 /**
- * IoT de docs/api/iot.md que usa la app (US16–US21, US43 E1). Registrar dispositivos, `generate-async` (sin endpoint
- * para consultar el trabajo), telemetría histórica, alertas del taller y convertir alertas en citas no tienen historia
- * móvil.
+ * IoT de docs/api/iot.md que usa la app (US16–US21, US43 E1). `generate-async` queda sin usar porque no hay
+ * endpoint para consultar el trabajo (H21).
  */
 interface IotService {
     @GET("api/v1/iot/devices")
@@ -72,9 +71,30 @@ interface IotService {
     @GET("api/v1/iot/health-reports/{reportId}/pdf")
     suspend fun getHealthReportPdf(@Path("reportId") reportId: String): Response<ResponseBody>
 
+    @GET("api/v1/iot/alerts/tenant")
+    suspend fun getTenantAlerts(): Response<List<PredictiveAlertDto>>
+
     @GET("api/v1/iot/alerts/vehicle/{vehicleId}")
     suspend fun getVehicleAlerts(@Path("vehicleId") vehicleId: String): Response<List<PredictiveAlertDto>>
 
     @PATCH("api/v1/iot/alerts/{id}/acknowledge")
     suspend fun acknowledgeAlert(@Path("id") id: String, @Body body: AcknowledgeAlertRequestDto): Response<PredictiveAlertDto>
+
+    @POST("api/v1/iot/alerts/{id}/convert-to-appointment")
+    suspend fun convertAlertToAppointment(
+        @Path("id") id: String,
+        @Body body: ConvertAlertToAppointmentRequestDto = ConvertAlertToAppointmentRequestDto()
+    ): Response<ConvertedAppointmentDto>
+
+    /** 404 = sin lecturas registradas para el vehículo. */
+    @GET("api/v1/iot/telemetry/vehicle/{vehicleId}/latest")
+    suspend fun getLatestTelemetry(@Path("vehicleId") vehicleId: String): Response<VehicleLatestTelemetryDto>
+
+    @GET("api/v1/iot/telemetry/vehicle/{vehicleId}/history")
+    suspend fun getTelemetryHistory(
+        @Path("vehicleId") vehicleId: String,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("bucket") bucket: String? = null
+    ): Response<List<TelemetryHistoryBucketDto>>
 }

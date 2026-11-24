@@ -1,6 +1,8 @@
 package com.andeva.atelier.mobile.features.diagnostics.infrastructure.di
 
 import com.andeva.atelier.mobile.core.data.sync.OperationHandler
+import com.andeva.atelier.mobile.core.data.sync.PreSyncHook
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.DiagnosticsPreSyncHook
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.RegisterFaultHandler
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.ResolveFaultHandler
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.sync.TelemetryBatchHandler
@@ -9,6 +11,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoMap
+import dagger.multibindings.IntoSet
 import dagger.multibindings.StringKey
 
 /** Handlers de la cola de diagnóstico (docs/06-offline-sync.md §3, "Cómo registra cada feature su tipo"). */
@@ -29,4 +32,8 @@ interface DiagnosticsSyncModule {
     @IntoMap
     @StringKey(ResolveFaultHandler.TYPE)
     fun bindResolveFaultHandler(handler: ResolveFaultHandler): OperationHandler
+
+    @Binds
+    @IntoSet
+    fun bindDiagnosticsPreSyncHook(hook: DiagnosticsPreSyncHook): PreSyncHook
 }

@@ -33,6 +33,8 @@ interface TaskRepository {
 
     suspend fun complete(id: TaskId, actualLaborHours: BigDecimal, notes: String?): Result<TaskDetail>
 
+    suspend fun reopen(id: TaskId, reason: String? = null): Result<TaskDetail>
+
     /** Guarda la foto comprimida y la encola (`UPLOAD_FILE` + `ATTACH_TASK_EVIDENCE`), con o sin red. */
     suspend fun attachEvidence(id: TaskId, workOrderId: String, photo: File, description: String): Result<Unit>
 

@@ -2,8 +2,6 @@ package com.andeva.atelier.mobile.features.main.presentation.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.andeva.atelier.mobile.core.domain.Permission
-import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.core.notifications.PushInbox
 import com.andeva.atelier.mobile.features.auth.application.GetSelectableBranchesUseCase
 import com.andeva.atelier.mobile.features.auth.application.SignOutUseCase
@@ -33,7 +31,6 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             observeSession().collect { session ->
                 if (session == null) return@collect
-                val derivedRole = deriveRoleTitle(session)
                 val plan = session.plan
                 _uiState.update { state ->
                     state.copy(
@@ -41,59 +38,36 @@ class ProfileViewModel @Inject constructor(
                         email = session.email,
                         tenantName = session.tenantName,
                         branchId = session.branchId,
-                        roleTitle = derivedRole,
-                        planName = plan?.tier?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Básico",
+                        planTier = plan?.tier?.lowercase()?.replaceFirstChar { it.uppercase() }.orEmpty(),
                         iotTelemetryEnabled = plan?.iotTelemetryEnabled ?: false,
-                        aiDiagnosticsEnabled = plan?.aiDiagnosticsEnabled ?: false,
-                        permissionsCount = session.permissions.size,
-                        permissions = session.permissions.sorted(),
-                        membershipId = session.membershipId
+                        aiDiagnosticsEnabled = plan?.aiDiagnosticsEnabled ?: false
                     )
                 }
-                resolveBranchName(session.branchId)
+                resolveBranch(session.branchId, session.canSwitchBranch())
             }
         }
         viewModelScope.launch {
-            observePendingCount().collect { count ->
-                _uiState.update { it.copy(pendingCount = count) }
-            }
+            observePendingCount().collect { count -> _uiState.update { it.copy(pendingCount = count) } }
         }
         viewModelScope.launch {
             pushInbox.history.collect { notifications ->
-                val unread = notifications.count { !it.read }
-                _uiState.update { it.copy(unreadNotificationsCount = unread) }
+                _uiState.update { it.copy(unreadNotificationsCount = notifications.count { n -> !n.read }) }
             }
         }
     }
 
-    private fun resolveBranchName(branchId: String?) {
+    /** Sin red conserva el estado previo: el nombre de la sede no está en la sesión. */
+    private fun resolveBranch(branchId: String?, allowSwitch: Boolean) {
         if (branchId.isNullOrBlank()) return
         viewModelScope.launch {
-            try {
-                val branches = getBranches().getOrNull().orEmpty()
-                val matched = branches.firstOrNull { it.id == branchId }?.name
-                if (matched != null) {
-                    _uiState.update { it.copy(branchName = matched) }
+            getBranches().onSuccess { branches ->
+                _uiState.update {
+                    it.copy(
+                        branchName = branches.firstOrNull { b -> b.id == branchId }?.name ?: it.branchName,
+                        canChangeBranch = allowSwitch && branches.size > 1
+                    )
                 }
-            } catch (_: Exception) {
-                // Si no hay conexión o falla la carga, conserva el estado previo
             }
-        }
-    }
-
-    private fun deriveRoleTitle(session: Session): String {
-        return when {
-            session.has(Permission.ATTENDANCE_AUDIT_ALL) || session.has(Permission.WORK_ORDERS_CANCEL) ->
-                "Supervisor general de taller"
-            session.has(Permission.BAYS_ASSIGN) ->
-                "Jefe de patio y bahías"
-            session.has(Permission.VEHICLES_CREATE) ->
-                "Asesor de recepción de vehículos"
-            session.has(Permission.TASKS_TRACK_TIME) ->
-                "Técnico especialista de servicio"
-            session.has(Permission.PARTS_READ) ->
-                "Encargado de almacén y repuestos"
-            else -> "Colaborador de taller"
         }
     }
 

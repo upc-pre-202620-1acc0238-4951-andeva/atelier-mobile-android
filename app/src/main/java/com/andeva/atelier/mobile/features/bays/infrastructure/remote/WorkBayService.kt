@@ -4,6 +4,7 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderT
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -23,6 +24,18 @@ interface WorkBayService {
         @Path("workOrderId") workOrderId: String,
         @Body body: AssignWorkBayRequestDto
     ): Response<WorkOrderDto>
+
+    @DELETE("api/v1/work-orders/{workOrderId}/bay")
+    suspend fun releaseBay(@Path("workOrderId") workOrderId: String): Response<Unit>
+
+    @PUT("api/v1/work-bays/{bayId}/maintenance")
+    suspend fun setMaintenance(
+        @Path("bayId") bayId: String,
+        @Body body: MaintenanceBayRequestDto
+    ): Response<WorkBayDto>
+
+    @PUT("api/v1/work-bays/{bayId}/restore")
+    suspend fun restoreBay(@Path("bayId") bayId: String): Response<WorkBayDto>
 
     @PUT("api/v1/tasks/{taskId}/mechanic")
     suspend fun assignMechanic(

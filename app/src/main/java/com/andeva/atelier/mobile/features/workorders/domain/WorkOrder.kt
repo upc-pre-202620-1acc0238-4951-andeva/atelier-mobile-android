@@ -49,8 +49,20 @@ data class WorkOrderDetail(
     val updatedAt: Instant?
 ) {
     /** Tareas con una solicitud de suspensión esperando al supervisor (H5). */
-    val tasksAwaitingSuspensionReview: List<TaskDetail> get() = tasks.filter { it.pendingSuspensionRequestedAt != null }
+    val tasksAwaitingSuspensionReview: List<TaskDetail> get() = tasks.filter { it.hasPendingSuspension }
 }
+
+/** Solicitud de suspensión por pieza defectuosa detectada en una orden en curso (US29 / H5). */
+data class PendingSuspensionItem(
+    val taskId: String,
+    val workOrderId: String,
+    val workOrderNumber: Int?,
+    val plate: String?,
+    val serviceName: String?,
+    val taskDescription: String,
+    val reason: String?,
+    val requestedAt: Instant?
+)
 
 /** Foto de recepción ya registrada (`WorkOrderImageResource`, US13 E2). */
 data class IntakeImage(

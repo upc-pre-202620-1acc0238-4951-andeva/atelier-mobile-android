@@ -9,7 +9,10 @@ value class Permission(val value: String) {
     companion object {
         // IAM
         val BRANCHES_READ = Permission("iam:branches:read")
+        val BRANCHES_MANAGE = Permission("iam:branches:manage")
         val MEMBERS_READ = Permission("iam:members:read")
+        val TENANTS_READ = Permission("iam:tenants:read")
+        val TENANTS_UPDATE = Permission("iam:tenants:update")
 
         // HR
         val ATTENDANCE_CLOCK_IN = Permission("hr:attendance:clock_in")
@@ -23,9 +26,12 @@ value class Permission(val value: String) {
         // CRM
         val CUSTOMERS_READ = Permission("crm:customers:read")
         val CUSTOMERS_CREATE = Permission("crm:customers:create")
+        val CUSTOMERS_UPDATE = Permission("crm:customers:update")
         val VEHICLES_READ = Permission("crm:vehicles:read")
         val VEHICLES_CREATE = Permission("crm:vehicles:create")
+        val VEHICLES_UPDATE = Permission("crm:vehicles:update")
         val APPOINTMENTS_READ = Permission("crm:appointments:read")
+        val APPOINTMENTS_CREATE = Permission("crm:appointments:create")
         val APPOINTMENTS_UPDATE = Permission("crm:appointments:update")
 
         // Operations
@@ -45,6 +51,7 @@ value class Permission(val value: String) {
         val TASKS_UPLOAD_PHOTOS = Permission("operations:tasks:upload_photos")
         val TASKS_HOLD_REQUEST = Permission("operations:tasks:hold_request")
         val TASKS_HOLD_VALIDATE = Permission("operations:tasks:hold_validate")
+        val TASKS_SUSPEND = TASKS_HOLD_VALIDATE
         val TASKS_COMPLETE = Permission("operations:tasks:complete")
         val TASKS_CHARGE_PARTS = Permission("operations:tasks:charge_parts")
         val BAYS_READ = Permission("operations:bays:read")
@@ -53,18 +60,21 @@ value class Permission(val value: String) {
         val BAYS_MANAGE = Permission("operations:bays:manage")
         val VEHICLE_HANDOVER_EXECUTE = Permission("operations:vehicle_handover:execute")
         val SERVICES_READ = Permission("operations:services:read")
+        val SERVICES_MANAGE = Permission("operations:services:manage")
 
         // Inventory
         val PARTS_READ = Permission("inventory:parts:read")
+        val PARTS_MANAGE = Permission("inventory:parts:manage")
+        val SUPPLIERS_MANAGE = Permission("inventory:suppliers:manage")
         val BATCHES_READ = Permission("inventory:batches:read")
         val BATCHES_RESTORE = Permission("inventory:batches:restore")
         val BATCHES_RECEIVE = Permission("inventory:batches:receive")
+        val BATCHES_DISPATCH_FIFO = Permission("inventory:batches:dispatch_fifo")
         val PURCHASE_ORDERS_READ = Permission("inventory:purchase_orders:read")
+        val PURCHASE_ORDERS_CREATE = Permission("inventory:purchase_orders:create")
         val ALERTS_READ = Permission("inventory:alerts:read")
         val INVENTORY_ALERTS_READ = ALERTS_READ
         val ALERTS_RESOLVE = Permission("inventory:alerts:resolve")
-        val VALUATION_READ = Permission("inventory:valuation:read")
-        val INVENTORY_VALUATION_READ = VALUATION_READ
 
         // IoT
         val DEVICES_READ = Permission("iot:devices:read")
@@ -73,6 +83,7 @@ value class Permission(val value: String) {
         val OBD_DEVICES_REGISTER = DEVICES_REGISTER
         val INSTALLATIONS_MANAGE = Permission("iot:installations:manage")
         val TELEMETRY_INGEST = Permission("iot:telemetry:ingest")
+        val TELEMETRY_READ = Permission("iot:telemetry:read")
         val FAULTS_READ = Permission("iot:faults:read")
         val FAULTS_RESOLVE = Permission("iot:faults:resolve")
         val HEALTH_REPORTS_GENERATE = Permission("iot:health_reports:generate")
@@ -82,6 +93,7 @@ value class Permission(val value: String) {
 
         // Invoicing
         val INVOICES_READ = Permission("invoicing:invoices:read")
+        val INVOICES_SETTLE = Permission("invoicing:invoices:settle")
         val INVOICES_ISSUE_SUNAT = Permission("invoicing:invoices:issue_sunat")
         val PAYMENTS_CREATE = Permission("invoicing:payments:create")
         val EXIT_PASSES_ISSUE = Permission("invoicing:exit_passes:issue")

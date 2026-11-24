@@ -17,5 +17,6 @@ data class TelemetryReadingEntity(
     @ColumnInfo(name = "fuel_percentage") val fuelPercentage: Double?,
     val latitude: Double?,
     val longitude: Double?,
-    @ColumnInfo(name = "batch_operation_id") val batchOperationId: String? = null  // id del TELEMETRY_BATCH que la lleva
+    @ColumnInfo(name = "batch_operation_id") val batchOperationId: String? = null,  // id del TELEMETRY_BATCH que la lleva
+    @ColumnInfo(name = "user_id") val userId: String? = null                       // propietario de la lectura en terminal compartido
 )

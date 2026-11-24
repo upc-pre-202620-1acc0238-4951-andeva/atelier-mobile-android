@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.features.main.application.ObservePendingOperationCountUseCase
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
+import com.andeva.atelier.mobile.features.main.presentation.navigation.BarPrimaryAction
 import com.andeva.atelier.mobile.features.main.presentation.navigation.MainTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,8 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = combine(observeSession(), observePendingCount()) { session, pending ->
         MainUiState(
             tabs = session?.let(MainTab::tabsFor).orEmpty(),
+            showModules = session?.let(MainTab::hasModules) == true,
+            primaryAction = session?.let(BarPrimaryAction::forSession) ?: BarPrimaryAction.NONE,
             pendingCount = pending
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())

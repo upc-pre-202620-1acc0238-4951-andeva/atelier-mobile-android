@@ -328,6 +328,7 @@ data class TaskEntity(
     @ColumnInfo(name = "hold_reason") val holdReason: String?,           // BREAK | END_OF_SHIFT | DEFECTIVE_PART | …
     @ColumnInfo(name = "missing_item_description") val missingItemDescription: String?,
     @ColumnInfo(name = "pending_suspension_reason") val pendingSuspensionReason: String?,
+    @ColumnInfo(name = "pending_suspension_requested_at") val pendingSuspensionRequestedAt: Long? = null,
     @ColumnInfo(name = "started_at") val startedAt: Long?,
     @ColumnInfo(name = "total_paused_seconds") val totalPausedSeconds: Long,
     @ColumnInfo(name = "synced_at") val syncedAt: Long
@@ -470,7 +471,8 @@ data class TelemetryReadingEntity(
     @ColumnInfo(name = "fuel_percentage") val fuelPercentage: Double?,
     val latitude: Double?,
     val longitude: Double?,
-    @ColumnInfo(name = "batch_operation_id") val batchOperationId: String? = null  // id del TELEMETRY_BATCH que la lleva
+    @ColumnInfo(name = "batch_operation_id") val batchOperationId: String? = null, // id del TELEMETRY_BATCH que la lleva
+    @ColumnInfo(name = "user_id") val userId: String? = null             // dueño de la muestra para aislamiento multi-usuario
 )
 
 // features/diagnostics/infrastructure/local/VehicleFaultEntity.kt
@@ -513,7 +515,7 @@ data class PredictiveAlertEntity(
         PartEntity::class, BatchEntity::class, VoucherEntity::class,
         TelemetryReadingEntity::class, VehicleFaultEntity::class, PredictiveAlertEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -532,7 +534,7 @@ Reemplaza `auth_session` del informe. Claves:
 
 | Clave | Origen | Nota |
 | --- | --- | --- |
-| `token`, `refresh_token` | `AuthenticatedUserResource` | El refresh rota en cada renovación |
+| `token`, `refresh_token` | `AuthenticatedUserResource` | Cifrados en reposo con AES-256-GCM en Android Keystore (`TokenCipher`, prefijo `enc:v1:`) y migrados automáticamente desde texto plano (`PlaintextTokenEncryptionMigration`). El refresh rota en cada renovación |
 | `token_expires_at` | claim `exp` del JWT | Para renovar antes de vencer |
 | `user_id`, `email`, `full_name` | sesión | |
 | `tenant_id`, `tenant_name` | `activeTenant` | |

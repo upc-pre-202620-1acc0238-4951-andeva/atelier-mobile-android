@@ -1,65 +1,96 @@
 package com.andeva.atelier.mobile.features.bays.presentation
 
+import android.content.res.Configuration
 import androidx.annotation.StringRes
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBottomSheet
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierFab
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierLiveBeacon
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMetricBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierPlate
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSegmentedControl
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSelectionCard
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.PlateSize
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.CardShape
-import com.andeva.atelier.mobile.core.designsystem.theme.PillShape
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
+import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.bays.domain.BayBoardItem
+import com.andeva.atelier.mobile.features.bays.domain.BayOccupant
 import com.andeva.atelier.mobile.features.bays.domain.BayStatus
 import com.andeva.atelier.mobile.features.bays.domain.BayType
 import com.andeva.atelier.mobile.features.bays.domain.WorkBay
+import com.andeva.atelier.mobile.features.bays.domain.laborElapsed
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import com.andeva.atelier.mobile.features.workorders.presentation.labelRes
+import kotlinx.coroutines.delay
+import java.time.Duration
+import java.time.Instant
 
+/**
+ * Tablero de bahías de la sede: cuál está libre, cuál ocupada, cuál en mantenimiento y con qué auto.
+ * Todas las acciones de asignación, liberación, mantenimiento y restauración son en línea.
+ */
 @Composable
 fun BaysScreen(
     onBack: () -> Unit,
@@ -68,170 +99,403 @@ fun BaysScreen(
     viewModel: BaysViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = rememberAtelierHaptics()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.pollWhileVisible()
+        }
+    }
+
+    LaunchedEffect(state.notice) {
+        if (state.notice != null) haptics.confirm()
+    }
+    LaunchedEffect(state.error) {
+        if (state.error != null) haptics.reject()
+    }
+
     BaysContent(
         state = state,
-        onBack = onBack,
-        onFilterChange = viewModel::onFilterChange,
-        onRefresh = viewModel::refresh,
-        onOpenOrder = onOpenOrder,
-        onOpenAssignOrder = viewModel::onOpenAssignOrder,
-        onDismissAssignOrder = viewModel::onDismissAssignOrder,
-        onAssignOrderToBay = viewModel::onAssignOrderToBay,
-        onOpenCreateBay = viewModel::onOpenCreateBay,
-        onDismissCreateBay = viewModel::onDismissCreateBay,
-        onCreateBay = viewModel::onCreateBay,
+        actions = BaysActions(
+            onBack = onBack,
+            onFilterChange = viewModel::onFilterChange,
+            onRefresh = viewModel::refresh,
+            onOpenOrder = onOpenOrder,
+            onOpenBayActions = viewModel::onOpenBayActions,
+            onDismissBayActions = viewModel::onDismissBayActions,
+            onAssignOrderToBay = viewModel::onAssignOrderToBay,
+            onReassignSelectedBayOrder = viewModel::onReassignSelectedBayOrder,
+            onReleaseSelectedBay = viewModel::onReleaseSelectedBay,
+            onOpenReassignTaskMechanic = viewModel::onOpenReassignTaskMechanic,
+            onConfirmReassignTaskMechanic = viewModel::onConfirmReassignTaskMechanic,
+            onToggleMaintenanceInput = viewModel::onToggleMaintenanceInput,
+            onMaintenanceReasonChange = viewModel::onMaintenanceReasonChange,
+            onConfirmSetMaintenance = viewModel::onConfirmSetMaintenance,
+            onRestoreSelectedBay = viewModel::onRestoreSelectedBay,
+            onDismissAssignOrder = viewModel::onDismissAssignOrder,
+            onOpenCreateBay = viewModel::onOpenCreateBay,
+            onDismissCreateBay = viewModel::onDismissCreateBay,
+            onCreateBay = viewModel::onCreateBay
+        ),
         modifier = modifier
     )
 }
 
+internal class BaysActions(
+    val onBack: () -> Unit = {},
+    val onFilterChange: (BayStatus?) -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onOpenOrder: (String) -> Unit = {},
+    val onOpenBayActions: (BayBoardItem) -> Unit = {},
+    val onDismissBayActions: () -> Unit = {},
+    val onAssignOrderToBay: (String) -> Unit = {},
+    val onReassignSelectedBayOrder: (WorkBay) -> Unit = {},
+    val onReleaseSelectedBay: () -> Unit = {},
+    val onOpenReassignTaskMechanic: (String?) -> Unit = {},
+    val onConfirmReassignTaskMechanic: (String, String) -> Unit = { _, _ -> },
+    val onToggleMaintenanceInput: (Boolean) -> Unit = {},
+    val onMaintenanceReasonChange: (String) -> Unit = {},
+    val onConfirmSetMaintenance: () -> Unit = {},
+    val onRestoreSelectedBay: () -> Unit = {},
+    val onDismissAssignOrder: () -> Unit = {},
+    val onOpenCreateBay: () -> Unit = {},
+    val onDismissCreateBay: () -> Unit = {},
+    val onCreateBay: (String, BayType) -> Unit = { _, _ -> }
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BaysContent(
     state: BaysUiState,
-    onBack: () -> Unit,
-    onFilterChange: (BayStatus?) -> Unit,
-    onRefresh: () -> Unit,
-    onOpenOrder: (String) -> Unit,
-    onOpenAssignOrder: (WorkBay) -> Unit,
-    onDismissAssignOrder: () -> Unit,
-    onAssignOrderToBay: (String) -> Unit,
-    onOpenCreateBay: () -> Unit,
-    onDismissCreateBay: () -> Unit,
-    onCreateBay: (String, BayType) -> Unit,
+    actions: BaysActions,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-    ) {
-        AtelierTopBar(title = stringResource(R.string.bays_title), onBack = onBack)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!state.canReadBays) {
-                AtelierBanner(
-                    message = stringResource(R.string.bays_no_permission),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Wait
-                )
+    val showSkeleton = rememberDelayedLoading(state.showSkeleton && state.canReadBays)
+    var now by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(state.occupiedCount) {
+        if (state.occupiedCount > 0) {
+            while (true) {
+                now = Instant.now()
+                delay(30_000L)
             }
-
-            state.notice?.let {
-                AtelierBanner(message = it.asString(), icon = Icons.Outlined.CheckCircle, kind = BannerKind.Ok)
-            }
-            state.error?.let {
-                AtelierBanner(message = it.asString(), icon = Icons.Filled.Error)
-            }
-
-            if (state.canManageBays) {
-                AtelierButton(
-                    text = stringResource(R.string.bays_new_btn),
-                    onClick = onOpenCreateBay,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Outlined.Add
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                FilterChipButton(
-                    text = stringResource(R.string.bays_filter_all, state.board.size),
-                    selected = state.statusFilter == null,
-                    onClick = { onFilterChange(null) },
-                    modifier = Modifier.weight(1f)
-                )
-                FilterChipButton(
-                    text = stringResource(R.string.bays_filter_available, state.availableCount),
-                    selected = state.statusFilter == BayStatus.AVAILABLE,
-                    onClick = { onFilterChange(BayStatus.AVAILABLE) },
-                    modifier = Modifier.weight(1f)
-                )
-                FilterChipButton(
-                    text = stringResource(R.string.bays_filter_occupied, state.occupiedCount),
-                    selected = state.statusFilter == BayStatus.OCCUPIED,
-                    onClick = { onFilterChange(BayStatus.OCCUPIED) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            if (state.filteredBoard.isEmpty() && !state.isRefreshing) {
-                AtelierBanner(
-                    message = stringResource(R.string.bays_empty),
-                    icon = Icons.Outlined.Info,
-                    kind = BannerKind.Info
-                )
-            } else {
-                state.filteredBoard.forEach { item ->
-                    BayCard(
-                        item = item,
-                        canAssign = state.canAssignBay && item.bay.canReceive && state.assignableOrders.isNotEmpty(),
-                        onOpenOrder = onOpenOrder,
-                        onAssignClick = { onOpenAssignOrder(item.bay) }
-                    )
-                }
-            }
-
-            AtelierButton(
-                text = stringResource(R.string.bays_refresh),
-                onClick = onRefresh,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Text,
-                loading = state.isRefreshing
-            )
         }
     }
 
-    if (state.showCreateDialog) {
-        CreateBayDialog(
-            isSaving = state.isCreatingBay,
-            onConfirm = onCreateBay,
-            onDismiss = onDismissCreateBay
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = { AtelierTopBar(title = stringResource(R.string.bays_title), onBack = actions.onBack) },
+        floatingActionButton = {
+            if (state.canManageBays && state.isOnline) {
+                AtelierFab(
+                    text = stringResource(R.string.bays_new_btn),
+                    icon = Icons.Outlined.Add,
+                    onClick = actions.onOpenCreateBay
+                )
+            }
+        }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (!state.canReadBays) {
+                AtelierNoPermissionState(
+                    text = stringResource(R.string.bays_no_permission),
+                    modifier = Modifier.padding(horizontal = Spacing.md)
+                )
+                return@Column
+            }
+            BayFilters(state, actions.onFilterChange)
+            AtelierRefreshBar(visible = state.isRefreshing && state.hasLoaded)
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing && state.hasLoaded,
+                onRefresh = actions.onRefresh,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .floatingBarPadding(),
+                    contentPadding = PaddingValues(bottom = 96.dp)
+                ) {
+                    if (!state.isOnline) {
+                        item(key = "offline") {
+                            AtelierBanner(
+                                message = stringResource(R.string.bays_offline),
+                                icon = Icons.Outlined.Info,
+                                kind = BannerKind.Info,
+                                modifier = Modifier.padding(start = Spacing.md, end = Spacing.md, top = Spacing.md)
+                            )
+                        }
+                    }
+                    state.notice?.let {
+                        item(key = "notice") {
+                            AtelierBanner(
+                                message = it.asString(),
+                                icon = Icons.Outlined.CheckCircle,
+                                kind = BannerKind.Ok,
+                                modifier = Modifier.padding(start = Spacing.md, end = Spacing.md, top = Spacing.md)
+                            )
+                        }
+                    }
+                    val error = state.error
+                    if (error != null && state.board.isNotEmpty() && !state.hasOpenSheet) {
+                        item(key = "error") {
+                            AtelierBanner(
+                                message = error.asString(),
+                                icon = Icons.Outlined.ErrorOutline,
+                                modifier = Modifier.padding(start = Spacing.md, end = Spacing.md, top = Spacing.md)
+                            )
+                        }
+                    }
+                    if (!showSkeleton && !state.showSkeleton && state.board.isNotEmpty()) {
+                        item(key = "occupancy-summary") {
+                            BayOccupancySummary(state)
+                        }
+                    }
+                    when {
+                        showSkeleton -> items(4, key = { "bone-$it" }) {
+                            AtelierListRow(title = "Bahía", subtitle = "Elevador", plate = "ABC123", loading = true)
+                        }
+                        state.showSkeleton -> Unit
+                        state.board.isEmpty() && error != null && !state.isOnline -> item(key = "offline-state") {
+                            AtelierOfflineState(modifier = Modifier.padding(horizontal = Spacing.md), onRetry = actions.onRefresh)
+                        }
+                        state.board.isEmpty() && error != null -> item(key = "error-state") {
+                            AtelierErrorState(
+                                message = error.asString(),
+                                modifier = Modifier.padding(horizontal = Spacing.md),
+                                onRetry = actions.onRefresh
+                            )
+                        }
+                        state.filteredBoard.isEmpty() -> item(key = "empty") {
+                            AtelierEmptyState(
+                                text = stringResource(R.string.bays_empty),
+                                modifier = Modifier.padding(horizontal = Spacing.md)
+                            )
+                        }
+                        else -> items(state.filteredBoard, key = { it.bay.id }) { item ->
+                            val liveElapsed = item.occupant?.let { occ ->
+                                if (occ.tasks.isNotEmpty()) laborElapsed(occ.tasks, now) else occ.laborElapsed
+                            }
+                            BayRow(
+                                item = item,
+                                state = state,
+                                liveElapsed = liveElapsed,
+                                onOpenOrder = actions.onOpenOrder,
+                                onOpenActions = { actions.onOpenBayActions(item) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    state.selectedBayItem?.let { item ->
+        val liveElapsed = item.occupant?.let { occ ->
+            if (occ.tasks.isNotEmpty()) laborElapsed(occ.tasks, now) else occ.laborElapsed
+        }
+        BayActionsSheet(
+            item = item,
+            state = state,
+            liveElapsed = liveElapsed,
+            onOpenOrder = { orderId ->
+                actions.onDismissBayActions()
+                actions.onOpenOrder(orderId)
+            },
+            onAssignOrder = actions.onAssignOrderToBay,
+            onReassignOrder = actions.onReassignSelectedBayOrder,
+            onReleaseBay = actions.onReleaseSelectedBay,
+            onOpenReassignTaskMechanic = actions.onOpenReassignTaskMechanic,
+            onConfirmReassignTaskMechanic = actions.onConfirmReassignTaskMechanic,
+            onToggleMaintenanceInput = actions.onToggleMaintenanceInput,
+            onMaintenanceReasonChange = actions.onMaintenanceReasonChange,
+            onConfirmMaintenance = actions.onConfirmSetMaintenance,
+            onRestoreBay = actions.onRestoreSelectedBay,
+            onDismiss = actions.onDismissBayActions
         )
     }
 
     state.targetBayForAssign?.let { bay ->
-        AlertDialog(
-            onDismissRequest = onDismissAssignOrder,
-            confirmButton = {},
-            dismissButton = {
-                AtelierButton(
-                    text = stringResource(R.string.proposals_cancel),
-                    onClick = onDismissAssignOrder,
-                    style = AtelierButtonStyle.Text
-                )
-            },
-            title = { Text(stringResource(R.string.order_assign_to_bay, bay.name)) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 420.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.bays_select_order_prompt),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AtelierTheme.colors.inkSecondary
-                    )
-                    state.assignableOrders.forEach { order ->
-                        val code = order.internalNumber?.let { stringResource(R.string.order_code_format, it) }
-                            ?: order.id.take(8)
-                        val titleText = if (!order.plate.isNullOrBlank()) "$code · ${order.plate}" else code
-                        AtelierSelectionCard(
-                            title = titleText,
-                            subtitle = order.customerName,
-                            badgeText = stringResource(order.status.labelRes()),
-                            enabled = !state.isAssigning,
-                            onClick = { onAssignOrderToBay(order.id) }
-                        )
-                    }
-                }
-            }
+        AssignOrderSheet(
+            state = state,
+            bay = bay,
+            onDismiss = actions.onDismissAssignOrder,
+            onAssign = actions.onAssignOrderToBay
         )
+    }
+
+    if (state.showCreateDialog) {
+        CreateBaySheet(
+            isSaving = state.isCreatingBay,
+            isOnline = state.isOnline,
+            errorText = state.error?.asString(),
+            onConfirm = actions.onCreateBay,
+            onDismiss = actions.onDismissCreateBay
+        )
+    }
+}
+
+private enum class BayFilterOption(val status: BayStatus?) {
+    ALL(null),
+    AVAILABLE(BayStatus.AVAILABLE),
+    OCCUPIED(BayStatus.OCCUPIED),
+    MAINTENANCE(BayStatus.MAINTENANCE)
+}
+
+/** Filtro del tablero en pista hundida con cápsula deslizante y conteo por estado. */
+@Composable
+private fun BayFilters(state: BaysUiState, onFilterChange: (BayStatus?) -> Unit) {
+    val selected = BayFilterOption.entries.firstOrNull { it.status == state.statusFilter } ?: BayFilterOption.ALL
+    val allLabel = stringResource(R.string.bays_filter_all_short)
+    val availableLabel = stringResource(R.string.bays_filter_available_short)
+    val occupiedLabel = stringResource(R.string.bays_filter_occupied_short)
+    val maintenanceLabel = stringResource(R.string.bays_filter_maintenance_short)
+    AtelierSegmentedControl(
+        options = BayFilterOption.entries,
+        selected = selected,
+        onSelect = { onFilterChange(it.status) },
+        label = { option ->
+            when (option) {
+                BayFilterOption.ALL -> allLabel
+                BayFilterOption.AVAILABLE -> availableLabel
+                BayFilterOption.OCCUPIED -> occupiedLabel
+                BayFilterOption.MAINTENANCE -> maintenanceLabel
+            }
+        },
+        badge = { option ->
+            when (option) {
+                BayFilterOption.ALL -> state.board.size
+                BayFilterOption.AVAILABLE -> state.availableCount
+                BayFilterOption.OCCUPIED -> state.occupiedCount
+                BayFilterOption.MAINTENANCE -> state.maintenanceCount
+            }
+        },
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
+    )
+}
+
+@Composable
+private fun BayOccupancySummary(state: BaysUiState) {
+    val colors = AtelierTheme.colors
+    val total = state.board.size
+    val progress = if (total > 0) state.occupiedCount.toFloat() / total.toFloat() else 0f
+    val barColor = when {
+        progress >= 0.85f -> colors.warnMark
+        state.occupiedCount > 0 -> colors.info
+        else -> colors.okMark
+    }
+    AtelierSurface(
+        modifier = Modifier
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .fillMaxWidth(),
+        tier = SurfaceTier.Card,
+        shape = CardLargeShape,
+        contentPadding = PaddingValues(Spacing.md)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state.occupiedCount > 0) {
+                        AtelierLiveBeacon(color = colors.info, size = 8.dp)
+                    }
+                    Text(
+                        text = stringResource(R.string.bays_occupancy_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.bays_occupancy_fraction, state.occupiedCount, total),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            AtelierMetricBar(
+                progress = progress,
+                color = barColor,
+                height = 8.dp
+            )
+            Text(
+                text = stringResource(R.string.bays_occupancy_breakdown, state.availableCount, state.maintenanceCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.inkSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun BayRow(
+    item: BayBoardItem,
+    state: BaysUiState,
+    liveElapsed: Duration?,
+    onOpenOrder: (String) -> Unit,
+    onOpenActions: () -> Unit
+) {
+    val colors = AtelierTheme.colors
+    val bay = item.bay
+    val occupant = item.occupant
+    val canAssignThisBay = state.canAssignBay && state.isOnline && bay.canReceive && state.assignableOrders.isNotEmpty()
+    val canActOnBay = when (bay.status) {
+        BayStatus.OCCUPIED -> occupant != null && (state.canReadWorkOrders || state.canReleaseBay || state.canAssignBay)
+        BayStatus.AVAILABLE -> canAssignThisBay || (state.canManageBays && state.isOnline)
+        BayStatus.MAINTENANCE -> state.canManageBays && state.isOnline
+        null -> false
+    }
+    val elapsed = liveElapsed ?: occupant?.laborElapsed
+    val mechanicNames = occupant?.let { state.mechanicLabelsFor(it) }.orEmpty()
+    val line = when {
+        occupant != null -> listOfNotNull(
+            bay.type?.let { stringResource(it.labelRes()) },
+            occupant.internalNumber?.let { stringResource(R.string.today_order_number, it) },
+            elapsed?.let { stringResource(R.string.bays_labor, it.formatBayElapsed()) },
+            mechanicNames.takeIf { it.isNotEmpty() }?.joinToString(", ")
+        ).joinToString(" · ")
+        canAssignThisBay -> listOfNotNull(
+            bay.type?.let { stringResource(it.labelRes()) },
+            stringResource(R.string.bays_tap_to_assign)
+        ).joinToString(" · ")
+        else -> bay.type?.let { stringResource(it.labelRes()) }.orEmpty()
+    }
+    AtelierListRow(
+        title = bay.name,
+        subtitle = line.ifEmpty { null },
+        plate = occupant?.plate,
+        onClick = when {
+            canActOnBay -> onOpenActions
+            occupant != null && state.canReadWorkOrders -> ({ onOpenOrder(occupant.workOrderId) })
+            else -> null
+        },
+        trailing = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (bay.status == BayStatus.OCCUPIED) {
+                    AtelierLiveBeacon(color = colors.info, size = 8.dp)
+                }
+                bay.status?.let { BayStatusChip(it) }
+            }
+        }
+    )
+}
+
+@Composable
+private fun BayStatusChip(status: BayStatus) {
+    when (status) {
+        BayStatus.AVAILABLE -> AtelierChip(stringResource(R.string.bay_status_available), kind = ChipKind.Ok)
+        BayStatus.OCCUPIED -> AtelierChip(stringResource(R.string.bay_status_occupied), kind = ChipKind.Info)
+        BayStatus.MAINTENANCE ->
+            AtelierChip(stringResource(R.string.bay_status_maintenance), kind = ChipKind.Warn, icon = Icons.Outlined.Build)
     }
 }
 
@@ -245,215 +509,63 @@ internal fun BayType.labelRes(): Int = when (this) {
     BayType.PAINT_BOOTH -> R.string.bay_type_paint_booth
 }
 
-@Composable
-private fun CreateBayDialog(
-    isSaving: Boolean,
-    onConfirm: (name: String, type: BayType) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(BayType.LIFT) }
+// region Previews
 
-    val types = listOf(
-        BayType.LIFT,
-        BayType.MECHANICAL_LIFT,
-        BayType.DIAGNOSTIC_PIT,
-        BayType.WASH_BAY,
-        BayType.ALIGNMENT_STATION,
-        BayType.PAINT_BOOTH
-    )
+private fun previewBay(id: String, name: String, type: BayType, status: BayStatus) =
+    WorkBay(id = id, branchId = "b1", name = name, type = type, status = status, currentWorkOrderId = null)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            AtelierButton(
-                text = stringResource(R.string.bays_create_confirm),
-                onClick = { onConfirm(name, selectedType) },
-                enabled = name.isNotBlank() && !isSaving,
-                loading = isSaving
-            )
-        },
-        dismissButton = {
-            AtelierButton(
-                text = stringResource(R.string.proposals_cancel),
-                onClick = onDismiss,
-                style = AtelierButtonStyle.Text,
-                enabled = !isSaving
-            )
-        },
-        title = { Text(stringResource(R.string.bays_create_dialog_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                AtelierTextField(
-                    label = stringResource(R.string.bays_name_label),
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = stringResource(R.string.bays_name_hint),
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSaving
-                )
-                Text(
-                    text = stringResource(R.string.bays_type_label),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                types.forEach { type ->
-                    val isSelected = type == selectedType
-                    Surface(
-                        onClick = { selectedType = type },
-                        shape = PillShape,
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        enabled = !isSaving
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 14.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Text(
-                                text = stringResource(type.labelRes()),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    )
-}
+private fun previewOrder(id: String, number: Int, plate: String, customer: String, status: WorkOrderStatus) = WorkOrder(
+    id = id, internalNumber = number, branchId = "b1", vehicleId = "v$id", customerId = "c$id",
+    currentBayId = null, bayName = null, status = status, diagnosticSummary = null, mileageIn = null,
+    subtotal = null, taxAmount = null, totalAmount = Money.of("480.00", Money.PEN), plate = plate, customerName = customer
+)
 
-@Composable
-private fun FilterChipButton(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        shape = PillShape,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+private val previewState = BaysUiState(
+    board = listOf(
+        BayBoardItem(
+            previewBay("1", "Elevador 1", BayType.LIFT, BayStatus.OCCUPIED),
+            BayOccupant("o1", 1041, "F5U731", listOf("m1"), Duration.ofMinutes(80))
         ),
-        modifier = modifier.height(38.dp)
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
+        BayBoardItem(
+            previewBay("2", "Elevador 2", BayType.LIFT, BayStatus.OCCUPIED),
+            BayOccupant("o2", 1040, "AXT209", listOf("m2"), null)
+        ),
+        BayBoardItem(previewBay("3", "Fosa de diagnóstico", BayType.DIAGNOSTIC_PIT, BayStatus.AVAILABLE), null),
+        BayBoardItem(previewBay("4", "Alineación", BayType.ALIGNMENT_STATION, BayStatus.MAINTENANCE), null)
+    ),
+    activeOrders = listOf(
+        previewOrder("o3", 1042, "BKR418", "Rosa Quispe Mamani", WorkOrderStatus.DRAFT)
+    ),
+    hasLoaded = true,
+    canReadBays = true,
+    canAssignBay = true,
+    canReleaseBay = true,
+    canManageBays = true
+)
 
 @Composable
-private fun BayCard(
-    item: BayBoardItem,
-    canAssign: Boolean,
-    onOpenOrder: (String) -> Unit,
-    onAssignClick: () -> Unit
-) {
-    val bay = item.bay
-    val occupant = item.occupant
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .background(AtelierTheme.colors.card)
-            .clickable(enabled = occupant != null) { occupant?.workOrderId?.let(onOpenOrder) }
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = bay.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            AtelierChip(
-                text = when (bay.status) {
-                    BayStatus.AVAILABLE -> stringResource(R.string.bay_status_available)
-                    BayStatus.OCCUPIED -> stringResource(R.string.bay_status_occupied)
-                    BayStatus.MAINTENANCE -> stringResource(R.string.bay_status_maintenance)
-                    null -> ""
-                },
-                kind = when (bay.status) {
-                    BayStatus.AVAILABLE -> ChipKind.Ok
-                    BayStatus.OCCUPIED -> ChipKind.Info
-                    BayStatus.MAINTENANCE -> ChipKind.Wait
-                    null -> ChipKind.Idle
-                }
-            )
-        }
-        bay.type?.let {
-            Text(text = stringResource(it.labelRes()), style = MaterialTheme.typography.bodySmall, color = AtelierTheme.colors.muted)
-        }
-
-        if (occupant != null) {
-            val code = occupant.internalNumber?.let { stringResource(R.string.order_code_format, it) }
-                ?: occupant.workOrderId.take(8)
-            val line = listOfNotNull(code, occupant.plate).joinToString(" · ")
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.DirectionsCar,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(text = line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            }
-        } else {
-            val statusDesc = when (bay.status) {
-                BayStatus.AVAILABLE -> stringResource(R.string.bay_status_available_desc)
-                BayStatus.OCCUPIED -> stringResource(R.string.bay_status_occupied_desc)
-                BayStatus.MAINTENANCE -> stringResource(R.string.bay_status_maintenance_desc)
-                null -> ""
-            }
-            if (statusDesc.isNotBlank()) {
-                Text(
-                    text = statusDesc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = when (bay.status) {
-                        BayStatus.AVAILABLE -> AtelierTheme.colors.ok
-                        BayStatus.MAINTENANCE -> AtelierTheme.colors.bad
-                        else -> AtelierTheme.colors.inkSecondary
-                    }
-                )
-            }
-        }
-
-        if (canAssign) {
-            AtelierButton(
-                text = stringResource(R.string.bays_assign_order_btn),
-                onClick = onAssignClick,
-                modifier = Modifier.fillMaxWidth(),
-                style = AtelierButtonStyle.Tonal
-            )
-        }
-    }
+private fun PreviewContent(state: BaysUiState) {
+    BaysContent(state = state, actions = BaysActions())
 }
+
+@Preview(name = "Bahías · claro", widthDp = 390, heightDp = 844)
+@Composable
+private fun BaysPreviewLight() = AtelierWorkshopTheme(darkTheme = false) { PreviewContent(previewState) }
+
+@Preview(name = "Bahías · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun BaysPreviewDark() = AtelierWorkshopTheme(darkTheme = true) { PreviewContent(previewState) }
+
+@Preview(name = "Bahías · cargando", widthDp = 390, heightDp = 844)
+@Composable
+private fun BaysPreviewLoading() = AtelierWorkshopTheme(darkTheme = false) {
+    PreviewContent(BaysUiState(canReadBays = true))
+}
+
+@Preview(name = "Bahías · hoja ocupada · oscuro", widthDp = 390, heightDp = 844, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun BaysPreviewOccupiedSheet() = AtelierWorkshopTheme(darkTheme = true) {
+    PreviewContent(previewState.copy(selectedBayItem = previewState.board[0]))
+}
+
+// endregion

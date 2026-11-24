@@ -184,4 +184,22 @@ class SyncProcessorTest {
         assertEquals(listOf("a"), sent)
         assertNull(dao.findById("a"))
     }
+
+    @Test
+    fun `ejecuta los hooks previos antes de vaciar la cola`() = runTest {
+        var hookUser: String? = null
+        val hook = object : PreSyncHook {
+            override suspend fun beforeSync(userId: String, forceFlushAll: Boolean) {
+                hookUser = userId
+                enqueue("from-hook", userId = userId)
+            }
+        }
+        val proc = SyncProcessor(dao, mapOf("CLOCK_IN" to handler(OperationResult.Applied)), "No se pudo sincronizar", setOf(hook)) { now }
+
+        proc.run("u1")
+
+        assertEquals("u1", hookUser)
+        assertEquals(listOf("from-hook"), sent)
+        assertNull(dao.findById("from-hook"))
+    }
 }

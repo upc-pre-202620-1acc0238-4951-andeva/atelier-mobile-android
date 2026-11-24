@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Más: todo lo que no cabe en las pestañas, agrupado por tarea -->
+    <string name="more_h_title">Más</string>
+    <string name="more_h_group_workshop">Taller</string>
+    <string name="more_h_group_cashier">Caja y reportes</string>
+    <string name="more_h_group_stock">Repuestos</string>
+    <string name="more_h_group_account">Cuenta</string>
+
+    <string name="more_h_branch">Cambiar de sede</string>
+    <string name="more_h_branch_sub">Elige la sede con la que trabajas</string>
+    <string name="more_h_my_attendance">Mi asistencia</string>
+    <string name="more_h_my_attendance_sub">Marcación GPS, turno y descargos</string>
+    <string name="more_h_my_tasks">Mis tareas</string>
+    <string name="more_h_my_tasks_sub">Cronómetro, evidencias y repuestos</string>
+    <string name="more_h_workshop_tasks">Tareas del taller</string>
+    <string name="more_h_workshop_tasks_sub">Faenas activas y suspensiones de la sede</string>
+    <string name="more_h_orders">Órdenes de trabajo</string>
+    <string name="more_h_orders_sub">Órdenes abiertas y proformas de la sede</string>
+    <string name="more_h_reception">Recibir vehículo</string>
+    <string name="more_h_reception_sub">Busca por placa y abre la orden</string>
+    <string name="more_h_bays">Bahías</string>
+    <string name="more_h_bays_sub">Qué auto ocupa cada bahía</string>
+    <string name="more_h_services">Servicios</string>
+    <string name="more_h_services_sub">Catálogo de mano de obra y tarifas</string>
+    <string name="more_h_obd">Escáneres OBD-II</string>
+    <string name="more_h_obd_sub">Equipos de diagnóstico del taller</string>
+
+    <string name="more_h_daily_cash">Caja del día</string>
+    <string name="more_h_daily_cash_sub">Lo cobrado hoy en la sede</string>
+    <string name="more_h_vouchers">Comprobantes SUNAT</string>
+    <string name="more_h_vouchers_sub">Boletas, facturas, notas de crédito</string>
+    <string name="more_h_reports">Reportes</string>
+    <string name="more_h_reports_sub">Flujo de caja y salud de flota en PDF</string>
+    <string name="more_h_series">Series de comprobantes</string>
+    <string name="more_h_series_sub">Boletas y facturas SUNAT de la sede</string>
+
+    <string name="more_h_parts">Catálogo de repuestos</string>
+    <string name="more_h_parts_sub">Stock, precios y lotes</string>
+    <string name="more_h_alerts">Alertas de stock</string>
+    <string name="more_h_alerts_sub">Repuestos por reponer o agotados</string>
+    <string name="more_h_purchases">Órdenes de compra</string>
+    <string name="more_h_purchases_sub">Pedidos a proveedores y su recepción</string>
+    <string name="more_h_suppliers">Proveedores</string>
+    <string name="more_h_suppliers_sub">Directorio comercial de suministros</string>
+    <string name="more_h_valuation">Valorización</string>
+    <string name="more_h_valuation_sub">Cuánto vale el inventario</string>
+
+    <string name="more_h_notifications">Notificaciones</string>
+    <string name="more_h_notifications_sub">Avisos y alertas del taller</string>
+    <string name="more_h_sync">Pendientes de sincronizar</string>
+    <string name="more_h_sync_sub">Fotos y propuestas guardadas sin red</string>
+    <string name="more_h_profile">Mi cuenta</string>
+    <string name="more_h_profile_sub">Perfil, sede y cerrar sesión</string>
+
+    <string name="main_tab_modules">Módulos</string>
+    <string name="main_tab_shift">Turno</string>
+    <string name="main_tab_purchases">Compras</string>
+    <string name="main_tab_cash">Caja</string>
+    <string name="main_tab_bays">Bahías</string>
+    <string name="bar_action_receive">Recibir</string>
+    <string name="bar_action_appointment">Cita</string>
+    <string name="bar_action_appointment_desc">Gestionar citas y recepción</string>
+    <string name="bar_action_collect">Cobrar</string>
+    <string name="bar_action_collect_desc">Ver órdenes listas para cobrar</string>
+    <string name="bar_action_scan">SKU</string>
+    <string name="bar_action_scan_desc">Buscar o escanear repuesto por SKU</string>
+    <string name="bar_action_tasks">Tareas</string>
+    <string name="bar_action_tasks_desc">Ir a mis tareas activas</string>
+    <string name="modules_title">Todos los módulos</string>
+</resources>

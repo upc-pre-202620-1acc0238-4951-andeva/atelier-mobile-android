@@ -1,28 +1,38 @@
 package com.andeva.atelier.mobile.features.tasks.presentation.detail
 
 import androidx.lifecycle.SavedStateHandle
-import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
+import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.domain.Permission
+import com.andeva.atelier.mobile.core.domain.Plan
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.AddPartToTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ApproveSuspensionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.AttachTaskEvidenceUseCase
 import com.andeva.atelier.mobile.features.tasks.application.CompleteTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.GetTaskDetailUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ObservePendingEvidenceUseCase
 import com.andeva.atelier.mobile.features.tasks.application.ObserveTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.PauseTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.RejectSuspensionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RemovePartFromTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ReopenTaskUseCase
+import com.andeva.atelier.mobile.features.tasks.application.RequestSuspensionUseCase
+import com.andeva.atelier.mobile.features.tasks.application.ResumeSuspendedTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SearchPartsUseCase
 import com.andeva.atelier.mobile.features.tasks.application.StartTaskUseCase
 import com.andeva.atelier.mobile.features.tasks.application.SuggestLaborHoursUseCase
 import com.andeva.atelier.mobile.features.tasks.application.UpdateTaskPartQuantityUseCase
+import com.andeva.atelier.mobile.features.tasks.domain.EvidenceKind
 import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.PartOption
-import com.andeva.atelier.mobile.features.tasks.domain.PausedElapsedStore
 import com.andeva.atelier.mobile.features.tasks.domain.PauseReason
+import com.andeva.atelier.mobile.features.tasks.domain.PausedElapsedStore
+import com.andeva.atelier.mobile.features.tasks.domain.PendingEvidence
 import com.andeva.atelier.mobile.features.tasks.domain.Task
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
@@ -43,6 +53,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.Clock
@@ -58,6 +69,7 @@ class TaskDetailViewModelTest {
     private val now = Instant.parse("2026-10-28T15:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
     private val task = MutableStateFlow<Task?>(null)
+    private val pendingEvidence = MutableStateFlow<List<PendingEvidence>>(emptyList())
     private val online = MutableStateFlow(true)
     private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
     private val pausedStore = mockk<PausedElapsedStore>(relaxUnitFun = true)
@@ -70,12 +82,13 @@ class TaskDetailViewModelTest {
         status: TaskStatus = TaskStatus.ASSIGNED,
         hold: HoldReason? = null,
         startedAt: Instant? = null,
-        paused: Long = 0
+        paused: Long = 0,
+        pendingSuspensionReason: String? = null
     ) = Task(
         id = id, workOrderId = "wo1", workOrderNumber = 10, workOrderStatus = null, vehicleId = "v1",
         plate = "ABC123", branchId = "b1", bayId = null, bayName = "B-1", serviceName = null, mechanicId = "m1",
         status = status, description = "Cambio de pastillas", estimatedHours = null, holdReason = hold,
-        missingItemDescription = null, pendingSuspensionReason = null, startedAt = startedAt, totalPausedSeconds = paused
+        missingItemDescription = null, pendingSuspensionReason = pendingSuspensionReason, startedAt = startedAt, totalPausedSeconds = paused
     )
 
     private fun producto(productId: String = "p1", quantity: String = "2") = TaskProduct(
@@ -93,44 +106,66 @@ class TaskDetailViewModelTest {
         hold: HoldReason? = null,
         startedAt: Instant? = null,
         paused: Long = 0,
-        products: List<TaskProduct> = emptyList()
+        products: List<TaskProduct> = emptyList(),
+        pendingSuspensionReason: String? = null,
+        missingItemDescription: String? = null
     ) = TaskDetail(
         id = id, workOrderId = "wo1", serviceId = "s1", serviceName = "Frenos", mechanicId = "m1", mechanicName = null,
         status = status, description = "Cambio de pastillas", price = null, holdReason = hold,
-        missingItemDescription = null, totalPausedSeconds = paused, startedAt = startedAt, completedAt = null,
-        pendingSuspensionReason = null, pendingSuspensionRequestedAt = null, products = products, evidenceImages = emptyList()
+        missingItemDescription = missingItemDescription, totalPausedSeconds = paused, startedAt = startedAt, completedAt = null,
+        pendingSuspensionReason = pendingSuspensionReason, pendingSuspensionRequestedAt = null, products = products, evidenceImages = emptyList()
     )
 
     private val mechanic = listOf(
-        Permission.TASKS_READ, Permission.TASKS_TRACK_TIME, Permission.TASKS_COMPLETE, Permission.TASKS_CHARGE_PARTS
+        Permission.TASKS_READ,
+        Permission.TASKS_TRACK_TIME,
+        Permission.TASKS_COMPLETE,
+        Permission.TASKS_CHARGE_PARTS,
+        Permission.TASKS_UPLOAD_PHOTOS,
+        Permission.TASKS_HOLD_REQUEST,
+        Permission.PROPOSALS_CREATE
     )
-    private val supervisor = mechanic + Permission.WORK_ORDERS_UPDATE
+    private val supervisor = mechanic + listOf(
+        Permission.WORK_ORDERS_UPDATE,
+        Permission.TASKS_HOLD_VALIDATE
+    )
 
-    private fun sessionWith(permissions: List<Permission>) = Session(
+    private fun sessionWith(permissions: List<Permission>, plan: Plan? = null) = Session(
         userId = "u", email = "m@taller.pe", fullName = "Mecánico", tenantId = "t", tenantName = "Taller",
-        membershipId = "m", permissions = permissions.map { it.value }.toSet(), plan = null
+        membershipId = "m", permissions = permissions.map { it.value }.toSet(), plan = plan
     )
 
-    private fun viewModel(permissions: List<Permission> = mechanic): TaskDetailViewModel {
+    private fun viewModel(
+        permissions: List<Permission> = mechanic,
+        plan: Plan? = null
+    ): TaskDetailViewModel {
         val observeSession = mockk<ObserveSessionUseCase>()
-        every { observeSession() } returns flowOf(sessionWith(permissions))
+        every { observeSession() } returns flowOf(sessionWith(permissions, plan))
         every { repository.observeTask(id) } returns task
+        every { repository.observePendingEvidence(id) } returns pendingEvidence
         return TaskDetailViewModel(
-            observeSession,
-            ObserveTaskUseCase(repository),
-            GetTaskDetailUseCase(repository),
-            StartTaskUseCase(repository),
-            PauseTaskUseCase(repository),
-            CompleteTaskUseCase(repository),
-            SuggestLaborHoursUseCase(clock),
-            SearchPartsUseCase(repository),
-            AddPartToTaskUseCase(repository),
-            UpdateTaskPartQuantityUseCase(repository),
-            RemovePartFromTaskUseCase(repository),
-            pausedStore,
-            clock,
-            connectivity,
-            SavedStateHandle(mapOf("workOrderId" to "wo1", "taskId" to "t1"))
+            observeSession = observeSession,
+            observeTask = ObserveTaskUseCase(repository),
+            observePendingEvidence = ObservePendingEvidenceUseCase(repository),
+            getDetail = GetTaskDetailUseCase(repository),
+            startTask = StartTaskUseCase(repository),
+            pauseTask = PauseTaskUseCase(repository),
+            completeTask = CompleteTaskUseCase(repository),
+            reopenTask = ReopenTaskUseCase(repository),
+            suggestLaborHours = SuggestLaborHoursUseCase(clock),
+            attachEvidence = AttachTaskEvidenceUseCase(repository),
+            requestSuspension = RequestSuspensionUseCase(repository),
+            approveSuspension = ApproveSuspensionUseCase(repository),
+            rejectSuspension = RejectSuspensionUseCase(repository),
+            resumeSuspendedTask = ResumeSuspendedTaskUseCase(repository),
+            searchParts = SearchPartsUseCase(repository),
+            addPart = AddPartToTaskUseCase(repository),
+            updatePartQuantity = UpdateTaskPartQuantityUseCase(repository),
+            removePart = RemovePartFromTaskUseCase(repository),
+            pausedElapsed = pausedStore,
+            clock = clock,
+            connectivity = connectivity,
+            savedStateHandle = SavedStateHandle(mapOf("workOrderId" to "wo1", "taskId" to "t1"))
         )
     }
 
@@ -249,16 +284,36 @@ class TaskDetailViewModelTest {
     }
 
     @Test
+    fun `no permite completar sin foto de montaje cuando el perfil puede subir fotos`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600)))
+        val vm = viewModel()
+        settle()
+
+        vm.onCompleteClick()
+        vm.onCompleteConfirm()
+        settle()
+
+        assertFalse(vm.uiState.value.completed)
+        assertTrue(vm.uiState.value.requiresAssemblyEvidence)
+        assertNotNull(vm.uiState.value.error)
+        coVerify(exactly = 0) { repository.complete(any(), any(), any()) }
+    }
+
+    @Test
     fun `terminar precarga las horas sugeridas y cierra la tarea`() = runTest(mainRule.dispatcher) {
         val started = now.minusSeconds(2 * 3600 + 600)
         task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = started, paused = 600)
-        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = started, paused = 600))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = started, paused = 600).copy(
+            evidenceImages = listOf(com.andeva.atelier.mobile.features.tasks.domain.TaskEvidence("img1", "https://demo/1.jpg", "Montaje", now))
+        ))
         coEvery { repository.complete(id, BigDecimal("2"), null) } returns Result.success(detalle(TaskStatus.COMPLETED))
         val vm = viewModel()
         settle()
 
         vm.onCompleteClick()
         assertEquals("2", vm.uiState.value.completeForm?.hours)
+        assertFalse(vm.uiState.value.requiresAssemblyEvidence)
 
         vm.onCompleteConfirm()
         settle()
@@ -269,7 +324,9 @@ class TaskDetailViewModelTest {
     @Test
     fun `horas invalidas marcan el campo sin llamar al backend`() = runTest(mainRule.dispatcher) {
         task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
-        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now).copy(
+            evidenceImages = listOf(com.andeva.atelier.mobile.features.tasks.domain.TaskEvidence("img1", "https://demo/1.jpg", "Montaje", now))
+        ))
         val vm = viewModel()
         settle()
 
@@ -286,7 +343,9 @@ class TaskDetailViewModelTest {
     @Test
     fun `acepta la coma como separador decimal al cerrar`() = runTest(mainRule.dispatcher) {
         task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
-        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now).copy(
+            evidenceImages = listOf(com.andeva.atelier.mobile.features.tasks.domain.TaskEvidence("img1", "https://demo/1.jpg", "Montaje: listo", now))
+        ))
         coEvery { repository.complete(id, BigDecimal("1.5"), "Sin novedad") } returns Result.success(detalle(TaskStatus.COMPLETED))
         val vm = viewModel()
         settle()
@@ -298,6 +357,183 @@ class TaskDetailViewModelTest {
         settle()
 
         assertTrue(vm.uiState.value.completed)
+    }
+
+    // --- US28: evidencias fotograficas offline-safe ---
+
+    @Test
+    fun `capturar foto de desmontaje o montaje funciona sin red y encola`() = runTest(mainRule.dispatcher) {
+        online.value = false
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        coEvery { repository.getDetail(id) } returns Result.failure(IOException())
+        val photo = File("evidencia.jpg")
+        coEvery { repository.attachEvidence(id, "wo1", photo, "Montaje: discos nuevos") } returns Result.success(Unit)
+        val vm = viewModel()
+        settle()
+
+        vm.onEvidenceKindChange(EvidenceKind.ASSEMBLY)
+        vm.onEvidenceNoteChange("discos nuevos")
+        vm.onEvidenceCaptured(photo)
+        settle()
+
+        assertEquals("", vm.uiState.value.evidenceNote)
+        assertNotNull(vm.uiState.value.notice)
+        coVerify(exactly = 1) { repository.attachEvidence(id, "wo1", photo, "Montaje: discos nuevos") }
+    }
+
+    @Test
+    fun `sin permiso de subir fotos no encola evidencia`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel(listOf(Permission.TASKS_READ))
+        settle()
+
+        vm.onEvidenceCaptured(File("x.jpg"))
+        settle()
+
+        assertFalse(vm.uiState.value.canUploadPhotos)
+        coVerify(exactly = 0) { repository.attachEvidence(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `observa evidencias pendientes en cola`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel()
+        pendingEvidence.value = listOf(
+            PendingEvidence("op1", "/tmp/1.jpg", "https://demo/1.jpg", "Desmontaje", "PENDING", null, now)
+        )
+        settle()
+
+        assertEquals(1, vm.uiState.value.pendingEvidence.size)
+    }
+
+    // --- US29: suspensiones mecanico y supervisor ---
+
+    @Test
+    fun `mecanico solicita suspension con item y repuesto opcional`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        coEvery { repository.searchParts("reten") } returns Result.success(listOf(repuesto("p9")))
+        coEvery {
+            repository.requestSuspension(id, "Retén con fuga", "p9")
+        } returns Result.success(
+            detalle(TaskStatus.IN_PROGRESS, pendingSuspensionReason = "Retén con fuga", missingItemDescription = "Retén con fuga")
+        )
+        val vm = viewModel()
+        settle()
+
+        vm.onRequestSuspensionClick()
+        assertNotNull(vm.uiState.value.suspensionRequestForm)
+        vm.onSuspensionPartQueryChange("reten")
+        settle()
+        vm.onSuspensionPartSelect(repuesto("p9"))
+        vm.onSuspensionMissingItemChange("Retén con fuga")
+        vm.onRequestSuspensionConfirm()
+        settle()
+
+        assertNull(vm.uiState.value.suspensionRequestForm)
+        assertTrue(vm.uiState.value.hasPendingSuspension)
+        assertFalse(vm.uiState.value.canRequestSuspension)
+    }
+
+    @Test
+    fun `solicitud de suspension sin motivo marca error sin llamar al backend`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now)
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel()
+        settle()
+
+        vm.onRequestSuspensionClick()
+        vm.onSuspensionMissingItemChange("  ")
+        vm.onRequestSuspensionConfirm()
+        settle()
+
+        assertEquals("missingItemDescription", vm.uiState.value.invalidField)
+        coVerify(exactly = 0) { repository.requestSuspension(any(), any(), any()) }
+    }
+
+    @Test
+    fun `supervisor aprueba rechaza y levanta suspension respetando H5 y H6`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now, pendingSuspensionReason = "Falta retén")
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, pendingSuspensionReason = "Falta retén"))
+        coEvery { repository.approveSuspension(id) } returns Result.success(
+            detalle(TaskStatus.ON_HOLD, HoldReason.DEFECTIVE_PART, startedAt = now, missingItemDescription = "Falta retén")
+        )
+        coEvery { repository.resume(id) } returns Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel(supervisor)
+        settle()
+
+        assertTrue(vm.uiState.value.canReviewSuspension)
+        vm.onReviewSuspensionClick()
+        assertNotNull(vm.uiState.value.reviewSuspensionForm)
+
+        vm.onApproveSuspension()
+        settle()
+        assertNull(vm.uiState.value.reviewSuspensionForm)
+        assertTrue(vm.uiState.value.isSuspended)
+        assertTrue(vm.uiState.value.canReviewSuspension)
+
+        vm.onReviewSuspensionClick()
+        vm.onResumeSuspendedTask()
+        settle()
+        assertFalse(vm.uiState.value.isSuspended)
+        assertEquals(TaskStatus.IN_PROGRESS, vm.uiState.value.status)
+        coVerify { pausedStore.clear(id) }
+    }
+
+    @Test
+    fun `supervisor rechaza suspension y tarea sigue en curso`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now, pendingSuspensionReason = "Falta retén")
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, pendingSuspensionReason = "Falta retén"))
+        coEvery { repository.rejectSuspension(id) } returns Result.success(detalle(TaskStatus.IN_PROGRESS, startedAt = now))
+        val vm = viewModel(supervisor)
+        settle()
+
+        vm.onReviewSuspensionClick()
+        vm.onRejectSuspension()
+        settle()
+
+        assertFalse(vm.uiState.value.hasPendingSuspension)
+        assertEquals(TaskStatus.IN_PROGRESS, vm.uiState.value.status)
+    }
+
+    // --- Reabrir tarea cerrada ---
+
+    @Test
+    fun `solo con WORK_ORDERS_UPDATE y tarea COMPLETED se puede reabrir`() = runTest(mainRule.dispatcher) {
+        task.value = tarea(TaskStatus.COMPLETED)
+        conDetalle(detalle(TaskStatus.COMPLETED))
+        coEvery { repository.reopen(id, "Revisión de ajuste") } returns Result.success(detalle(TaskStatus.ASSIGNED))
+
+        val mechanicVm = viewModel(mechanic)
+        settle()
+        assertFalse(mechanicVm.uiState.value.canReopen)
+
+        val supervisorVm = viewModel(supervisor)
+        settle()
+        assertTrue(supervisorVm.uiState.value.canReopen)
+
+        supervisorVm.onReopenClick()
+        supervisorVm.onReopenReasonChange("Revisión de ajuste")
+        supervisorVm.onReopenConfirm()
+        settle()
+
+        assertNull(supervisorVm.uiState.value.reopenForm)
+        assertEquals(TaskStatus.ASSIGNED, supervisorVm.uiState.value.status)
+        assertFalse(supervisorVm.uiState.value.completed)
+    }
+
+    @Test
+    fun `obd se oculta si el plan no incluye telemetria`() = runTest(mainRule.dispatcher) {
+        task.value = tarea()
+        conDetalle(detalle(TaskStatus.ASSIGNED))
+        val planWithoutIot = Plan(tier = "GO", status = "ACTIVE", accessGranted = true, iotTelemetryEnabled = false, aiDiagnosticsEnabled = false)
+        val vm = viewModel(mechanic + Permission.TELEMETRY_INGEST, plan = planWithoutIot)
+        settle()
+
+        assertFalse(vm.uiState.value.canOpenObd)
+        assertTrue(vm.uiState.value.canReportFinding)
     }
 
     // --- US32 E2/E3: imputar repuesto ---
@@ -548,7 +784,9 @@ class TaskDetailViewModelTest {
     @Test
     fun `cerrar la tarea descarta el tiempo guardado`() = runTest(mainRule.dispatcher) {
         task.value = tarea(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600))
-        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600)))
+        conDetalle(detalle(TaskStatus.IN_PROGRESS, startedAt = now.minusSeconds(3600)).copy(
+            evidenceImages = listOf(com.andeva.atelier.mobile.features.tasks.domain.TaskEvidence("img1", "https://demo/1.jpg", "Montaje", now))
+        ))
         coEvery { repository.complete(id, BigDecimal("1"), null) } returns Result.success(detalle(TaskStatus.COMPLETED))
         val vm = viewModel()
         settle()

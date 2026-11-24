@@ -19,7 +19,8 @@ import javax.inject.Singleton
 /** Sesión del usuario en DataStore. Claves de docs/06-offline-sync.md §5. */
 @Singleton
 class SessionManager @Inject constructor(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val tokenCipher: TokenCipher = NoOpTokenCipher
 ) {
     companion object {
         val TOKEN = stringPreferencesKey("token")
@@ -49,15 +50,28 @@ class SessionManager @Inject constructor(
     val session: Flow<Session?> = dataStore.data.map { it.toSession() }
 
     suspend fun getSession(): Session? = session.first()
-    suspend fun getAuthToken(): String? = dataStore.data.map { it[TOKEN] }.first()
-    suspend fun getRefreshToken(): String? = dataStore.data.map { it[REFRESH_TOKEN] }.first()
+
+    suspend fun getAuthToken(): String? {
+        val raw = dataStore.data.map { it[TOKEN] }.first() ?: return null
+        val plain = tokenCipher.decrypt(raw)
+        if (plain == null) clear()
+        return plain
+    }
+
+    suspend fun getRefreshToken(): String? {
+        val raw = dataStore.data.map { it[REFRESH_TOKEN] }.first() ?: return null
+        val plain = tokenCipher.decrypt(raw)
+        if (plain == null) clear()
+        return plain
+    }
+
     suspend fun getTokenExpiresAt(): Long? = dataStore.data.map { it[TOKEN_EXPIRES_AT] }.first()
 
     /** Guarda la respuesta de sign-in, google-sign-in, invitations/accept o refresh. */
     suspend fun save(user: AuthenticatedUserDto) {
         dataStore.edit {
-            it[TOKEN] = user.token
-            it[REFRESH_TOKEN] = user.refreshToken
+            it[TOKEN] = tokenCipher.encrypt(user.token)
+            it[REFRESH_TOKEN] = tokenCipher.encrypt(user.refreshToken)
             JwtClaims.expiresAtMillis(user.token)?.let { exp -> it[TOKEN_EXPIRES_AT] = exp } ?: it.remove(TOKEN_EXPIRES_AT)
             it[USER_ID] = user.userId
             it[EMAIL] = user.email
@@ -118,12 +132,18 @@ class SessionManager @Inject constructor(
         dataStore.edit { it.remove(BRANCH_CHOICE_PENDING) }
     }
 
+    /** Actualiza el nombre comercial del taller en caliente tras `PUT /api/v1/tenants/current` (US42). */
+    suspend fun updateTenantName(name: String) {
+        dataStore.edit { it[TENANT_NAME] = name }
+    }
+
     suspend fun clear() {
         dataStore.edit { it.clear() }
     }
 
     private fun Preferences.toSession(): Session? {
-        if (this[TOKEN] == null) return null
+        val rawToken = this[TOKEN] ?: return null
+        if (tokenCipher.decrypt(rawToken) == null) return null
         val userId = this[USER_ID] ?: return null
         return Session(
             userId = userId,

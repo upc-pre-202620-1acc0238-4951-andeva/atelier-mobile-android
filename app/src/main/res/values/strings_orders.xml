@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Órdenes: lista -->
+    <string name="orders_list_title">Órdenes</string>
+    <string name="orders_receive_vehicle">Recibir vehículo</string>
+    <string name="orders_search_label">Buscar por placa</string>
+    <string name="orders_search_clear">Borrar búsqueda</string>
+    <string name="orders_filter_all">Todas</string>
+    <string name="orders_empty_filtered">Ninguna orden coincide con lo que buscas.</string>
+    <string name="orders_order_number">Orden #%1$d</string>
+    <string name="orders_updated_now">Actualizado ahora</string>
+    <plurals name="orders_updated_ago">
+        <item quantity="one">Actualizado hace %1$d min</item>
+        <item quantity="other">Actualizado hace %1$d min</item>
+    </plurals>
+
+    <!-- Órdenes: ficha -->
+    <string name="orders_section_decisions">Esperan tu decisión</string>
+    <string name="orders_section_data">Datos de la orden</string>
+    <string name="orders_section_proposals">Propuestas por hallazgo</string>
+    <string name="orders_section_photos">Fotos de recepción</string>
+    <string name="orders_section_quotation">Proforma</string>
+    <string name="orders_section_costs">Costos y repuestos</string>
+    <string name="orders_see_all">Ver todas</string>
+    <string name="orders_bay_label">Bahía de trabajo</string>
+    <string name="orders_bay_none">Sin bahía asignada</string>
+    <string name="orders_bay_change">Cambiar</string>
+    <string name="orders_bay_assign">Asignar</string>
+    <string name="orders_mileage_label">Kilometraje al ingreso</string>
+    <string name="orders_diagnostic_label">Motivo de ingreso</string>
+    <plurals name="orders_photos_count">
+        <item quantity="one">%1$d foto</item>
+        <item quantity="other">%1$d fotos</item>
+    </plurals>
+    <string name="orders_checkout">Cobrar y entregar</string>
+
+    <!-- Órdenes: ciclo de vida -->
+    <string name="orders_action_start">Iniciar orden</string>
+    <string name="orders_action_complete">Completar orden</string>
+    <string name="orders_action_cancel">Cancelar orden</string>
+    <string name="orders_started_notice">Orden iniciada. Los técnicos ya pueden empezar.</string>
+    <string name="orders_completed_notice">Orden completada. Ya se puede cobrar y entregar.</string>
+    <string name="orders_canceled_notice">Orden cancelada. Los repuestos reservados volvieron al inventario.</string>
+    <string name="orders_cancel_title">¿Cancelar la orden?</string>
+    <string name="orders_cancel_body">Se libera la bahía y los repuestos reservados vuelven al inventario. No se puede deshacer.</string>
+    <string name="orders_cancel_reason_label">Motivo de la cancelación</string>
+    <string name="orders_cancel_reason_hint">El cliente decidió no repararlo</string>
+    <string name="orders_cancel_field_error">Escribe el motivo de la cancelación (máximo 1000 caracteres).</string>
+    <string name="orders_cancel_confirm">Sí, cancelar orden</string>
+
+    <!-- Órdenes: decisiones -->
+    <string name="orders_decision_suspension">Suspensión: %1$s</string>
+    <string name="orders_decision_proposal">Propuesta: %1$s</string>
+    <string name="orders_quotation_decision_title">Proforma sin respuesta</string>
+    <string name="orders_quotation_decision_row_hint">Registra lo que respondió el cliente</string>
+    <string name="orders_quotation_send_short">Enviar por correo</string>
+    <string name="orders_suspension_title">Suspensión por validar</string>
+    <string name="orders_suspension_no_reason">El mecánico no indicó el motivo.</string>
+    <string name="orders_suspension_missing_item">Falta: %1$s</string>
+    <string name="orders_suspension_approve">Aprobar suspensión</string>
+    <string name="orders_suspension_reject">Rechazar suspensión</string>
+    <string name="orders_suspension_approved_notice">Suspensión aprobada. La tarea queda detenida hasta que llegue el repuesto.</string>
+    <string name="orders_suspension_rejected_notice">Suspensión rechazada. El mecánico sigue con la tarea.</string>
+    <string name="orders_resume_task">Reanudar tarea</string>
+    <string name="orders_task_resumed_notice">Tarea reanudada. Se avisó al mecánico.</string>
+
+    <!-- Órdenes: propuestas -->
+    <string name="orders_proposals_resolved">Ya resueltas</string>
+    <string name="orders_proposal_sheet_title">Propuesta de hallazgo</string>
+
+    <!-- Órdenes: rentabilidad y movimientos de repuestos -->
+    <string name="orders_profitability_title">Rentabilidad</string>
+    <string name="orders_profitability_hint">Ingreso de repuestos contra su costo</string>
+    <string name="orders_profit_labor_revenue">Ingreso por mano de obra</string>
+    <string name="orders_profit_parts_revenue">Ingreso por repuestos</string>
+    <string name="orders_profit_cost_of_sales">Costo de los repuestos</string>
+    <string name="orders_profit_parts_gross">Ganancia de repuestos</string>
+    <string name="orders_profit_subtotal">Subtotal sin IGV</string>
+    <string name="orders_profit_lines">Por repuesto</string>
+    <string name="orders_profit_line_detail">%1$s unid. · costo %2$s</string>
+    <string name="orders_movements_title">Movimientos de repuestos</string>
+    <string name="orders_movements_hint">De qué lote salió cada repuesto y cuánto volvió</string>
+    <string name="orders_movements_empty">Esta orden aún no tiene repuestos imputados.</string>
+    <string name="orders_movement_detail">Salió %1$s · volvió %2$s</string>
+</resources>

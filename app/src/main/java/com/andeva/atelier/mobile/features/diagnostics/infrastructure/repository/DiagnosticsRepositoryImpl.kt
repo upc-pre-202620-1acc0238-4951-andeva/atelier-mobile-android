@@ -7,14 +7,17 @@ import com.andeva.atelier.mobile.core.data.sync.PendingOperationQueue
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.diagnostics.domain.ClearFaultsResult
+import com.andeva.atelier.mobile.features.diagnostics.domain.ConvertedAppointment
 import com.andeva.atelier.mobile.features.diagnostics.domain.DeviceInstallation
 import com.andeva.atelier.mobile.features.diagnostics.domain.DeviceStatus
 import com.andeva.atelier.mobile.features.diagnostics.domain.DiagnosticsRepository
 import com.andeva.atelier.mobile.features.diagnostics.domain.DiagnosticsSyncState
 import com.andeva.atelier.mobile.features.diagnostics.domain.Dtc
 import com.andeva.atelier.mobile.features.diagnostics.domain.DtcCatalog
+import com.andeva.atelier.mobile.features.diagnostics.domain.LatestVehicleTelemetry
 import com.andeva.atelier.mobile.features.diagnostics.domain.ObdDevice
 import com.andeva.atelier.mobile.features.diagnostics.domain.PredictiveAlert
+import com.andeva.atelier.mobile.features.diagnostics.domain.TelemetryHistoryBucket
 import com.andeva.atelier.mobile.features.diagnostics.domain.TelemetrySample
 import com.andeva.atelier.mobile.features.diagnostics.domain.VehicleFault
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.PredictiveAlertDao
@@ -26,6 +29,7 @@ import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.toDom
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.toEntity
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.local.toItemDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.AcknowledgeAlertRequestDto
+import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.ConvertAlertToAppointmentRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.InstallDeviceRequestDto
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.IotService
 import com.andeva.atelier.mobile.features.diagnostics.infrastructure.remote.RegisterDeviceRequestDto
@@ -42,15 +46,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Instalación del escáner en línea; lecturas y fallas capturadas sin red y enviadas por la cola
  * (docs/06-offline-sync.md §6, "US16–US19 — OBD-II en foso"); fallas activas y alertas offline-first.
  */
+@Singleton
 class DiagnosticsRepositoryImpl @Inject constructor(
     private val iotService: IotService,
     private val readingDao: TelemetryReadingDao,
@@ -62,6 +70,8 @@ class DiagnosticsRepositoryImpl @Inject constructor(
     private val gson: Gson,
     private val clock: Clock
 ) : DiagnosticsRepository {
+
+    private val batchMutex = Mutex()
 
     override suspend fun getDevices(status: DeviceStatus?): Result<List<ObdDevice>> =
         apiCall(gson, { iotService.getDevices(status?.name) }) { dtos -> dtos.map { it.toDomain() } }
@@ -97,13 +107,14 @@ class DiagnosticsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun installDevice(deviceId: String, vehicleId: String, currentOdometerKm: Int?): Result<DeviceInstallation> =
-        apiCall(gson, { iotService.install(InstallDeviceRequestDto(deviceId, vehicleId, currentOdometerKm)) }) { it.toDomain() }
+        apiCall(gson, { iotService.install(InstallDeviceRequestDto(deviceId, vehicleId, currentOdometerKm ?: 0)) }) { it.toDomain() }
 
     override suspend fun uninstallDevice(installationId: String, finalOdometerKm: Int?): Result<DeviceInstallation> =
-        apiCall(gson, { iotService.uninstall(installationId, UninstallDeviceRequestDto(finalOdometerKm)) }) { it.toDomain() }
+        apiCall(gson, { iotService.uninstall(installationId, UninstallDeviceRequestDto(finalOdometerKm ?: 0)) }) { it.toDomain() }
 
     override suspend fun saveReading(vehicleId: String, sample: TelemetrySample, latitude: Double?, longitude: Double?): Boolean {
         val engineTemp = sample.engineTempCelsius ?: return false
+        val userId = sessionManager.getSession()?.userId
         val row = TelemetryReadingEntity(
             id = UUID.randomUUID().toString(),
             vehicleId = vehicleId,
@@ -114,7 +125,8 @@ class DiagnosticsRepositoryImpl @Inject constructor(
             batteryVoltage = sample.batteryVoltage,
             fuelPercentage = sample.fuelPercentage,
             latitude = latitude,
-            longitude = longitude
+            longitude = longitude,
+            userId = userId
         )
         return readingDao.insert(row) != -1L
     }
@@ -122,24 +134,43 @@ class DiagnosticsRepositoryImpl @Inject constructor(
     /**
      * Si el lote ya estaba en cola (se cortó entre encolar y marcar las filas) se reutiliza su operación por la
      * `dedupe_key`, así ninguna lectura queda sin lote ni viaja dos veces.
+     * Con [userId] filtra lecturas del usuario propietario; con [excludeVehicleId] omite un vehículo en stream activo;
+     * con [minIdleMs] > 0 solo empaqueta remanentes `< 200` si la última muestra tiene al menos esa antigüedad.
      */
-    override suspend fun enqueueUnbatchedReadings(onlyFull: Boolean): Int {
-        if (sessionManager.getSession() == null) return 0
+    override suspend fun enqueueUnbatchedReadings(
+        onlyFull: Boolean,
+        userId: String?,
+        excludeVehicleId: String?,
+        minIdleMs: Long
+    ): Int = batchMutex.withLock {
+        val session = sessionManager.getSession()
+        val targetUserId = userId ?: session?.userId ?: return@withLock 0
+        if (session != null && !session.has(Permission.TELEMETRY_INGEST)) return@withLock 0
+        val now = clock.millis()
         var batches = 0
-        for (vehicleId in readingDao.vehiclesWithUnbatched()) {
+        val vehicles = readingDao.vehiclesWithUnbatchedForUser(targetUserId)
+        for (vehicleId in vehicles) {
+            if (excludeVehicleId != null && vehicleId == excludeVehicleId) continue
             while (true) {
-                val rows = readingDao.unbatched(vehicleId, BATCH_SIZE)
-                if (rows.isEmpty() || (onlyFull && rows.size < BATCH_SIZE)) break
+                val rows = readingDao.unbatchedForUser(vehicleId, targetUserId, BATCH_SIZE)
+                if (rows.isEmpty()) break
+                if (rows.size < BATCH_SIZE) {
+                    if (onlyFull) break
+                    if (minIdleMs > 0L) {
+                        val lastTs = readingDao.maxTimestampUnbatchedForUser(vehicleId, targetUserId) ?: rows.last().timestamp
+                        if (now - lastTs < minIdleMs) break
+                    }
+                }
                 val dedupeKey = DiagnosticsDedupeKeys.telemetryBatch(vehicleId, rows.first().timestamp, rows.last().timestamp)
                 val body = TelemetryBatchRequestDto(vehicleId, rows.map { it.toItemDto() })
-                val operationId = queue.enqueue(TelemetryBatchHandler.TYPE, body, dedupeKey, nowMillis = clock.millis())
+                val operationId = queue.enqueue(TelemetryBatchHandler.TYPE, body, dedupeKey, nowMillis = now)
                     ?: pendingOperationDao.findByDedupeKey(dedupeKey)?.id
                     ?: break
                 readingDao.assignBatch(rows.map { it.id }, operationId)
                 batches++
             }
         }
-        return batches
+        batches
     }
 
     override suspend fun purgeConfirmedReadings() {
@@ -169,9 +200,27 @@ class DiagnosticsRepositoryImpl @Inject constructor(
         faultDao.observeActive(vehicleId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun registerDetectedFaults(vehicleId: String, dtcs: List<Dtc>, sessionId: String): List<VehicleFault> {
+        val canIngest = sessionManager.getSession()?.has(Permission.TELEMETRY_INGEST) == true
         val active = faultDao.findActive(vehicleId)
         return dtcs.distinct().map { dtc ->
-            active.firstOrNull { it.dtcCode == dtc.code }?.toDomain() ?: queueFault(vehicleId, dtc, sessionId)
+            active.firstOrNull { it.dtcCode == dtc.code }?.toDomain()
+                ?: if (canIngest) {
+                    queueFault(vehicleId, dtc, sessionId)
+                } else {
+                    // Mecánico Jefe con `iot:faults:resolve` sin `iot:telemetry:ingest` (H22): lectura local sin encolar POST /iot/faults (evita 403).
+                    val entry = DtcCatalog.describe(dtc)
+                    VehicleFault(
+                        id = "scan-${dtc.code}",
+                        vehicleId = vehicleId,
+                        dtc = dtc,
+                        dtcCode = dtc.code,
+                        severity = entry.severity,
+                        description = entry.description,
+                        detectedAt = Instant.ofEpochMilli(clock.millis()),
+                        isResolved = false,
+                        resolvedAt = null
+                    )
+                }
         }
     }
 
@@ -261,6 +310,52 @@ class DiagnosticsRepositoryImpl @Inject constructor(
                 if (vehicleId.isNotEmpty()) alertDao.upsert(dto.toEntity(vehicleId, clock.millis()))
                 dto.toDomain(vehicleId)
             }
+
+    override suspend fun getTenantPredictiveAlerts(): Result<List<PredictiveAlert>> {
+        val now = clock.millis()
+        return apiCall(gson, { iotService.getTenantAlerts() }) { it }
+            .map { dtos ->
+                val entities = dtos.filter { !it.vehicleId.isNullOrBlank() }
+                    .map { it.toEntity(it.vehicleId.orEmpty(), now) }
+                if (entities.isNotEmpty()) alertDao.upsertAll(entities)
+                dtos.map { it.toDomain(it.vehicleId.orEmpty()) }
+            }
+    }
+
+    override fun observeAllPredictiveAlerts(): Flow<List<PredictiveAlert>> =
+        alertDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun convertAlertToAppointment(
+        alertId: String,
+        scheduledAt: Instant?,
+        estimatedDurationMinutes: Int?,
+        reason: String?
+    ): Result<ConvertedAppointment> {
+        val branchId = sessionManager.getSession()?.branchId
+        val body = ConvertAlertToAppointmentRequestDto(
+            branchId = branchId,
+            scheduledAt = scheduledAt?.toString(),
+            estimatedDurationMinutes = estimatedDurationMinutes,
+            reason = reason?.trim()?.ifBlank { null }
+        )
+        return apiCall(gson, { iotService.convertAlertToAppointment(alertId, body) }) { it.toDomain() }
+    }
+
+    override suspend fun getLatestVehicleTelemetry(vehicleId: String): Result<LatestVehicleTelemetry?> {
+        val result = apiCall(gson, { iotService.getLatestTelemetry(vehicleId) }) { it.toDomain(vehicleId) }
+        val error = result.exceptionOrNull()
+        return if (error is ApiException && error.httpStatus == 404) Result.success(null) else result
+    }
+
+    override suspend fun getVehicleTelemetryHistory(
+        vehicleId: String,
+        from: Instant?,
+        to: Instant?,
+        bucket: String?
+    ): Result<List<TelemetryHistoryBucket>> = apiCall(
+        gson,
+        { iotService.getTelemetryHistory(vehicleId, from?.toString(), to?.toString(), bucket) }
+    ) { dtos -> dtos.map { it.toDomain(vehicleId) } }
 
     companion object {
         /** Lecturas por `TELEMETRY_BATCH` (docs/04-mobile-integration.md §4). */

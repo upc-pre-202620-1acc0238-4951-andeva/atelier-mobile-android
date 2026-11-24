@@ -15,8 +15,12 @@ data class Session(
 ) {
     fun has(permission: Permission) = permission.value in permissions
 
-    /** Diagnóstico OBD-II: permiso del rol y módulo incluido en el plan. */
+    /** Diagnóstico OBD-II (ingesta en vivo): permiso del rol y módulo incluido en el plan. */
     fun canUseTelemetry() = has(Permission.TELEMETRY_INGEST) && (plan?.iotTelemetryEnabled ?: true)
+
+    /** Lectura de telemetría remota o fallas OBD-II: permiso de lectura y módulo incluido en el plan. */
+    fun canReadTelemetry() = (has(Permission.TELEMETRY_READ) || has(Permission.FAULTS_READ)) &&
+        (plan?.iotTelemetryEnabled ?: true)
 
     /** Informe de salud con IA: permiso del rol y módulo incluido en el plan. */
     fun canUseAiDiagnostics() = has(Permission.HEALTH_REPORTS_GENERATE) && (plan?.aiDiagnosticsEnabled ?: true)
@@ -26,4 +30,13 @@ data class Session(
 
     /** false solo si el plan dice que la suscripción no está vigente; sin plan conocido no se avisa (api/README.md §2). */
     fun hasSubscriptionAccess() = plan?.accessGranted != false
+
+    /**
+     * `iam:branches:read` lo tienen todos los roles para consultar geocerca y nombre de su sede asignada.
+     * Cambiar de sede activa solo corresponde a quien administra sedes (`iam:branches:manage`) o a una cuenta
+     * sin perfil laboral fijo en una sede (`shiftId == null` y sin marcación de asistencia personal, H33).
+     */
+    fun canSwitchBranch(): Boolean =
+        has(Permission.BRANCHES_READ) &&
+            (has(Permission.BRANCHES_MANAGE) || (shiftId == null && !has(Permission.ATTENDANCE_CLOCK_IN)))
 }

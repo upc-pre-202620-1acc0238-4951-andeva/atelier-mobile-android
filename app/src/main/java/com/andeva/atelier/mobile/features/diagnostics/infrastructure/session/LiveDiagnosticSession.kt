@@ -73,6 +73,19 @@ class LiveDiagnosticSession(
         return result
     }
 
+    override suspend fun reconnect(): Result<ObdConnectionInfo> {
+        val currentVehicleId = _state.value.vehicleId
+        _state.update { it.copy(state = ObdLinkState.RECONNECTING) }
+        val result = mutex.withLock { link.reconnect() }
+        if (result.isSuccess) {
+            if (sessionId == null) sessionId = UUID.randomUUID().toString()
+            _state.update { it.copy(state = ObdLinkState.CONNECTED, vehicleId = currentVehicleId) }
+        } else {
+            _state.update { it.copy(state = ObdLinkState.LOST, vehicleId = currentVehicleId) }
+        }
+        return result
+    }
+
     override suspend fun startStreaming(vehicleId: String): Result<Unit> {
         if (!link.isConnected) return Result.failure(ObdNotConnectedException())
         stopStreaming()

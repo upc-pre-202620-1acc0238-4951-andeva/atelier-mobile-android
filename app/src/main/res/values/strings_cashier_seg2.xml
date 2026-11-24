@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Caja Segmento 2: Comprobantes SUNAT, anulación y notas de crédito -->
+    <string name="cashier_err_reason">Ingresa un motivo válido de hasta 250 caracteres.</string>
+    <string name="cashier_err_customer">El comprobante no tiene un cliente asociado.</string>
+
+    <string name="cashier_daily_vouchers">Comprobantes SUNAT</string>
+    <string name="cashier_daily_vouchers_sub">Boletas, facturas, notas de crédito y anulaciones</string>
+
+    <string name="cashier_vouchers_title">Comprobantes SUNAT</string>
+    <string name="cashier_vouchers_no_access">Tu cuenta no puede consultar comprobantes emitidos.</string>
+    <string name="cashier_vouchers_empty">Aún no hay comprobantes emitidos en esta sede.</string>
+    <string name="cashier_vouchers_empty_filtered">No hay comprobantes con este filtro.</string>
+    <string name="cashier_vouchers_filter_all">Todos</string>
+    <string name="cashier_vouchers_filter_accepted">Aceptados</string>
+    <string name="cashier_vouchers_filter_balance">Con saldo</string>
+    <string name="cashier_vouchers_filter_voided">Anulados</string>
+    <string name="cashier_vouchers_filter_credit_notes">Notas de crédito</string>
+    <string name="cashier_vouchers_balance_short">Saldo %1$s</string>
+    <string name="cashier_vouchers_sunat_label">Estado SUNAT</string>
+    <string name="cashier_vouchers_cdr_code">CDR %1$s · %2$s</string>
+    <string name="cashier_vouchers_customer_label">Cliente</string>
+    <string name="cashier_vouchers_issued_at">Emitido el %1$s</string>
+    <string name="cashier_vouchers_lines_label">Detalle del comprobante</string>
+    <string name="cashier_vouchers_close">Cerrar</string>
+    <string name="cashier_vouchers_no_actions">Este comprobante no admite anulaciones ni notas de crédito.</string>
+
+    <string name="cashier_void_action">Anular comprobante</string>
+    <string name="cashier_void_short">Anular</string>
+    <string name="cashier_void_title">Anular %1$s</string>
+    <string name="cashier_void_body">Se enviará la comunicación de baja a SUNAT (disponible dentro de los 7 días calendario). Esta acción no se puede deshacer.</string>
+    <string name="cashier_void_reason_label">Motivo de anulación</string>
+    <string name="cashier_void_reason_placeholder">Ej. Error en datos fiscales del cliente</string>
+    <string name="cashier_void_reason_error">Escribe el motivo (máximo 250 caracteres).</string>
+    <string name="cashier_void_confirm">Confirmar anulación</string>
+    <string name="cashier_void_done">Comprobante anulado.</string>
+
+    <string name="cashier_nc_action">Emitir nota de crédito</string>
+    <string name="cashier_nc_short">Nota de crédito</string>
+    <string name="cashier_nc_title">Emitir nota de crédito</string>
+    <string name="cashier_nc_reference">Comprobante de referencia: %1$s</string>
+    <string name="cashier_nc_reason_label">Motivo de la nota de crédito</string>
+    <string name="cashier_nc_reason_placeholder">Ej. Descuento o devolución parcial</string>
+    <string name="cashier_nc_reason_error">Escribe el motivo (máximo 250 caracteres).</string>
+    <string name="cashier_nc_amount_label">Monto de la nota de crédito</string>
+    <string name="cashier_nc_amount_error">Ingresa un monto válido, hasta el total del comprobante.</string>
+    <string name="cashier_nc_irreversible">La nota de crédito se enviará a SUNAT y no se puede deshacer.</string>
+    <string name="cashier_nc_confirm">Emitir nota por %1$s</string>
+    <string name="cashier_nc_done">Nota de crédito emitida.</string>
+    <string name="cashier_nc_serie_label">Serie de nota de crédito</string>
+    <string name="cashier_nc_serie_error">Serie de 4 caracteres acorde al comprobante (F para factura, B para boleta).</string>
+
+    <!-- Acciones sobre PDF/XML/CDR y PSE SUNAT -->
+    <string name="cashier_doc_open_pdf">Abrir PDF</string>
+    <string name="cashier_doc_share_pdf">Compartir PDF</string>
+    <string name="cashier_doc_share_xml">Compartir XML UBL 2.1</string>
+    <string name="cashier_doc_share_cdr">Compartir CDR SUNAT</string>
+    <string name="cashier_sunat_refresh_status">Actualizar estado SUNAT</string>
+    <string name="cashier_sunat_rejected_reissue_hint">El comprobante fue rechazado por SUNAT. Puedes corregir los datos y volver a emitir.</string>
+    <string name="cashier_exit_pass_open">Abrir pase de salida</string>
+    <string name="cashier_exit_pass_share">Compartir pase de salida</string>
+    <string name="cashier_checkout_h26_note">El total del comprobante incluye IGV sobre cada línea y define el saldo fiscal a cobrar.</string>
+    <string name="cashier_checkout_profitability">Ver margen FIFO y rentabilidad</string>
+
+    <!-- US42: Perfil fiscal del taller + PSE administrado -->
+    <string name="cashier_fiscal_tenant_section">Información fiscal del taller</string>
+    <string name="cashier_fiscal_tenant_name">Nombre comercial</string>
+    <string name="cashier_fiscal_tenant_legal_name">Razón social</string>
+    <string name="cashier_fiscal_tenant_ruc">RUC del emisor (11 dígitos)</string>
+    <string name="cashier_fiscal_tenant_edit">Editar datos fiscales</string>
+    <string name="cashier_fiscal_tenant_save">Guardar datos fiscales</string>
+    <string name="cashier_fiscal_tenant_saved">Datos fiscales del taller actualizados.</string>
+    <string name="cashier_fiscal_pse_managed_title">PSE administrado por Atelier</string>
+    <string name="cashier_fiscal_pse_managed_body">La firma digital UBL 2.1 y la conexión con el Proveedor de Servicios Electrónicos (PSE) ante SUNAT están gestionadas directamente por la plataforma.</string>
+    <string name="cashier_series_branch_section">Series electrónicas de la sede</string>
+    <string name="cashier_series_nc_hint">Incluye series para Factura (F), Boleta (B) y Notas de Crédito.</string>
+</resources>

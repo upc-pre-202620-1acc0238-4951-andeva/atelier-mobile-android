@@ -43,14 +43,23 @@ class PhotoCapture @Inject constructor(
         val photoId = StoragePaths.newId()
         val local = uploader.compress(photo, File(context.filesDir, "pending/$photoId.jpg"))
         val path = storagePath(session.tenantId, photoId)
-        uploadDao.insert(PendingUploadEntity(photoId, local.path, path, target, createdAt = clock.millis()))
+        val now = clock.millis()
+        uploadDao.insert(PendingUploadEntity(photoId, local.path, path, target, createdAt = now))
 
-        val uploadId = queue.enqueue(UploadFileHandler.TYPE, UploadFilePayload(photoId), uploadDedupeKey(photoId))
+        val uploadId = queue.enqueue(
+            type = UploadFileHandler.TYPE,
+            payload = UploadFilePayload(photoId),
+            dedupeKey = uploadDedupeKey(photoId),
+            nowMillis = now,
+            triggerSync = false
+        )
         queue.enqueue(
             type = attachType,
             payload = attachPayload(uploader.publicUrlFor(path)),
             dedupeKey = attachDedupeKey(photoId),
-            dependsOn = uploadId
+            dependsOn = uploadId,
+            nowMillis = now + 1L,
+            triggerSync = true
         )
         photoId
     }

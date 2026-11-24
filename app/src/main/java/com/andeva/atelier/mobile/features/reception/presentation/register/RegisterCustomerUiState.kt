@@ -26,7 +26,8 @@ data class RegisterCustomerUiState(
     val error: UiText? = null,
     val invalidField: String? = null,
     val done: Boolean = false,
-    val canRegister: Boolean = false
+    val canRegister: Boolean = false,
+    val isOnline: Boolean = true
 ) {
     val customerLocked: Boolean get() = registeredCustomerId != null
     val hasCustomerData: Boolean
@@ -35,6 +36,6 @@ data class RegisterCustomerUiState(
             CustomerType.COMPANY -> companyName.isNotBlank()
         })
     val canSubmit: Boolean
-        get() = canRegister && !isSaving && !done && hasCustomerData &&
+        get() = isOnline && canRegister && !isSaving && !done && hasCustomerData &&
             plate.isNotBlank() && brand.isNotBlank() && model.isNotBlank()
 }

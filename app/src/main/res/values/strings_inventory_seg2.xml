@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Escáner SKU -->
+    <string name="inv_seg2_scanner_title">Escanear SKU</string>
+    <string name="inv_seg2_scanner_open_desc">Escanear código de barras o QR</string>
+    <string name="inv_seg2_scanner_hint">Apunta la cámara al código de barras o QR del repuesto.</string>
+    <string name="inv_seg2_scanner_permission_title">Permiso de cámara</string>
+    <string name="inv_seg2_scanner_permission_body">Necesitamos acceso a la cámara para leer códigos de barras. También puedes escribir el SKU abajo.</string>
+    <string name="inv_seg2_scanner_permission_grant">Permitir cámara</string>
+    <string name="inv_seg2_scanner_manual_label">Ingreso manual de SKU</string>
+    <string name="inv_seg2_scanner_manual_hint">Ej. BRK-001</string>
+    <string name="inv_seg2_scanner_search_btn">Buscar SKU</string>
+    <string name="inv_seg2_scanner_not_found">No se encontró ningún repuesto con el SKU %1$s.</string>
+    <string name="inv_seg2_scanner_invalid_sku">El código %1$s no tiene formato válido de SKU (3 a 50 caracteres: A-Z, 0-9, - o _).</string>
+    <string name="inv_seg2_scanner_retry">Escanear otro código</string>
+    <string name="inv_seg2_scanner_no_permission">Tu perfil no tiene permiso para consultar el catálogo de repuestos.</string>
+
+    <!-- Proveedores -->
+    <string name="inv_seg2_suppliers_title">Proveedores</string>
+    <string name="inv_seg2_suppliers_no_permission">Tu perfil no tiene permiso para gestionar proveedores.</string>
+    <string name="inv_seg2_suppliers_search_label">Buscar proveedor</string>
+    <string name="inv_seg2_suppliers_search_hint">Razón social o RUC</string>
+    <string name="inv_seg2_suppliers_empty">Todavía no hay proveedores registrados.</string>
+    <string name="inv_seg2_suppliers_empty_filtered">Ningún proveedor coincide con la búsqueda.</string>
+    <string name="inv_seg2_suppliers_new_fab">Nuevo proveedor</string>
+    <string name="inv_seg2_suppliers_create_title">Nuevo proveedor</string>
+    <string name="inv_seg2_suppliers_edit_title">Editar proveedor</string>
+    <string name="inv_seg2_suppliers_tax_id_line">RUC %1$s</string>
+    <string name="inv_seg2_suppliers_active">Activo</string>
+    <string name="inv_seg2_suppliers_inactive">Inactivo</string>
+    <string name="inv_seg2_supplier_business_name">Razón social</string>
+    <string name="inv_seg2_supplier_tax_id">RUC o documento</string>
+    <string name="inv_seg2_supplier_contact">Persona de contacto (opcional)</string>
+    <string name="inv_seg2_supplier_phone">Teléfono (opcional)</string>
+    <string name="inv_seg2_supplier_email">Correo electrónico (opcional)</string>
+    <string name="inv_seg2_supplier_address">Dirección fiscal (opcional)</string>
+    <string name="inv_seg2_supplier_active_toggle">Proveedor activo</string>
+    <string name="inv_seg2_supplier_err_name">Ingresa la razón social del proveedor.</string>
+    <string name="inv_seg2_supplier_err_tax_id">Ingresa un RUC o documento de 8 a 20 dígitos.</string>
+    <string name="inv_seg2_supplier_err_email">El formato del correo electrónico no es válido.</string>
+    <string name="inv_seg2_supplier_saved">Proveedor guardado.</string>
+
+    <!-- Alta y edición de repuestos -->
+    <string name="inv_seg2_part_new_fab">Nuevo repuesto</string>
+    <string name="inv_seg2_part_create_title">Nuevo repuesto</string>
+    <string name="inv_seg2_part_edit_title">Editar repuesto</string>
+    <string name="inv_seg2_part_edit_btn">Editar</string>
+    <string name="inv_seg2_part_name">Nombre del repuesto</string>
+    <string name="inv_seg2_part_sku">Código SKU</string>
+    <string name="inv_seg2_part_category">Categoría</string>
+    <string name="inv_seg2_part_base_price">Precio base sin IGV (S/)</string>
+    <string name="inv_seg2_part_min_stock">Stock mínimo</string>
+    <string name="inv_seg2_part_status">Estado en catálogo</string>
+    <string name="inv_seg2_part_status_active">Activo</string>
+    <string name="inv_seg2_part_status_inactive">Inactivo</string>
+    <string name="inv_seg2_part_status_discontinued">Descontinuado</string>
+    <string name="inv_seg2_part_err_name">Ingresa el nombre del repuesto.</string>
+    <string name="inv_seg2_part_err_sku">Usa de 3 a 50 caracteres (A-Z, 0-9, guion o guion bajo).</string>
+    <string name="inv_seg2_part_err_price">Ingresa un precio base igual o mayor a 0.</string>
+    <string name="inv_seg2_part_err_min_stock">Ingresa un stock mínimo igual o mayor a 0.</string>
+    <string name="inv_seg2_part_saved">Repuesto guardado.</string>
+
+    <!-- Operaciones directas de lotes FIFO -->
+    <string name="inv_seg2_batch_actions_header">Movimientos de lote FIFO</string>
+    <string name="inv_seg2_batch_receive_btn">Ingresar lote directo</string>
+    <string name="inv_seg2_batch_dispatch_btn">Despachar FIFO</string>
+    <string name="inv_seg2_batch_restore_btn">Reintegrar lote</string>
+    <string name="inv_seg2_batch_receive_title">Ingreso directo de lote</string>
+    <string name="inv_seg2_batch_dispatch_title">Despacho FIFO</string>
+    <string name="inv_seg2_batch_restore_title">Reintegrar lote</string>
+    <string name="inv_seg2_batch_number_label">Número de lote</string>
+    <string name="inv_seg2_batch_quantity_label">Cantidad</string>
+    <string name="inv_seg2_batch_unit_cost_label">Costo unitario (S/)</string>
+    <string name="inv_seg2_batch_reason_label">Motivo del reintegro (opcional)</string>
+    <string name="inv_seg2_batch_select_label">Lote de origen</string>
+    <string name="inv_seg2_batch_select_auto">Automático (último lote)</string>
+    <string name="inv_seg2_batch_err_number">Ingresa el número de lote.</string>
+    <string name="inv_seg2_batch_err_qty">La cantidad debe ser al menos 0.01.</string>
+    <string name="inv_seg2_batch_err_cost">El costo unitario debe ser igual o mayor a 0.</string>
+    <string name="inv_seg2_batch_received_ok">Lote ingresado al inventario.</string>
+    <string name="inv_seg2_batch_dispatched_ok">Despacho FIFO realizado (%1$s u.).</string>
+    <string name="inv_seg2_batch_restored_ok">Stock reintegrado (%1$s u.).</string>
+
+    <!-- Alertas H13 + acceso a compras -->
+    <string name="inv_seg2_alerts_create_po_fab">Crear orden de compra</string>
+    <string name="inv_seg2_part_low_stock_banner">Existencias bajo el stock mínimo (%1$s / mín. %2$s). Programa una orden de compra o ingresa un lote.</string>
+    <string name="inv_seg2_part_open_po_btn">Ir a órdenes de compra</string>
+
+    <!-- Órdenes de compra ciclo completo -->
+    <string name="inv_seg2_po_filter_draft">Borradores</string>
+    <string name="inv_seg2_po_filter_canceled">Anuladas</string>
+    <string name="inv_seg2_po_new_fab">Nueva orden</string>
+    <string name="inv_seg2_po_create_title">Nueva orden de compra</string>
+    <string name="inv_seg2_po_select_supplier">Elige un proveedor</string>
+    <string name="inv_seg2_po_no_suppliers">No hay proveedores activos. Registra uno antes de crear una orden.</string>
+    <string name="inv_seg2_po_number_optional">Número de orden (opcional)</string>
+    <string name="inv_seg2_po_notes_optional">Notas internas (opcional)</string>
+    <string name="inv_seg2_po_create_confirm">Crear borrador</string>
+    <string name="inv_seg2_po_add_line_btn">Agregar repuesto</string>
+    <string name="inv_seg2_po_add_line_title">Agregar línea a la orden</string>
+    <string name="inv_seg2_po_select_part">Selecciona un repuesto</string>
+    <string name="inv_seg2_po_part_search_hint">Buscar por nombre o SKU</string>
+    <string name="inv_seg2_po_issue_btn">Emitir orden</string>
+    <string name="inv_seg2_po_issue_hint">Agrega al menos un repuesto para poder emitir la orden al proveedor.</string>
+    <string name="inv_seg2_po_cancel_btn">Anular orden</string>
+    <string name="inv_seg2_po_cancel_title">Anular orden de compra</string>
+    <string name="inv_seg2_po_cancel_body">La orden quedará anulada y no podrá recibirse.</string>
+    <string name="inv_seg2_po_cancel_reason">Motivo de anulación (opcional)</string>
+    <string name="inv_seg2_po_cancel_confirm">Confirmar anulación</string>
+    <string name="inv_seg2_po_issued_ok">Orden emitida. Ya está lista para recibir.</string>
+    <string name="inv_seg2_po_canceled_ok">Orden de compra anulada.</string>
+    <string name="inv_seg2_po_line_added_ok">Repuesto agregado a la orden.</string>
+    <string name="inv_seg2_po_missing_branch">Tu sesión no tiene sede asignada para crear órdenes.</string>
+    <string name="inv_seg2_po_initial_line_title">Primer repuesto de la orden</string>
+    <string name="inv_seg2_po_no_parts">No hay repuestos en el catálogo. Registra un repuesto antes de crear la orden de compra.</string>
+    <string name="inv_seg2_po_low_stock_only">Solo stock mínimo (%1$d)</string>
+    <string name="inv_seg2_po_low_stock_empty">No hay repuestos con stock mínimo que coincidan.</string>
+    <string name="inv_seg2_po_generate_low_stock_btn">Generar borrador con stock mínimo (%1$d)</string>
+    <string name="inv_seg2_po_generate_low_stock_hint">Agrega todos los repuestos en o debajo del mínimo con cantidad sugerida.</string>
+    <string name="inv_seg2_po_part_chip_low_stock">%1$s (%2$s) · Stock %3$s/%4$s</string>
+    <string name="inv_seg2_po_part_chip_out_of_stock">%1$s (%2$s) · Sin stock (mín. %3$s)</string>
+
+    <!-- Común inventario Seg2 -->
+    <string name="inv_seg2_save">Guardar</string>
+    <string name="inv_seg2_confirm">Confirmar</string>
+    <string name="inv_seg2_clear">Limpiar</string>
+</resources>
