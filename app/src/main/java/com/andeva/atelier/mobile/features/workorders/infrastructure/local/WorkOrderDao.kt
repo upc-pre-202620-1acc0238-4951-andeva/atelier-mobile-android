@@ -65,11 +65,21 @@ abstract class WorkOrderDao {
     abstract fun observeById(id: String): Flow<WorkOrderWithRefs?>
 }
 
-private fun WorkOrderEntity.keepDetailOf(previous: WorkOrderEntity) = copy(
-    internalNumber = internalNumber ?: previous.internalNumber,
-    bayName = bayName ?: previous.bayName.takeIf { currentBayId == previous.currentBayId },
-    diagnosticSummary = diagnosticSummary ?: previous.diagnosticSummary,
-    mileageIn = mileageIn ?: previous.mileageIn,
-    subtotal = subtotal ?: previous.subtotal.takeIf { totalAmount == previous.totalAmount },
-    taxAmount = taxAmount ?: previous.taxAmount.takeIf { totalAmount == previous.totalAmount }
-)
+private const val APPOINTMENT_STUB_PREFIX = "Ingreso por cita programada"
+
+private fun WorkOrderEntity.keepDetailOf(previous: WorkOrderEntity): WorkOrderEntity {
+    val resolvedMileage = mileageIn?.takeIf { it > 0 } ?: previous.mileageIn?.takeIf { it > 0 } ?: mileageIn
+    val resolvedDiagnostic = diagnosticSummary
+        ?.takeIf { it.isNotBlank() && !it.startsWith(APPOINTMENT_STUB_PREFIX) }
+        ?: previous.diagnosticSummary?.takeIf { it.isNotBlank() && !it.startsWith(APPOINTMENT_STUB_PREFIX) }
+        ?: diagnosticSummary
+        ?: previous.diagnosticSummary
+    return copy(
+        internalNumber = internalNumber ?: previous.internalNumber,
+        bayName = bayName ?: previous.bayName.takeIf { currentBayId == previous.currentBayId },
+        diagnosticSummary = resolvedDiagnostic,
+        mileageIn = resolvedMileage,
+        subtotal = subtotal ?: previous.subtotal.takeIf { totalAmount == previous.totalAmount },
+        taxAmount = taxAmount ?: previous.taxAmount.takeIf { totalAmount == previous.totalAmount }
+    )
+}

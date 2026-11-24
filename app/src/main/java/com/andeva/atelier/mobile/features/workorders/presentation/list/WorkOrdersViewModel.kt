@@ -11,6 +11,7 @@ import com.andeva.atelier.mobile.features.reception.application.EnrichReceptionR
 import com.andeva.atelier.mobile.features.workorders.application.ObserveBranchWorkOrdersUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RefreshBranchWorkOrdersUseCase
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
+import com.andeva.atelier.mobile.features.workorders.infrastructure.repository.PendingSuspensionMonitor
 import com.andeva.atelier.mobile.features.workorders.presentation.toWorkOrderUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +36,8 @@ class WorkOrdersViewModel @Inject constructor(
     private val enrichReferences: EnrichReceptionReferencesUseCase? = null,
     private val clock: Clock? = null,
     observePendingSyncCount: ObservePendingOperationCountUseCase? = null,
-    pushInbox: PushInbox? = null
+    pushInbox: PushInbox? = null,
+    private val pendingSuspensionMonitor: PendingSuspensionMonitor? = null
 ) : ViewModel() {
 
     constructor(
@@ -89,6 +91,15 @@ class WorkOrdersViewModel @Inject constructor(
                 }
             }
         }
+        if (pendingSuspensionMonitor != null) {
+            viewModelScope.launch {
+                pendingSuspensionMonitor.items.collect { items ->
+                    _uiState.update {
+                        it.copy(orderIdsWithPendingSuspension = items.map { item -> item.workOrderId }.toSet())
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             connectivity.isOnline.collect { online ->
                 _uiState.update { it.copy(isOnline = online) }
@@ -107,6 +118,7 @@ class WorkOrdersViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(isRefreshing = false, showingCache = false, lastRefreshedAt = (clock ?: Clock.systemUTC()).instant())
                     }
+                    launch { pendingSuspensionMonitor?.refreshForActiveBranch(force = false) }
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isRefreshing = false, showingCache = true, error = e.toWorkOrderUiText()) }

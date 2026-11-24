@@ -41,7 +41,9 @@ import com.andeva.atelier.mobile.features.workorders.application.StartWorkOrderU
 import com.andeva.atelier.mobile.features.workorders.application.GetBranchMechanicsUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetServiceCatalogUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
+import com.andeva.atelier.mobile.features.workorders.application.ObserveWorkOrderUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RejectQuotationUseCase
+import com.andeva.atelier.mobile.features.workorders.application.RemoveWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.application.SendQuotationUseCase
 import com.andeva.atelier.mobile.features.workorders.application.UpdateWorkOrderTaskUseCase
 import com.andeva.atelier.mobile.features.workorders.domain.InvalidWorkOrderInputException
@@ -100,7 +102,9 @@ class WorkOrderDetailViewModel @Inject constructor(
     private val rejectSuspension: RejectSuspensionUseCase? = null,
     private val resumeSuspendedTask: ResumeSuspendedTaskUseCase? = null,
     private val getProfitability: GetProfitabilityUseCase? = null,
-    private val getPartMovements: GetPartMovementsUseCase? = null
+    private val getPartMovements: GetPartMovementsUseCase? = null,
+    private val observeWorkOrder: ObserveWorkOrderUseCase? = null,
+    private val removeTask: RemoveWorkOrderTaskUseCase? = null
 ) : ViewModel() {
 
     constructor(
@@ -150,9 +154,35 @@ class WorkOrderDetailViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     init {
+        observeWorkOrder?.let { observeCached ->
+            viewModelScope.launch {
+                observeCached(workOrderId).collect { cached ->
+                    _uiState.update { state ->
+                        val updatedDetail = if (cached != null && state.detail != null) {
+                            state.detail.copy(
+                                workOrder = state.detail.workOrder.copy(
+                                    mileageIn = cached.mileageIn?.takeIf { it > 0 } ?: state.detail.workOrder.mileageIn,
+                                    diagnosticSummary = cached.diagnosticSummary ?: state.detail.workOrder.diagnosticSummary,
+                                    currentBayId = cached.currentBayId ?: state.detail.workOrder.currentBayId,
+                                    bayName = cached.bayName ?: state.detail.workOrder.bayName,
+                                    plate = cached.plate ?: state.detail.workOrder.plate,
+                                    customerName = cached.customerName ?: state.detail.workOrder.customerName
+                                )
+                            )
+                        } else state.detail
+                        state.copy(cachedOrder = cached, detail = updatedDetail)
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             observeSession().collect { session ->
                 val canReadParts = session?.has(Permission.PARTS_READ) == true
+                val canReassignBayPerm = session?.has(Permission.BAYS_REASSIGN) == true
+                val canOpenObd = session?.let { s ->
+                    s.canUseTelemetry() || s.canReadTelemetry() || s.canUseAiDiagnostics() || s.canReadAiReports() ||
+                        s.has(Permission.DEVICES_READ) || s.has(Permission.DEVICES_REGISTER) || s.has(Permission.PREDICTIVE_ALERTS_READ)
+                } == true
                 _uiState.update {
                     it.copy(
                         canUpdateWorkOrder = session?.has(Permission.WORK_ORDERS_UPDATE) == true,
@@ -162,9 +192,9 @@ class WorkOrderDetailViewModel @Inject constructor(
                         canReadQuotation = session?.has(Permission.QUOTATIONS_READ) == true,
                         canSendQuotation = session?.has(Permission.QUOTATIONS_SEND) == true,
                         canApproveQuotation = session?.has(Permission.QUOTATIONS_APPROVE) == true,
-                        canAssignBay = session?.has(Permission.BAYS_ASSIGN) == true &&
-                            session.has(Permission.WORK_ORDERS_UPDATE),
-                        canReassignMechanic = session?.has(Permission.BAYS_REASSIGN) == true ||
+                        canAssignBay = canReassignBayPerm,
+                        canReassignViaBay = canReassignBayPerm,
+                        canReassignMechanic = canReassignBayPerm ||
                             session?.has(Permission.WORK_ORDERS_UPDATE) == true,
                         canCancelWorkOrder = session?.has(Permission.WORK_ORDERS_CANCEL) == true,
                         canResolveProposals = session?.has(Permission.PROPOSALS_RESOLVE) == true,
@@ -173,7 +203,9 @@ class WorkOrderDetailViewModel @Inject constructor(
                             session?.has(Permission.CASHFLOW_EXPORT_PDF) == true,
                         canReadPartMovements = session?.has(Permission.BATCHES_READ) == true ||
                             session?.has(Permission.BATCHES_RESTORE) == true,
+                        canOpenObd = canOpenObd,
                         hasCheckoutPermission = listOf(
+                            Permission.INVOICES_READ,
                             Permission.INVOICES_ISSUE_SUNAT,
                             Permission.PAYMENTS_CREATE,
                             Permission.EXIT_PASSES_ISSUE,
@@ -366,6 +398,38 @@ class WorkOrderDetailViewModel @Inject constructor(
                             editLaborForm = null,
                             detail = updatedDetail,
                             notice = UiText.Resource(R.string.order_task_updated)
+                        )
+                    }
+                }
+                .onFailure(::failWorkOrder)
+        }
+    }
+
+    fun onOpenDeleteTask(task: TaskDetail) {
+        val state = _uiState.value
+        if (!state.canModifyTasks) return
+        _uiState.update { it.copy(deletingTask = task, notice = null, error = null, invalidField = null) }
+    }
+
+    fun onDismissDeleteTask() = _uiState.update {
+        if (it.isBusy) it else it.copy(deletingTask = null, error = null)
+    }
+
+    fun onConfirmDeleteTask() {
+        val state = _uiState.value
+        val task = state.deletingTask ?: return
+        val remove = removeTask ?: return
+        if (!state.canModifyTasks || task.products.isNotEmpty()) return
+        _uiState.update { it.copy(busyAction = WorkOrderDetailAction.DELETE_TASK, error = null) }
+        viewModelScope.launch {
+            remove(workOrderId, task.id.value)
+                .onSuccess { updatedDetail ->
+                    _uiState.update {
+                        it.copy(
+                            busyAction = null,
+                            deletingTask = null,
+                            detail = updatedDetail,
+                            notice = UiText.Resource(R.string.order_task_deleted)
                         )
                     }
                 }
@@ -912,19 +976,19 @@ class WorkOrderDetailViewModel @Inject constructor(
     }
 
     fun onConfirmAssignMechanic(mechanic: MechanicOption) {
-        val task = _uiState.value.assigningMechanicTask ?: return
-        if (!_uiState.value.canChangeMechanic || _uiState.value.isBusy) return
+        val state = _uiState.value
+        val task = state.assigningMechanicTask ?: return
+        if (!state.canChangeMechanic || state.isBusy) return
         _uiState.update { it.copy(busyAction = WorkOrderDetailAction.ASSIGN_MECHANIC, error = null) }
         viewModelScope.launch {
-            // Intentamos primero reassignTaskMechanic (operations:bays:reassign); si falla o no está disponible,
-            // usamos updateTask (operations:work_orders:update) como fallback transparente (US12 E2, US22 E2).
-            val reassignResult = if (reassignTaskMechanic != null) {
-                reassignTaskMechanic(task.id.value, mechanic.membershipId)
-                    .mapCatching { getDetail(workOrderId).getOrThrow() }
-            } else null
-
-            val result = if (reassignResult != null && reassignResult.isSuccess) {
-                reassignResult
+            val result = if (reassignTaskMechanic != null) {
+                val bayResult = reassignTaskMechanic(task.id.value, mechanic.membershipId)
+                val bayError = bayResult.exceptionOrNull() as? com.andeva.atelier.mobile.core.domain.ApiException
+                if (bayResult.isFailure && bayError?.httpStatus == 403 && state.canUpdateWorkOrder) {
+                    updateTask(workOrderId, task.id.value, WorkOrderTaskChanges(mechanicId = mechanic.membershipId))
+                } else {
+                    bayResult.mapCatching { getDetail(workOrderId).getOrThrow() }
+                }
             } else {
                 updateTask(workOrderId, task.id.value, WorkOrderTaskChanges(mechanicId = mechanic.membershipId))
             }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.BluetoothConnected
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
@@ -28,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,7 +37,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
+import com.andeva.atelier.mobile.core.presentation.DocumentIntents
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -56,22 +58,27 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierPlate
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.component.PlateSize
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.bone
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
 import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
+import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.features.bays.domain.WorkBay
-import com.andeva.atelier.mobile.features.tasks.domain.PartOption
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
 import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
-import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.ChargePartDialog
-import com.andeva.atelier.mobile.features.tasks.presentation.detail.components.PartEditDialog
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.Proposal
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalSeverity
@@ -87,7 +94,10 @@ import com.andeva.atelier.mobile.features.workorders.presentation.detail.compone
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.AssignBaySheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.AssignMechanicSheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.CancelOrderSheet
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.DeleteTaskSheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.EditLaborSheet
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.OrderChargePartSheet
+import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.OrderPartEditSheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.PartMovementsSheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.PdfPreviewSheet
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.components.ProfitabilitySheet
@@ -115,11 +125,20 @@ fun WorkOrderDetailScreen(
     onCompleteOrder: (vehicleId: String, customerId: String, workOrderId: String) -> Unit,
     onOpenCheckout: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenObd: (vehicleId: String, plate: String?) -> Unit = { _, _ -> },
     viewModel: WorkOrderDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val shareTitle = stringResource(R.string.quotation_share_chooser)
+    val haptics = rememberAtelierHaptics()
+
+    LaunchedEffect(state.notice) {
+        if (state.notice != null) haptics.confirm()
+    }
+    LaunchedEffect(state.error) {
+        if (state.error != null) haptics.reject()
+    }
 
     // Al volver desde el detalle de una tarea recarga la orden para reflejar cambios en repuestos o estados.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -135,6 +154,7 @@ fun WorkOrderDetailScreen(
             onRetry = viewModel::load,
             onCompleteOrder = onCompleteOrder,
             onOpenCheckout = { onOpenCheckout(viewModel.workOrderId) },
+            onOpenObd = onOpenObd,
             onOpenTask = onOpenTask,
             onOpenProposals = { onOpenProposals(viewModel.workOrderId) },
             onOpenGallery = { onOpenGallery(viewModel.workOrderId) },
@@ -148,6 +168,9 @@ fun WorkOrderDetailScreen(
             onDismissEditLabor = viewModel::onDismissEditLabor,
             onEditLaborPriceChange = viewModel::onEditLaborPriceChange,
             onConfirmEditLabor = viewModel::onConfirmEditLabor,
+            onOpenDeleteTask = viewModel::onOpenDeleteTask,
+            onDismissDeleteTask = viewModel::onDismissDeleteTask,
+            onConfirmDeleteTask = viewModel::onConfirmDeleteTask,
             onOpenChargePart = viewModel::onOpenChargePart,
             onDismissChargePart = viewModel::onDismissChargePart,
             onChargeQueryChange = viewModel::onChargeQueryChange,
@@ -205,6 +228,7 @@ internal class WorkOrderDetailActions(
     val onRetry: () -> Unit = {},
     val onCompleteOrder: (String, String, String) -> Unit = { _, _, _ -> },
     val onOpenCheckout: () -> Unit = {},
+    val onOpenObd: (vehicleId: String, plate: String?) -> Unit = { _, _ -> },
     val onOpenTask: (String, String) -> Unit = { _, _ -> },
     val onOpenProposals: () -> Unit = {},
     val onOpenGallery: () -> Unit = {},
@@ -219,6 +243,9 @@ internal class WorkOrderDetailActions(
     val onDismissEditLabor: () -> Unit = {},
     val onEditLaborPriceChange: (String) -> Unit = {},
     val onConfirmEditLabor: () -> Unit = {},
+    val onOpenDeleteTask: (TaskDetail) -> Unit = {},
+    val onDismissDeleteTask: () -> Unit = {},
+    val onConfirmDeleteTask: () -> Unit = {},
     val onOpenChargePart: (TaskId) -> Unit = {},
     val onDismissChargePart: () -> Unit = {},
     val onChargeQueryChange: (String) -> Unit = {},
@@ -273,6 +300,7 @@ internal fun WorkOrderDetailContent(
 ) {
     val detail = state.detail
     val order = detail?.workOrder
+    val headerOrder = order ?: state.cachedOrder
     val showSkeleton = rememberDelayedLoading(state.isLoading && detail == null)
 
     Scaffold(
@@ -297,10 +325,12 @@ internal fun WorkOrderDetailContent(
                 .padding(padding)
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .floatingBarPadding(),
                 contentPadding = PaddingValues(bottom = 96.dp)
             ) {
-                item(key = "panel") { OrderPanel(order, actions.onBack) }
+                item(key = "panel") { OrderPanel(headerOrder, showSkeleton && headerOrder == null, actions.onBack) }
                 item(key = "refresh") { AtelierRefreshBar(visible = state.isLoading && detail != null) }
                 if (detail == null || order == null) {
                     emptyOrError(state, showSkeleton, actions.onRetry)
@@ -315,9 +345,16 @@ internal fun WorkOrderDetailContent(
 }
 
 @Composable
-private fun OrderPanel(order: WorkOrder?, onBack: () -> Unit) {
+private fun OrderPanel(order: WorkOrder?, loading: Boolean, onBack: () -> Unit) {
     if (order == null) {
-        AtelierFichaPanel(onBack = onBack, title = stringResource(R.string.order_detail_title))
+        AtelierFichaPanel(
+            onBack = onBack,
+            title = stringResource(R.string.order_detail_title),
+            subtitle = if (loading) "Cargando ficha…" else null,
+            identity = if (loading) {
+                { AtelierPlate("BKR418", size = PlateSize.L, modifier = Modifier.bone(true)) }
+            } else null
+        )
         return
     }
     val label = order.numberLabel()
@@ -388,6 +425,19 @@ private fun LazyListScope.orderContent(
     }
     decisions(state, detail, order, actions)
     lifecycle(state, actions)
+    if (state.canOpenObd) {
+        item(key = "obd-quick-action") {
+            AtelierButton(
+                text = stringResource(R.string.orders_obd_diagnostic_btn),
+                onClick = { actions.onOpenObd(order.vehicleId, order.plate) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                style = AtelierButtonStyle.Outlined,
+                icon = Icons.Outlined.BluetoothConnected
+            )
+        }
+    }
     orderData(state, order, actions)
     tasks(state, detail, order, actions)
     proposals(state, detail, actions)
@@ -498,39 +548,52 @@ private fun LazyListScope.orderData(state: WorkOrderDetailUiState, order: WorkOr
     val canAssign = state.canAssignBay && state.isEditableOrder
     val mileage = order.mileageIn?.takeIf { it > 0 }
     val diagnostic = order.diagnosticSummary?.takeIf { it.isNotBlank() }
-    if (order.bayName == null && !canAssign && mileage == null && diagnostic == null) return
+    val showBay = order.bayName != null || canAssign
+    if (!showBay && mileage == null && diagnostic == null) return
     item(key = "data-header") {
         AtelierSectionHeader(title = stringResource(R.string.orders_section_data), modifier = Modifier.padding(horizontal = 16.dp))
     }
-    if (order.bayName != null || canAssign) {
-        item(key = "data-bay") {
-            AtelierListRow(
-                title = order.bayName ?: stringResource(R.string.orders_bay_none),
-                subtitle = stringResource(R.string.orders_bay_label),
-                onClick = if (canAssign) actions.onOpenAssignBay else null,
-                trailing = if (canAssign) {
-                    {
-                        Text(
-                            text = stringResource(if (order.bayName != null) R.string.orders_bay_change else R.string.orders_bay_assign),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                } else null
-            )
-        }
-    }
-    if (mileage != null) {
-        item(key = "data-mileage") {
-            AtelierListRow(
-                title = stringResource(R.string.reception_vehicle_mileage_km, mileage),
-                subtitle = stringResource(R.string.orders_mileage_label)
-            )
-        }
-    }
-    if (diagnostic != null) {
-        item(key = "data-diagnostic") {
-            AtelierListRow(title = diagnostic, subtitle = stringResource(R.string.orders_diagnostic_label))
+    item(key = "data-card") {
+        AtelierSurface(
+            tier = SurfaceTier.Card,
+            shape = CardLargeShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+        ) {
+            Column {
+                if (showBay) {
+                    AtelierListRow(
+                        title = order.bayName ?: stringResource(R.string.orders_bay_none),
+                        subtitle = stringResource(R.string.orders_bay_label),
+                        showDivider = mileage != null || diagnostic != null,
+                        onClick = if (canAssign) actions.onOpenAssignBay else null,
+                        trailing = if (canAssign) {
+                            {
+                                Text(
+                                    text = stringResource(if (order.bayName != null) R.string.orders_bay_change else R.string.orders_bay_assign),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = AtelierTheme.colors.primaryText
+                                )
+                            }
+                        } else null
+                    )
+                }
+                if (mileage != null) {
+                    AtelierListRow(
+                        title = stringResource(R.string.reception_vehicle_mileage_km, mileage),
+                        subtitle = stringResource(R.string.orders_mileage_label),
+                        showDivider = diagnostic != null
+                    )
+                }
+                if (diagnostic != null) {
+                    AtelierListRow(
+                        title = diagnostic,
+                        subtitle = stringResource(R.string.orders_diagnostic_label),
+                        showDivider = false
+                    )
+                }
+            }
         }
     }
 }
@@ -554,17 +617,27 @@ private fun LazyListScope.tasks(
         }
     }
     items(detail.tasks, key = { "task-${it.id.value}" }) { task ->
-        TaskBlock(
-            task = task,
-            state = state,
-            onOpenTask = { actions.onOpenTask(order.id, task.id.value) },
-            onEditLabor = { actions.onOpenEditLabor(task) },
-            onAddPart = { actions.onOpenChargePart(task.id) },
-            onEditPart = { product -> actions.onOpenEditPart(task.id, product) },
-            onReturnPart = { product -> actions.onOpenReturnPart(task.id, product) },
-            onAssignMechanic = { actions.onOpenAssignMechanic(task) },
-            onResume = { actions.onResumeTask(task) }
-        )
+        AtelierSurface(
+            tier = SurfaceTier.Card,
+            shape = CardLargeShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+        ) {
+            TaskBlock(
+                task = task,
+                state = state,
+                onOpenTask = { actions.onOpenTask(order.id, task.id.value) },
+                onEditLabor = { actions.onOpenEditLabor(task) },
+                onAddPart = { actions.onOpenChargePart(task.id) },
+                onEditPart = { product -> actions.onOpenEditPart(task.id, product) },
+                onReturnPart = { product -> actions.onOpenReturnPart(task.id, product) },
+                onAssignMechanic = { actions.onOpenAssignMechanic(task) },
+                onResume = { actions.onResumeTask(task) },
+                onDeleteTask = { actions.onOpenDeleteTask(task) },
+                showOuterDivider = false
+            )
+        }
     }
     if (state.canModifyTasks && state.services.isNotEmpty()) {
         item(key = "tasks-add") {
@@ -619,12 +692,21 @@ private fun LazyListScope.photos(detail: WorkOrderDetail, actions: WorkOrderDeta
         AtelierSectionHeader(title = stringResource(R.string.orders_section_photos), modifier = Modifier.padding(horizontal = 16.dp))
     }
     item(key = "photos-row") {
-        AtelierListRow(
-            title = stringResource(R.string.order_open_gallery),
-            subtitle = pluralStringResource(R.plurals.orders_photos_count, detail.intakeImages.size, detail.intakeImages.size),
-            onClick = actions.onOpenGallery,
-            trailing = { ChevronIcon() }
-        )
+        AtelierSurface(
+            tier = SurfaceTier.Card,
+            shape = CardLargeShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+        ) {
+            AtelierListRow(
+                title = stringResource(R.string.order_open_gallery),
+                subtitle = pluralStringResource(R.plurals.orders_photos_count, detail.intakeImages.size, detail.intakeImages.size),
+                showDivider = false,
+                onClick = actions.onOpenGallery,
+                trailing = { ChevronIcon() }
+            )
+        }
     }
 }
 
@@ -658,24 +740,34 @@ private fun LazyListScope.costs(state: WorkOrderDetailUiState, actions: WorkOrde
     item(key = "costs-header") {
         AtelierSectionHeader(title = stringResource(R.string.orders_section_costs), modifier = Modifier.padding(horizontal = 16.dp))
     }
-    if (state.canReadProfitability) {
-        item(key = "costs-profit") {
-            AtelierListRow(
-                title = stringResource(R.string.orders_profitability_title),
-                subtitle = stringResource(R.string.orders_profitability_hint),
-                onClick = if (state.isOnline) actions.onOpenProfitability else null,
-                trailing = { ChevronIcon() }
-            )
-        }
-    }
-    if (state.canReadPartMovements) {
-        item(key = "costs-movements") {
-            AtelierListRow(
-                title = stringResource(R.string.orders_movements_title),
-                subtitle = stringResource(R.string.orders_movements_hint),
-                onClick = if (state.isOnline) actions.onOpenMovements else null,
-                trailing = { ChevronIcon() }
-            )
+    item(key = "costs-card") {
+        AtelierSurface(
+            tier = SurfaceTier.Card,
+            shape = CardLargeShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+        ) {
+            Column {
+                if (state.canReadProfitability) {
+                    AtelierListRow(
+                        title = stringResource(R.string.orders_profitability_title),
+                        subtitle = stringResource(R.string.orders_profitability_hint),
+                        showDivider = state.canReadPartMovements,
+                        onClick = if (state.isOnline) actions.onOpenProfitability else null,
+                        trailing = { ChevronIcon() }
+                    )
+                }
+                if (state.canReadPartMovements) {
+                    AtelierListRow(
+                        title = stringResource(R.string.orders_movements_title),
+                        subtitle = stringResource(R.string.orders_movements_hint),
+                        showDivider = false,
+                        onClick = if (state.isOnline) actions.onOpenMovements else null,
+                        trailing = { ChevronIcon() }
+                    )
+                }
+            }
         }
     }
     if (!state.isOnline) {
@@ -723,8 +815,18 @@ private fun OrderSheets(state: WorkOrderDetailUiState, actions: WorkOrderDetailA
             onDismiss = actions.onDismissEditLabor
         )
     }
+    state.deletingTask?.let { task ->
+        DeleteTaskSheet(
+            taskTitle = state.taskTitle(task),
+            hasProducts = task.products.isNotEmpty(),
+            isSaving = state.busyAction == WorkOrderDetailAction.DELETE_TASK,
+            error = state.error,
+            onConfirm = actions.onConfirmDeleteTask,
+            onDismiss = actions.onDismissDeleteTask
+        )
+    }
     state.chargeForm?.let { form ->
-        ChargePartDialog(
+        OrderChargePartSheet(
             form = form,
             isSaving = state.busyAction == WorkOrderDetailAction.CHARGE_PART,
             invalidField = state.invalidField,
@@ -737,7 +839,7 @@ private fun OrderSheets(state: WorkOrderDetailUiState, actions: WorkOrderDetailA
         )
     }
     state.partEdit?.let { form ->
-        PartEditDialog(
+        OrderPartEditSheet(
             form = form,
             isSaving = state.busyAction == WorkOrderDetailAction.EDIT_PART ||
                 state.busyAction == WorkOrderDetailAction.REMOVE_PART,
@@ -848,26 +950,11 @@ private fun WorkOrder.numberLabel(): String =
     internalNumber?.let { stringResource(R.string.orders_order_number, it) } ?: stringResource(R.string.orders_no_number)
 
 /**
- * US24 (docs/04-mobile-integration.md §8): comparte el PDF descargado en `cacheDir/pdfs` mediante el menú nativo de
- * Android (WhatsApp, correo, etc.) usando `FileProvider`.
+ * US24 (docs/04-mobile-integration.md §8): abre o comparte el PDF descargado en `cacheDir/pdfs` mediante
+ * [DocumentIntents] (`ACTION_VIEW` con fallback a `ACTION_SEND`).
  */
-private fun shareOrOpenPdf(context: Context, pdfFile: File, chooserTitle: String): Boolean = try {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
-    val sendIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    val chooser = Intent.createChooser(sendIntent, chooserTitle).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(chooser)
-    true
-} catch (_: ActivityNotFoundException) {
-    false
-} catch (_: IllegalArgumentException) {
-    false
-}
+private fun shareOrOpenPdf(context: Context, pdfFile: File, chooserTitle: String): Boolean =
+    DocumentIntents.openPdf(context, pdfFile, chooserTitle)
 
 // region Previews
 
@@ -944,6 +1031,7 @@ private val previewState = WorkOrderDetailUiState(
     canValidateSuspensions = true,
     canReadProfitability = true,
     canReadPartMovements = true,
+    canOpenObd = true,
     canReassignMechanic = true
 )
 

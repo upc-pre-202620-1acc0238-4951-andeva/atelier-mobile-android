@@ -13,6 +13,7 @@ import com.andeva.atelier.mobile.features.workorders.presentation.intake.IntakeG
 import com.andeva.atelier.mobile.features.workorders.presentation.list.WorkOrdersScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.open.OpenWorkOrderScreen
 import com.andeva.atelier.mobile.features.workorders.presentation.proposals.ProposalsPanelScreen
+import com.andeva.atelier.mobile.features.workorders.presentation.services.ServicesCatalogScreen
 import kotlinx.serialization.Serializable
 
 /**
@@ -46,6 +47,10 @@ data class ProposalsPanelRoute(val workOrderId: String)
 @Serializable
 data class ReportFindingRoute(val workOrderId: String)
 
+/** Catálogo de servicios estándar del taller (`operations:services:read` / `operations:services:manage`). */
+@Serializable
+data object ServicesCatalogRoute
+
 /**
  * Destinos de órdenes de trabajo. Se llega a ellos desde otra pantalla con el id de la orden o del vehículo, así que
  * no hay un destino inicial propio: no se agrupan en un `navigation<>`.
@@ -53,7 +58,9 @@ data class ReportFindingRoute(val workOrderId: String)
 fun NavGraphBuilder.workOrderNavGraph(
     navController: NavController,
     /** Abre "Cobrar y entregar" de la orden (lo construye el feature de caja). */
-    onOpenCheckout: (workOrderId: String) -> Unit
+    onOpenCheckout: (workOrderId: String) -> Unit,
+    /** Abre diagnóstico OBD-II del vehículo (lo conecta AppNavHost con `diagnostics`). */
+    onOpenObd: (vehicleId: String, plate: String?) -> Unit = { _, _ -> }
 ) {
     composable<OpenWorkOrderRoute> {
         OpenWorkOrderScreen(
@@ -82,7 +89,8 @@ fun NavGraphBuilder.workOrderNavGraph(
             onCompleteOrder = { vehicleId, customerId, workOrderId ->
                 navController.navigate(OpenWorkOrderRoute(vehicleId, customerId, workOrderId))
             },
-            onOpenCheckout = onOpenCheckout
+            onOpenCheckout = onOpenCheckout,
+            onOpenObd = onOpenObd
         )
     }
     composable<IntakeGalleryRoute> { entry ->
@@ -90,8 +98,10 @@ fun NavGraphBuilder.workOrderNavGraph(
         IntakeGalleryScreen(
             onBack = { navController.popBackStack() },
             onDone = {
-                navController.navigate(WorkOrderDetailRoute(workOrderId)) {
-                    popUpTo<IntakeGalleryRoute> { inclusive = true }
+                if (!navController.popBackStack(WorkOrderDetailRoute(workOrderId), inclusive = false)) {
+                    navController.navigate(WorkOrderDetailRoute(workOrderId)) {
+                        popUpTo<IntakeGalleryRoute> { inclusive = true }
+                    }
                 }
             },
             onOpenProposals = { id -> navController.navigate(ProposalsPanelRoute(id)) }
@@ -106,5 +116,8 @@ fun NavGraphBuilder.workOrderNavGraph(
     }
     composable<ReportFindingRoute> {
         ReportFindingScreen(onBack = { navController.popBackStack() })
+    }
+    composable<ServicesCatalogRoute> {
+        ServicesCatalogScreen(onBack = { navController.popBackStack() })
     }
 }

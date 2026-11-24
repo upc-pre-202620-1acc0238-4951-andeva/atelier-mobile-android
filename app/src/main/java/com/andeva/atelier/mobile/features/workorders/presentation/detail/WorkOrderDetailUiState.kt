@@ -12,6 +12,7 @@ import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.PartMovement
 import com.andeva.atelier.mobile.features.workorders.domain.Profitability
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
+import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderDetail
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import java.io.File
@@ -26,6 +27,7 @@ private const val GENERIC_PRODUCT_PREFIX = "Product "
 enum class WorkOrderDetailAction {
     ADD_TASK,
     EDIT_LABOR,
+    DELETE_TASK,
     CHARGE_PART,
     EDIT_PART,
     REMOVE_PART,
@@ -89,6 +91,7 @@ data class CascadeBreakdown(
 )
 
 data class WorkOrderDetailUiState(
+    val cachedOrder: WorkOrder? = null,
     val detail: WorkOrderDetail? = null,
     val services: List<ServiceOption> = emptyList(),
     val partNamesById: Map<String, String> = emptyMap(),
@@ -97,6 +100,7 @@ data class WorkOrderDetailUiState(
     val busyAction: WorkOrderDetailAction? = null,
     val addTaskForm: AddTaskForm? = null,
     val editLaborForm: EditLaborForm? = null,
+    val deletingTask: TaskDetail? = null,
     val chargeTaskId: TaskId? = null,
     val chargeForm: ChargeForm? = null,
     val editingPartTaskId: TaskId? = null,
@@ -117,6 +121,7 @@ data class WorkOrderDetailUiState(
     val availableBays: List<WorkBay> = emptyList(),
     val showAssignBayDialog: Boolean = false,
     val canReassignMechanic: Boolean = false,
+    val canReassignViaBay: Boolean = false,
     val availableMechanics: List<MechanicOption> = emptyList(),
     val assigningMechanicTask: TaskDetail? = null,
     val cancelForm: CancelOrderForm? = null,
@@ -130,12 +135,13 @@ data class WorkOrderDetailUiState(
     val canValidateSuspensions: Boolean = false,
     val canReadProfitability: Boolean = false,
     val canReadPartMovements: Boolean = false,
+    val canOpenObd: Boolean = false,
     /** Alguno de los permisos de cobro y entrega (facturar, cobrar, pase de salida, entrega). */
     val hasCheckoutPermission: Boolean = false
 ) {
     val isBusy: Boolean get() = busyAction != null
 
-    val status: WorkOrderStatus? get() = detail?.workOrder?.status
+    val status: WorkOrderStatus? get() = detail?.workOrder?.status ?: cachedOrder?.status
     val isDraft: Boolean get() = status == WorkOrderStatus.DRAFT
     val isEditableOrder: Boolean get() = status == WorkOrderStatus.DRAFT || status == WorkOrderStatus.IN_PROGRESS
 
@@ -158,9 +164,10 @@ data class WorkOrderDetailUiState(
     val hasLifecyclePermission: Boolean get() =
         (canUpdateWorkOrder && (isDraft || status == WorkOrderStatus.IN_PROGRESS)) || (canCancelWorkOrder && isEditableOrder)
 
-    val hasOpenSheet: Boolean get() = addTaskForm != null || editLaborForm != null || chargeForm != null ||
-        partEdit != null || rejectForm != null || showAssignBayDialog || assigningMechanicTask != null ||
-        cancelForm != null || showQuotationDecision || reviewingSuspension != null || generatedPdf != null
+    val hasOpenSheet: Boolean get() = addTaskForm != null || editLaborForm != null || deletingTask != null ||
+        chargeForm != null || partEdit != null || rejectForm != null || showAssignBayDialog ||
+        assigningMechanicTask != null || cancelForm != null || showQuotationDecision ||
+        reviewingSuspension != null || generatedPdf != null
 
     val breakdown: CascadeBreakdown? get() = detail?.cascadeBreakdown()
 
@@ -185,7 +192,7 @@ data class WorkOrderDetailUiState(
     fun productTitle(product: TaskProduct): String? {
         val fromCatalog = partNamesById[product.productId]
         val rawName = product.productName?.takeIf { it.isNotBlank() && !it.startsWith(GENERIC_PRODUCT_PREFIX) }
-        return fromCatalog ?: rawName ?: product.productName
+        return fromCatalog ?: rawName
     }
 }
 

@@ -58,6 +58,7 @@ import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoad
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.features.workorders.domain.Proposal
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalSeverity
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalStatus
@@ -91,6 +92,7 @@ fun ProposalsPanelScreen(
             onServiceChange = viewModel::onServiceChange,
             onFinalPriceChange = viewModel::onFinalPriceChange,
             onLaborHoursChange = viewModel::onLaborHoursChange,
+            onMechanicChange = viewModel::onMechanicChange,
             onNotesChange = viewModel::onNotesChange,
             onConfirm = viewModel::onConfirm
         ),
@@ -109,7 +111,8 @@ internal class ProposalsPanelActions(
     val onFinalPriceChange: (String) -> Unit,
     val onLaborHoursChange: (String) -> Unit,
     val onNotesChange: (String) -> Unit,
-    val onConfirm: () -> Unit
+    val onConfirm: () -> Unit,
+    val onMechanicChange: (String?) -> Unit = {}
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -292,6 +295,16 @@ private fun ProposalSheet(
                     enabled = !state.isBusy
                 )
             } else {
+                if (state.canNotify) {
+                    AtelierButton(
+                        text = stringResource(R.string.proposals_notify),
+                        onClick = { actions.onNotify(proposal.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = AtelierButtonStyle.Tonal,
+                        enabled = canAct,
+                        loading = busy
+                    )
+                }
                 if (state.canResolve) {
                     AtelierButton(
                         text = stringResource(R.string.proposals_approve),
@@ -307,19 +320,10 @@ private fun ProposalSheet(
                         enabled = canAct
                     )
                 }
-                if (state.canNotify) {
-                    AtelierButton(
-                        text = stringResource(R.string.proposals_notify),
-                        onClick = { actions.onNotify(proposal.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                        style = AtelierButtonStyle.Tonal,
-                        enabled = canAct,
-                        loading = busy
-                    )
-                }
             }
         }
     ) {
+        val recommendedService = proposal.serviceId?.let { id -> state.services.firstOrNull { it.id == id } }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             proposal.severity?.let { AtelierChip(text = stringResource(it.labelRes()), kind = it.chipKind()) }
         }
@@ -328,6 +332,18 @@ private fun ProposalSheet(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
+        recommendedService?.let { svc ->
+            val summary = listOfNotNull(
+                svc.name,
+                svc.basePrice?.format(),
+                svc.estimatedMinutes?.takeIf { it > 0 }?.let { "${it} min" }
+            ).joinToString(" · ")
+            Text(
+                text = stringResource(R.string.proposals_recommended_service, summary),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
         proposal.imageUrl?.let { url ->
             AsyncImage(
                 model = url,
@@ -362,8 +378,13 @@ private fun ProposalFormFields(form: ProposalForm, state: ProposalsPanelUiState,
         )
         androidx.compose.foundation.layout.Column {
             state.services.forEach { service ->
+                val subtitle = listOfNotNull(
+                    service.basePrice?.format(),
+                    service.estimatedMinutes?.takeIf { it > 0 }?.let { "${it} min" }
+                ).joinToString(" · ").ifEmpty { null }
                 PickRow(
                     title = service.name,
+                    subtitle = subtitle,
                     selected = form.serviceId == service.id,
                     enabled = !saving,
                     onClick = { actions.onServiceChange(service.id) }
@@ -377,16 +398,24 @@ private fun ProposalFormFields(form: ProposalForm, state: ProposalsPanelUiState,
                 color = AtelierTheme.colors.bad
             )
         }
+        val priceLocked = state.isPriceLockedByCatalog
         AtelierTextField(
             label = stringResource(R.string.proposals_final_price),
             value = form.finalPrice,
             onValueChange = actions.onFinalPriceChange,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !saving,
+            enabled = !saving && !priceLocked,
             isError = state.invalidField == "finalPrice",
             errorText = if (state.invalidField == "finalPrice") stringResource(R.string.proposals_field_amount) else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
         )
+        if (priceLocked) {
+            Text(
+                text = stringResource(R.string.proposals_price_from_catalog),
+                style = MaterialTheme.typography.labelSmall,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
         AtelierTextField(
             label = stringResource(R.string.proposals_labor_hours),
             value = form.laborHours,
@@ -397,6 +426,29 @@ private fun ProposalFormFields(form: ProposalForm, state: ProposalsPanelUiState,
             errorText = if (state.invalidField == "laborHours") stringResource(R.string.proposals_field_amount) else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
         )
+        if (state.availableMechanics.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.proposals_mechanic),
+                style = MaterialTheme.typography.labelLarge,
+                color = AtelierTheme.colors.inkSecondary
+            )
+            androidx.compose.foundation.layout.Column {
+                PickRow(
+                    title = stringResource(R.string.proposals_mechanic_unassigned),
+                    selected = form.mechanicId == null,
+                    enabled = !saving,
+                    onClick = { actions.onMechanicChange(null) }
+                )
+                state.availableMechanics.forEach { mechanic ->
+                    PickRow(
+                        title = mechanic.displayName,
+                        selected = form.mechanicId == mechanic.membershipId,
+                        enabled = !saving,
+                        onClick = { actions.onMechanicChange(mechanic.membershipId) }
+                    )
+                }
+            }
+        }
     }
     AtelierTextField(
         label = stringResource(if (approve) R.string.proposals_notes_optional else R.string.proposals_customer_notes_label),

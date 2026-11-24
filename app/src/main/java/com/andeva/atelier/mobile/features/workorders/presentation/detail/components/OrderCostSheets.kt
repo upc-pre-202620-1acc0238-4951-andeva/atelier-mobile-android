@@ -63,11 +63,15 @@ internal fun ProfitabilitySheet(
     ) {
         val data = state.data
         when {
-            state.isLoading -> Text(
-                text = stringResource(R.string.search_loading),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
-            )
+            state.isLoading -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(4) {
+                    AtelierListRow(
+                        title = "Ingresos de repuestos",
+                        subtitle = "Costo de ventas FIFO",
+                        loading = true
+                    )
+                }
+            }
             state.error != null -> {
                 AtelierBanner(message = state.error.asString(), icon = Icons.Outlined.ErrorOutline)
                 AtelierButton(
@@ -140,11 +144,15 @@ internal fun PartMovementsSheet(
     ) {
         val data = state.data
         when {
-            state.isLoading -> Text(
-                text = stringResource(R.string.search_loading),
-                style = MaterialTheme.typography.bodyLarge,
-                color = AtelierTheme.colors.inkSecondary
-            )
+            state.isLoading -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(4) {
+                    AtelierListRow(
+                        title = "Ingresos de repuestos",
+                        subtitle = "Costo de ventas FIFO",
+                        loading = true
+                    )
+                }
+            }
             state.error != null -> {
                 AtelierBanner(message = state.error.asString(), icon = Icons.Outlined.ErrorOutline)
                 AtelierButton(

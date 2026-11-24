@@ -1,6 +1,7 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.proposals
 
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
+import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.Proposal
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 
@@ -11,9 +12,11 @@ data class ProposalForm(
     val proposalId: String,
     val action: ProposalAction,
     val serviceId: String? = null,
-    /** Precio final sin IGV: el backend calcula el 18 % (docs/api/README.md). */
+    /** Tarifa del servicio sin IGV (consolidada desde catálogo cuando el servicio tiene precio base). */
     val finalPrice: String = "",
     val laborHours: String = "",
+    /** Mecánico opcional asignado directamente a la tarea creada. */
+    val mechanicId: String? = null,
     /** Observaciones: opcionales al aprobar, obligatorias al rechazar (`customerNotes`). */
     val notes: String = ""
 ) {
@@ -27,6 +30,7 @@ data class ProposalForm(
 data class ProposalsPanelUiState(
     val proposals: List<Proposal> = emptyList(),
     val services: List<ServiceOption> = emptyList(),
+    val availableMechanics: List<MechanicOption> = emptyList(),
     val isLoading: Boolean = true,
     /** Propuesta con una operación en curso (notificar, aprobar o rechazar). */
     val busyProposalId: String? = null,
@@ -42,4 +46,10 @@ data class ProposalsPanelUiState(
 ) {
     val isBusy: Boolean get() = busyProposalId != null
     val canConfirm: Boolean get() = form?.isFilled == true && !isBusy && isOnline
+
+    val selectedCatalogService: ServiceOption?
+        get() = form?.serviceId?.let { id -> services.firstOrNull { it.id == id } }
+
+    val isPriceLockedByCatalog: Boolean
+        get() = selectedCatalogService?.basePrice != null
 }

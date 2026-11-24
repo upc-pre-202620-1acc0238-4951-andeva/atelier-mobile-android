@@ -18,18 +18,20 @@ class WorkOrdersUiStateTest {
         orders = listOf(
             orden("1", "BKR418", WorkOrderStatus.DRAFT),
             orden("2", "F5U731", WorkOrderStatus.IN_PROGRESS),
-            orden("3", null, WorkOrderStatus.IN_PROGRESS)
+            orden("3", null, WorkOrderStatus.IN_PROGRESS),
+            orden("4", "D2C604", WorkOrderStatus.COMPLETED)
         )
     )
 
     @Test
     fun sinFiltroMuestraTodas() {
-        assertEquals(listOf("1", "2", "3"), state.visibleOrders.map { it.id })
+        assertEquals(listOf("1", "2", "3", "4"), state.visibleOrders.map { it.id })
     }
 
     @Test
     fun filtraPorEstado() {
         assertEquals(listOf("2", "3"), state.copy(statusFilter = WorkOrderStatus.IN_PROGRESS).visibleOrders.map { it.id })
+        assertEquals(listOf("4"), state.copy(statusFilter = WorkOrderStatus.COMPLETED).visibleOrders.map { it.id })
     }
 
     @Test

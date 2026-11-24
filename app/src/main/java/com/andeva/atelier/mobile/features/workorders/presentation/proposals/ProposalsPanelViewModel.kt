@@ -9,12 +9,14 @@ import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.workorders.application.ApproveProposalUseCase
+import com.andeva.atelier.mobile.features.workorders.application.GetBranchMechanicsUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetServiceCatalogUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
 import com.andeva.atelier.mobile.features.workorders.application.NotifyProposalUseCase
 import com.andeva.atelier.mobile.features.workorders.application.RejectProposalUseCase
 import com.andeva.atelier.mobile.features.workorders.domain.InvalidWorkOrderInputException
 import com.andeva.atelier.mobile.features.workorders.domain.ProposalApproval
+import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.presentation.invalidWorkOrderField
 import com.andeva.atelier.mobile.features.workorders.presentation.toWorkOrderUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 
 /**
@@ -39,7 +42,8 @@ class ProposalsPanelViewModel @Inject constructor(
     private val approveProposal: ApproveProposalUseCase,
     private val rejectProposal: RejectProposalUseCase,
     savedStateHandle: SavedStateHandle,
-    connectivity: ConnectivityObserver? = null
+    connectivity: ConnectivityObserver? = null,
+    private val getBranchMechanics: GetBranchMechanicsUseCase? = null
 ) : ViewModel() {
 
     private val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
@@ -67,17 +71,33 @@ class ProposalsPanelViewModel @Inject constructor(
         load()
     }
 
-    /** `GET /work-orders/{id}`: propuestas de la orden, y los servicios para elegir al aprobar. */
+    /** `GET /work-orders/{id}`: propuestas de la orden, servicios del catálogo y mecánicos para crear la tarea. */
     fun load() {
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             val services = getServices().getOrDefault(emptyList())
+            val mechanics = getBranchMechanics?.invoke()?.getOrDefault(_uiState.value.availableMechanics)
+                ?: _uiState.value.availableMechanics
             getDetail(workOrderId)
                 .onSuccess { detail ->
-                    _uiState.update { it.copy(isLoading = false, proposals = detail.proposals, services = services) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            proposals = detail.proposals,
+                            services = services,
+                            availableMechanics = mechanics
+                        )
+                    }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, services = services, error = e.toWorkOrderUiText()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            services = services,
+                            availableMechanics = mechanics,
+                            error = e.toWorkOrderUiText()
+                        )
+                    }
                 }
         }
     }
@@ -100,9 +120,23 @@ class ProposalsPanelViewModel @Inject constructor(
         val state = _uiState.value
         if (!state.canResolve || state.isBusy) return
         val proposal = state.proposals.firstOrNull { it.id == proposalId } ?: return
+        val suggested = proposal.serviceId?.let { id -> state.services.firstOrNull { it.id == id } }
+        val prefilledPrice = if (action == ProposalAction.APPROVE) {
+            suggested?.basePrice?.amount?.toPlainString().orEmpty()
+        } else ""
+        val prefilledHours = if (action == ProposalAction.APPROVE) {
+            suggested.estimatedHoursText()
+        } else ""
         _uiState.update {
             it.copy(
-                form = ProposalForm(proposalId, action, serviceId = proposal.serviceId),
+                form = ProposalForm(
+                    proposalId = proposalId,
+                    action = action,
+                    serviceId = proposal.serviceId,
+                    finalPrice = prefilledPrice,
+                    laborHours = prefilledHours,
+                    mechanicId = null
+                ),
                 notice = null, error = null, invalidField = null
             )
         }
@@ -115,9 +149,26 @@ class ProposalsPanelViewModel @Inject constructor(
         if (form == null || it.isBusy) it else it.copy(form = change(form), error = null, invalidField = null)
     }
 
-    fun onServiceChange(serviceId: String) = editForm { it.copy(serviceId = serviceId) }
-    fun onFinalPriceChange(value: String) = editForm { it.copy(finalPrice = value) }
+    fun onServiceChange(serviceId: String) = _uiState.update { state ->
+        val form = state.form
+        if (form == null || state.isBusy) return@update state
+        val service = state.services.firstOrNull { it.id == serviceId }
+        val nextPrice = service?.basePrice?.amount?.toPlainString() ?: form.finalPrice
+        val nextHours = service.estimatedHoursText().ifBlank { form.laborHours }
+        state.copy(
+            form = form.copy(serviceId = serviceId, finalPrice = nextPrice, laborHours = nextHours),
+            error = null,
+            invalidField = null
+        )
+    }
+
+    fun onFinalPriceChange(value: String) {
+        if (_uiState.value.isPriceLockedByCatalog) return
+        editForm { it.copy(finalPrice = value) }
+    }
+
     fun onLaborHoursChange(value: String) = editForm { it.copy(laborHours = value) }
+    fun onMechanicChange(mechanicId: String?) = editForm { it.copy(mechanicId = mechanicId) }
     fun onNotesChange(value: String) = editForm { it.copy(notes = value) }
 
     fun onConfirm() {
@@ -134,10 +185,12 @@ class ProposalsPanelViewModel @Inject constructor(
         val serviceId = form.serviceId
         val price = form.finalPrice.toAmount()
         val hours = form.laborHours.toAmount()
-        if (serviceId == null || price == null || hours == null) {
+        val catalogPrice = _uiState.value.selectedCatalogService?.basePrice?.amount
+        val effectivePrice = catalogPrice ?: price
+        if (serviceId == null || effectivePrice == null || hours == null) {
             val field = when {
                 serviceId == null -> "serviceId"
-                price == null -> "finalPrice"
+                effectivePrice == null -> "finalPrice"
                 else -> "laborHours"
             }
             fail(InvalidWorkOrderInputException(field))
@@ -145,7 +198,13 @@ class ProposalsPanelViewModel @Inject constructor(
         }
         _uiState.update { it.copy(busyProposalId = form.proposalId, notice = null, error = null, invalidField = null) }
         viewModelScope.launch {
-            val approval = ProposalApproval(serviceId, price, hours, notes = form.notes.trim().ifBlank { null })
+            val approval = ProposalApproval(
+                serviceId = serviceId,
+                finalPrice = effectivePrice,
+                laborHours = hours,
+                mechanicId = form.mechanicId,
+                notes = form.notes.trim().ifBlank { null }
+            )
             approveProposal(workOrderId, form.proposalId, approval)
                 .onSuccess { detail ->
                     _uiState.update {
@@ -178,6 +237,14 @@ class ProposalsPanelViewModel @Inject constructor(
 
     /** Acepta coma o punto decimal; null si no es un número. */
     private fun String.toAmount(): BigDecimal? = trim().replace(',', '.').toBigDecimalOrNull()
+
+    private fun ServiceOption?.estimatedHoursText(): String {
+        val minutes = this?.estimatedMinutes?.takeIf { it > 0 } ?: return ""
+        return BigDecimal(minutes)
+            .divide(BigDecimal(60), 2, RoundingMode.HALF_UP)
+            .stripTrailingZeros()
+            .toPlainString()
+    }
 
     private fun fail(error: Throwable) = _uiState.update {
         it.copy(busyProposalId = null, error = error.toWorkOrderUiText(), invalidField = error.invalidWorkOrderField())

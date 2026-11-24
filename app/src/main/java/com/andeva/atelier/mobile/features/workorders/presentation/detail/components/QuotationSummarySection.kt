@@ -1,8 +1,10 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.detail.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -11,25 +13,33 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.HeroShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.core.presentation.formatQuantity
 import com.andeva.atelier.mobile.features.tasks.domain.TaskDetail
 import com.andeva.atelier.mobile.features.tasks.domain.TaskProduct
+import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
 import com.andeva.atelier.mobile.features.tasks.presentation.taskStatusChipKind
 import com.andeva.atelier.mobile.features.tasks.presentation.taskStatusLabelRes
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.CascadeBreakdown
@@ -54,7 +64,9 @@ internal fun TaskBlock(
     onReturnPart: (TaskProduct) -> Unit,
     onAssignMechanic: () -> Unit,
     onResume: () -> Unit,
-    modifier: Modifier = Modifier
+    onDeleteTask: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    showOuterDivider: Boolean = true
 ) {
     val currency = state.breakdown?.currency ?: task.price?.currency ?: Money.PEN
     val title = state.taskTitle(task)
@@ -111,12 +123,24 @@ internal fun TaskBlock(
                     onReturn = { onReturnPart(product) }
                 )
             }
-            if (state.canAddPartToTask) {
-                AtelierButton(
-                    text = stringResource(R.string.order_add_part),
-                    onClick = onAddPart,
-                    style = AtelierButtonStyle.Text
-                )
+            val canDeleteThisTask = state.canModifyTasks && task.status != TaskStatus.COMPLETED
+            if (state.canAddPartToTask || canDeleteThisTask) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.canAddPartToTask) {
+                        AtelierButton(
+                            text = stringResource(R.string.order_add_part),
+                            onClick = onAddPart,
+                            style = AtelierButtonStyle.Text
+                        )
+                    }
+                    if (canDeleteThisTask) {
+                        AtelierButton(
+                            text = stringResource(R.string.order_delete_task),
+                            onClick = onDeleteTask,
+                            style = AtelierButtonStyle.Destructive
+                        )
+                    }
+                }
             }
             if (task.isSuspended && state.canValidateSuspensions) {
                 AtelierButton(
@@ -128,7 +152,9 @@ internal fun TaskBlock(
                 )
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (showOuterDivider) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
     }
 }
 
@@ -151,7 +177,7 @@ private fun DetailLine(label: String, value: String, actionLabel: String?, onCli
             Text(
                 text = actionLabel,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = AtelierTheme.colors.primaryText
             )
         }
     }
@@ -220,19 +246,52 @@ internal fun QuotationSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        SummaryRow(stringResource(R.string.quotation_labor_subtotal), breakdown.laborSubtotal.format())
-        SummaryRow(stringResource(R.string.quotation_parts_subtotal), breakdown.partsSubtotal.format())
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        SummaryRow(stringResource(R.string.quotation_subtotal), breakdown.subtotal.format())
-        SummaryRow(stringResource(R.string.quotation_igv), breakdown.taxAmount.format())
-        SummaryRow(stringResource(R.string.quotation_total), breakdown.totalAmount.format(), emphasized = true)
+        AtelierSurface(
+            tier = SurfaceTier.Elevated,
+            shape = HeroShape,
+            contentPadding = PaddingValues(Spacing.md),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                SummaryRow(stringResource(R.string.quotation_labor_subtotal), breakdown.laborSubtotal.format())
+                SummaryRow(stringResource(R.string.quotation_parts_subtotal), breakdown.partsSubtotal.format())
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = Spacing.xs),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                SummaryRow(stringResource(R.string.quotation_subtotal), breakdown.subtotal.format())
+                SummaryRow(stringResource(R.string.quotation_igv), breakdown.taxAmount.format())
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = Spacing.xs),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.quotation_total),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = breakdown.totalAmount.format(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
         if (showPdfActions || showEmailAction) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 if (showPdfActions) {
                     AtelierButton(
@@ -281,6 +340,51 @@ internal fun SummaryRow(label: String, value: String, emphasized: Boolean = fals
             style = if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1
+        )
+    }
+}
+
+private val previewBreakdown = CascadeBreakdown(
+    currency = Money.PEN,
+    laborSubtotal = Money.of("300.00", Money.PEN),
+    partsSubtotal = Money.of("210.00", Money.PEN),
+    subtotal = Money.of("510.00", Money.PEN),
+    taxAmount = Money.of("91.80", Money.PEN),
+    totalAmount = Money.of("601.80", Money.PEN)
+)
+
+@Preview(name = "Proforma · claro", widthDp = 390, showBackground = true)
+@Composable
+private fun QuotationSectionPreviewLight() = AtelierWorkshopTheme(darkTheme = false) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        QuotationSection(
+            breakdown = previewBreakdown,
+            canGeneratePdf = true,
+            canEmailQuotation = true,
+            showPdfActions = true,
+            showEmailAction = true,
+            busyAction = null,
+            onGeneratePdf = {},
+            onSendEmail = {},
+            modifier = Modifier.padding(vertical = Spacing.md)
+        )
+    }
+}
+
+@Preview(name = "Proforma · oscuro", widthDp = 390, showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun QuotationSectionPreviewDark() = AtelierWorkshopTheme(darkTheme = true) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        QuotationSection(
+            breakdown = previewBreakdown,
+            canGeneratePdf = true,
+            canEmailQuotation = true,
+            showPdfActions = true,
+            showEmailAction = true,
+            busyAction = null,
+            onGeneratePdf = {},
+            onSendEmail = {},
+            modifier = Modifier.padding(vertical = Spacing.md)
         )
     }
 }

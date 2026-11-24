@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.workorders.infrastructure.repository
 import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.PdfDownloader
 import com.andeva.atelier.mobile.core.data.remote.apiCall
+import com.andeva.atelier.mobile.core.data.remote.apiCallUnit
 import com.andeva.atelier.mobile.core.data.remote.employee.EmployeeService
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataDao
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataEntity
@@ -37,12 +38,14 @@ import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toEnti
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.toMechanicOption
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.ApproveProposalRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.AttachIntakeImagePayload
+import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.CreateServiceRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.CreateWorkOrderRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.CreateWorkOrderTaskRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.ReasonRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.RejectProposalRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.ServiceCatalogService
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.SubmitProposalPayload
+import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.UpdateServiceRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.UpdateWorkOrderRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.UpdateWorkOrderTaskRequestDto
 import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderDto
@@ -59,6 +62,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import retrofit2.Response
 import java.io.File
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -81,7 +85,8 @@ class WorkOrderRepositoryImpl @Inject constructor(
     private val pdfDownloader: PdfDownloader,
     private val sessionManager: SessionManager,
     private val gson: Gson,
-    private val clock: Clock
+    private val clock: Clock,
+    private val pendingSuspensionMonitor: PendingSuspensionMonitor? = null
 ) : WorkOrderRepository {
 
     /** El catálogo de servicios cambia poco: se lee una vez por taller mientras viva el proceso. */
@@ -106,7 +111,9 @@ class WorkOrderRepositoryImpl @Inject constructor(
     override fun observeWorkOrder(id: String): Flow<WorkOrder?> = workOrderDao.observeById(id).map { it?.toDomain() }
 
     override suspend fun getDetail(id: String): Result<WorkOrderDetail> =
-        apiCall(gson, { workOrderService.getWorkOrder(id) }) { it }.map { dto -> dto.toDetail(saveHeader(dto)) }
+        apiCall(gson, { workOrderService.getWorkOrder(id) }) { it }
+            .map { dto -> dto.toDetail(saveHeader(dto)) }
+            .onSuccess { detail -> pendingSuspensionMonitor?.updateFromDetail(detail) }
 
     override suspend fun findDraftForVehicle(branchId: String, vehicleId: String): Result<WorkOrder?> =
         refreshBranch(branchId).map { rows ->
@@ -127,8 +134,15 @@ class WorkOrderRepositoryImpl @Inject constructor(
         return header { workOrderService.create(body) }
     }
 
-    override suspend fun update(id: String, mileageIn: Int?, diagnosticSummary: String?): Result<WorkOrder> =
-        header { workOrderService.update(id, UpdateWorkOrderRequestDto(mileageIn, diagnosticSummary.blankToNull())) }
+    override suspend fun update(id: String, mileageIn: Int?, diagnosticSummary: String?): Result<WorkOrder> {
+        val cleanSummary = diagnosticSummary.blankToNull()
+        return apiCall(gson, { workOrderService.update(id, UpdateWorkOrderRequestDto(mileageIn, cleanSummary)) }) { dto ->
+            dto.copy(
+                mileageIn = mileageIn ?: dto.mileageIn,
+                diagnosticSummary = cleanSummary ?: dto.diagnosticSummary
+            )
+        }.map { saveHeader(it) }
+    }
 
     /** La tarea nueva cambia los totales y la respuesta no trae la orden: se recarga el detalle. */
     override suspend fun addTask(id: String, task: NewWorkOrderTask): Result<WorkOrderDetail> {
@@ -141,13 +155,52 @@ class WorkOrderRepositoryImpl @Inject constructor(
         return apiCall(gson, { workOrderService.updateTask(taskId, body) }) { it }.then { getDetail(workOrderId) }
     }
 
+    override suspend fun removeTask(workOrderId: String, taskId: String): Result<WorkOrderDetail> =
+        apiCallUnit(gson) { workOrderService.deleteTask(taskId) }.then { getDetail(workOrderId) }
+
     override suspend fun getServiceCatalog(): Result<List<ServiceOption>> {
         val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
         if (!session.has(Permission.SERVICES_READ)) return Result.success(emptyList())
         services?.takeIf { it.first == session.tenantId }?.let { return Result.success(it.second) }
-        return apiCall(gson, { serviceCatalogService.getServices() }) { dtos -> dtos.map { it.toDomain() } }
-            .onSuccess { services = session.tenantId to it }
+        return refreshServiceCatalog()
     }
+
+    override suspend fun refreshServiceCatalog(): Result<List<ServiceOption>> {
+        val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
+        if (!session.has(Permission.SERVICES_READ) && !session.has(Permission.SERVICES_MANAGE)) {
+            return Result.success(emptyList())
+        }
+        return apiCall(gson, { serviceCatalogService.getServices() }) { dtos ->
+            dtos.map { it.toDomain() }.sortedBy { it.name.lowercase() }
+        }.onSuccess { services = session.tenantId to it }
+    }
+
+    override suspend fun createService(
+        name: String,
+        basePrice: BigDecimal,
+        currency: String,
+        estimatedMinutes: Int
+    ): Result<ServiceOption> {
+        val body = CreateServiceRequestDto(name.trim(), basePrice, currency, estimatedMinutes)
+        return apiCall(gson, { serviceCatalogService.createService(body) }) { it.toDomain() }
+            .onSuccess { services = null }
+    }
+
+    override suspend fun updateService(
+        serviceId: String,
+        name: String,
+        basePrice: BigDecimal,
+        currency: String,
+        estimatedMinutes: Int
+    ): Result<ServiceOption> {
+        val body = UpdateServiceRequestDto(name.trim(), basePrice, currency, estimatedMinutes)
+        return apiCall(gson, { serviceCatalogService.updateService(serviceId, body) }) { it.toDomain() }
+            .onSuccess { services = null }
+    }
+
+    override suspend fun deleteService(serviceId: String): Result<Unit> =
+        apiCallUnit(gson) { serviceCatalogService.deleteService(serviceId) }
+            .onSuccess { services = null }
 
     /** Sin `iam:members:read` no se puede listar (H11): lista vacía y la tarea se crea sin mecánico. */
     override suspend fun getBranchMechanics(): Result<List<MechanicOption>> {

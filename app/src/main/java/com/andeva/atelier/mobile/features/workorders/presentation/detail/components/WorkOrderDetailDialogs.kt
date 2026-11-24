@@ -48,14 +48,23 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSelectionCard
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.ControlShape
+import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
+import com.andeva.atelier.mobile.core.presentation.formatQuantity
 import com.andeva.atelier.mobile.features.bays.domain.BayStatus
 import com.andeva.atelier.mobile.features.bays.domain.WorkBay
+import com.andeva.atelier.mobile.features.bays.presentation.labelRes
+import com.andeva.atelier.mobile.features.tasks.domain.PartOption
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.ChargeForm
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditForm
+import com.andeva.atelier.mobile.features.tasks.presentation.detail.PartEditMode
 import com.andeva.atelier.mobile.features.workorders.domain.MechanicOption
 import com.andeva.atelier.mobile.features.workorders.domain.ServiceOption
 import com.andeva.atelier.mobile.features.workorders.presentation.detail.AddTaskForm
@@ -263,6 +272,54 @@ internal fun EditLaborSheet(
             errorText = if (invalidField == "price") stringResource(R.string.order_field_price) else null,
             keyboardOptions = DecimalKeyboard
         )
+        SheetError(error)
+    }
+}
+
+/** Confirmación para eliminar una tarea no completada de la orden de trabajo. */
+@Composable
+internal fun DeleteTaskSheet(
+    taskTitle: String,
+    hasProducts: Boolean,
+    isSaving: Boolean,
+    error: UiText?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.order_delete_task_title),
+        onDismiss = onDismiss,
+        actions = {
+            AtelierButton(
+                text = stringResource(R.string.order_delete_task_confirm),
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.DestructiveFilled,
+                enabled = !hasProducts && !isSaving,
+                loading = isSaving
+            )
+            AtelierButton(
+                text = stringResource(R.string.quotation_reject_back),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
+        if (hasProducts) {
+            AtelierBanner(
+                message = stringResource(R.string.order_delete_task_has_parts),
+                icon = Icons.Outlined.ErrorOutline,
+                kind = BannerKind.Wait
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.order_delete_task_body, taskTitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
         SheetError(error)
     }
 }
@@ -554,7 +611,7 @@ internal fun PdfPreviewSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.small)
+                        .clip(ControlShape)
                         .background(AtelierTheme.colors.plate)
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
@@ -591,7 +648,19 @@ internal fun AssignBaySheet(
     onSelectBay: (WorkBay) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AtelierBottomSheet(title = stringResource(R.string.order_assign_bay_title), onDismiss = onDismiss) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.order_assign_bay_title),
+        onDismiss = onDismiss,
+        actions = {
+            AtelierButton(
+                text = stringResource(R.string.common_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
         Text(
             text = stringResource(R.string.order_assign_bay_subtitle),
             style = MaterialTheme.typography.bodyMedium,
@@ -615,7 +684,7 @@ internal fun AssignBaySheet(
                     }
                     PickRow(
                         title = bay.name,
-                        subtitle = bay.type?.name,
+                        subtitle = bay.type?.let { stringResource(it.labelRes()) },
                         selected = isCurrent,
                         enabled = bay.canReceive && !isCurrent && !isSaving,
                         onClick = { onSelectBay(bay) },
@@ -645,7 +714,19 @@ internal fun AssignMechanicSheet(
     onSelectMechanic: (MechanicOption) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AtelierBottomSheet(title = stringResource(R.string.order_assign_mechanic_title), onDismiss = onDismiss) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.order_assign_mechanic_title),
+        onDismiss = onDismiss,
+        actions = {
+            AtelierButton(
+                text = stringResource(R.string.common_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
         Text(
             text = stringResource(R.string.order_assign_mechanic_subtitle, taskTitle),
             style = MaterialTheme.typography.bodyMedium,
@@ -684,3 +765,179 @@ internal fun AssignMechanicSheet(
         SheetError(error)
     }
 }
+
+/** US32 E2: buscar el repuesto e imputarlo desde la orden en hoja inferior (acciones al alcance del pulgar). */
+@Composable
+internal fun OrderChargePartSheet(
+    form: ChargeForm,
+    isSaving: Boolean,
+    invalidField: String?,
+    error: UiText?,
+    onQueryChange: (String) -> Unit,
+    onSelect: (PartOption) -> Unit,
+    onQuantityChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AtelierBottomSheet(
+        title = stringResource(R.string.charge_title),
+        onDismiss = { if (!isSaving) onDismiss() },
+        actions = {
+            AtelierButton(
+                text = stringResource(R.string.charge_confirm),
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = form.selected != null && form.quantity.isNotBlank() && !isSaving,
+                loading = isSaving
+            )
+            AtelierButton(
+                text = stringResource(R.string.proposals_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
+        if (form.selected == null) {
+            AtelierTextField(
+                label = stringResource(R.string.catalog_search_label),
+                value = form.query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSaving,
+                placeholder = stringResource(R.string.catalog_search_hint),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+            )
+            Text(
+                text = stringResource(R.string.charge_select_part_prompt),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            when {
+                form.isSearching -> Text(
+                    text = stringResource(R.string.search_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AtelierTheme.colors.inkSecondary
+                )
+                form.results.isEmpty() -> Text(
+                    text = stringResource(R.string.catalog_empty_filtered),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AtelierTheme.colors.inkSecondary
+                )
+                else -> form.results.take(MAX_PART_RESULTS).forEach { part ->
+                    OrderPartOptionRow(part = part, onSelect = onSelect, enabled = !isSaving)
+                }
+            }
+        } else {
+            OrderPartOptionRow(part = form.selected, onSelect = {}, enabled = false, selected = true)
+            AtelierButton(
+                text = stringResource(R.string.charge_change_part_btn),
+                onClick = { onQueryChange(form.query) },
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+            AtelierTextField(
+                label = stringResource(R.string.charge_quantity),
+                value = form.quantity,
+                onValueChange = onQuantityChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSaving,
+                isError = invalidField == "quantity",
+                errorText = if (invalidField == "quantity") stringResource(R.string.task_field_quantity) else null,
+                keyboardOptions = DecimalKeyboard
+            )
+        }
+        SheetError(error)
+    }
+}
+
+@Composable
+private fun OrderPartOptionRow(
+    part: PartOption,
+    onSelect: (PartOption) -> Unit,
+    enabled: Boolean,
+    selected: Boolean = false
+) {
+    val stockText = if (part.isAvailable) {
+        stringResource(R.string.part_stock, part.totalStock.formatQuantity())
+    } else {
+        stringResource(R.string.stock_out)
+    }
+    val priceFormatted = part.basePrice?.let {
+        stringResource(R.string.part_price, Money(it, Money.PEN).format())
+    }
+
+    AtelierSelectionCard(
+        title = part.name,
+        subtitle = stockText,
+        price = priceFormatted,
+        badgeText = if (!part.isAvailable) stringResource(R.string.stock_out) else null,
+        badgeColor = if (!part.isAvailable) AtelierTheme.colors.badContainer else null,
+        selected = selected,
+        enabled = enabled && part.isAvailable,
+        onClick = { onSelect(part) }
+    )
+}
+
+/** US33: corregir la cantidad de un repuesto imputado o devolverlo al lote de origen en hoja inferior. */
+@Composable
+internal fun OrderPartEditSheet(
+    form: PartEditForm,
+    isSaving: Boolean,
+    invalidField: String?,
+    error: UiText?,
+    onQuantityChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val returning = form.mode == PartEditMode.RETURN
+    AtelierBottomSheet(
+        title = stringResource(if (returning) R.string.return_title else R.string.edit_part_title),
+        onDismiss = { if (!isSaving) onDismiss() },
+        actions = {
+            AtelierButton(
+                text = stringResource(if (returning) R.string.return_confirm else R.string.edit_part_confirm),
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                style = if (returning) AtelierButtonStyle.DestructiveFilled else AtelierButtonStyle.Filled,
+                enabled = (returning || form.quantity.isNotBlank()) && !isSaving,
+                loading = isSaving
+            )
+            AtelierButton(
+                text = stringResource(R.string.proposals_cancel),
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = AtelierButtonStyle.Text,
+                enabled = !isSaving
+            )
+        }
+    ) {
+        Text(
+            text = form.product.productName ?: stringResource(R.string.task_part_unnamed),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = stringResource(if (returning) R.string.return_body else R.string.edit_part_body),
+            style = MaterialTheme.typography.bodyLarge,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        if (!returning) {
+            AtelierTextField(
+                label = stringResource(R.string.charge_quantity),
+                value = form.quantity,
+                onValueChange = onQuantityChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSaving,
+                isError = invalidField == "quantity",
+                errorText = if (invalidField == "quantity") stringResource(R.string.task_field_quantity) else null,
+                keyboardOptions = DecimalKeyboard
+            )
+        }
+        SheetError(error)
+    }
+}
+
+private const val MAX_PART_RESULTS = 8

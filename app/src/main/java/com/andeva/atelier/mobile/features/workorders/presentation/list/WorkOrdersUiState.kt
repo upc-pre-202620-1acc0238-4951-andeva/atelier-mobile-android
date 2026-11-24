@@ -21,6 +21,7 @@ data class WorkOrdersUiState(
     val statusFilter: WorkOrderStatus? = null,
     /** Texto de la búsqueda por placa. */
     val query: String = "",
+    val orderIdsWithPendingSuspension: Set<String> = emptySet(),
     val pendingSyncCount: Int = 0,
     val unreadNotificationsCount: Int = 0
 ) {

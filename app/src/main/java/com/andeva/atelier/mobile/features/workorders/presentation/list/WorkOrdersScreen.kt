@@ -1,7 +1,6 @@
 package com.andeva.atelier.mobile.features.workorders.presentation.list
 
 import android.content.res.Configuration
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,15 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +25,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -42,18 +38,20 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierChip
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
-import com.andeva.atelier.mobile.core.designsystem.component.LocalFloatingBarInset
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSegmentedControl
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
 import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.ChipShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
@@ -62,8 +60,19 @@ import com.andeva.atelier.mobile.features.workorders.presentation.labelRes
 import java.time.Duration
 import java.time.Instant
 
-/** Estados que se pueden filtrar: la lista de la sede solo trae órdenes sin cerrar. */
-private val FilterStatuses = listOf(WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.COMPLETED)
+/** Filtros rápidos en barra: Todas, Por cobrar (COMPLETED), En curso y Borrador. */
+private val FilterOptions: List<WorkOrderStatus?> = listOf(
+    null,
+    WorkOrderStatus.COMPLETED,
+    WorkOrderStatus.IN_PROGRESS,
+    WorkOrderStatus.DRAFT
+)
+
+private fun WorkOrderStatus?.filterSegmentLabelRes(): Int = when (this) {
+    null -> R.string.orders_filter_all
+    WorkOrderStatus.COMPLETED -> R.string.orders_filter_to_collect
+    else -> labelRes()
+}
 
 /**
  * Raíz de la pestaña "Órdenes": las órdenes sin cerrar de la sede, con filtro por estado y búsqueda por placa.
@@ -127,9 +136,10 @@ internal fun WorkOrdersContent(
                 .padding(padding)
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                // La barra flotante tapa el final de la lista: se suma su alto.
-                contentPadding = PaddingValues(bottom = 16.dp + LocalFloatingBarInset.current)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .floatingBarPadding(),
+                contentPadding = PaddingValues(bottom = Spacing.md)
             ) {
                 item(key = "refresh") {
                     AtelierRefreshBar(visible = state.isRefreshing && state.orders.isNotEmpty())
@@ -188,7 +198,11 @@ internal fun WorkOrdersContent(
                         )
                     }
                     else -> items(visible, key = { it.id }) { order ->
-                        OrderRow(order = order, onClick = { onOpenOrder(order.id) })
+                        OrderRow(
+                            order = order,
+                            hasPendingSuspension = order.id in state.orderIdsWithPendingSuspension,
+                            onClick = { onOpenOrder(order.id) }
+                        )
                     }
                 }
             }
@@ -220,38 +234,17 @@ private fun Filters(
                 }
             } else null
         )
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatusChip(
-                label = stringResource(R.string.orders_filter_all),
-                selected = state.statusFilter == null,
-                onClick = { onStatusFilterChange(null) }
-            )
-            FilterStatuses.forEach { status ->
-                StatusChip(
-                    label = stringResource(status.labelRes()),
-                    selected = state.statusFilter == status,
-                    onClick = { onStatusFilterChange(status) }
-                )
+        val filterLabels = FilterOptions.associateWith { stringResource(it.filterSegmentLabelRes()) }
+        AtelierSegmentedControl(
+            options = FilterOptions,
+            selected = state.statusFilter,
+            onSelect = onStatusFilterChange,
+            label = { filterLabels.getValue(it) },
+            badge = { status ->
+                if (status == null) 0 else state.orders.count { it.status == status }
             }
-        }
+        )
     }
-}
-
-@Composable
-private fun StatusChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
-        shape = ChipShape,
-        // La selección no depende solo del color: lleva una marca.
-        leadingIcon = if (selected) {
-            { Icon(Icons.Outlined.Check, contentDescription = null) }
-        } else null
-    )
 }
 
 @Composable
@@ -267,7 +260,7 @@ private fun UpdatedLine(refreshedAt: Instant) {
 }
 
 @Composable
-private fun OrderRow(order: WorkOrder, onClick: () -> Unit) {
+private fun OrderRow(order: WorkOrder, hasPendingSuspension: Boolean, onClick: () -> Unit) {
     val number = order.internalNumber?.let { stringResource(R.string.orders_order_number, it) }
         ?: stringResource(R.string.orders_no_number)
     AtelierListRow(
@@ -277,7 +270,20 @@ private fun OrderRow(order: WorkOrder, onClick: () -> Unit) {
             .ifEmpty { null },
         plate = order.plate,
         onClick = onClick,
-        trailing = { AtelierChip(text = stringResource(order.status.labelRes()), kind = order.status.chipKind()) }
+        trailing = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (hasPendingSuspension) {
+                    AtelierChip(
+                        text = stringResource(R.string.orders_pending_suspension_chip),
+                        kind = ChipKind.Warn
+                    )
+                }
+                AtelierChip(text = stringResource(order.status.labelRes()), kind = order.status.chipKind())
+            }
+        }
     )
 }
 
