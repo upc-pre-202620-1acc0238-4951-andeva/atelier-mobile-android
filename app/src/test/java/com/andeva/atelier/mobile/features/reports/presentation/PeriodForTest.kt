@@ -27,4 +27,13 @@ class PeriodForTest {
         assertEquals(LocalDate.of(2026, 1, 1), period.from)
         assertEquals(LocalDate.of(2026, 12, 31), period.to)
     }
+
+    @Test
+    fun `rango personalizado conserva las fechas elegidas`() {
+        val from = LocalDate.of(2026, 2, 10)
+        val to = LocalDate.of(2026, 3, 5)
+        val period = periodFor(PeriodChoice.Custom(from, to), today)
+        assertEquals(from, period.from)
+        assertEquals(to, period.to)
+    }
 }

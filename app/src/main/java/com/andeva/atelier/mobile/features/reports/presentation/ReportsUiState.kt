@@ -9,13 +9,24 @@ import java.time.LocalDate
 import java.time.Year
 import java.time.YearMonth
 
-enum class PeriodChoice { ThisMonth, PreviousMonth, ThisYear }
+sealed interface PeriodChoice {
+    data object ThisMonth : PeriodChoice
+    data object PreviousMonth : PeriodChoice
+    data object ThisYear : PeriodChoice
+    data class Custom(val from: LocalDate, val to: LocalDate) : PeriodChoice
+}
+
+enum class ReportPdfActionMode { OPEN, SHARE }
 
 /** El rango de fechas de [choice] visto desde [today] (día de Lima). */
 fun periodFor(choice: PeriodChoice, today: LocalDate): ReportPeriod = when (choice) {
     PeriodChoice.ThisMonth -> ReportPeriod.month(YearMonth.from(today))
     PeriodChoice.PreviousMonth -> ReportPeriod.month(YearMonth.from(today).minusMonths(1))
     PeriodChoice.ThisYear -> ReportPeriod.year(Year.from(today))
+    is PeriodChoice.Custom -> ReportPeriod(
+        from = minOf(choice.from, choice.to),
+        to = maxOf(choice.from, choice.to)
+    )
 }
 
 enum class ReportDownload { CashFlow, FleetHealth }
@@ -26,6 +37,7 @@ data class FleetSheet(
     val results: List<Customer> = emptyList(),
     val hasSearched: Boolean = false,
     val isSearching: Boolean = false,
+    val actionMode: ReportPdfActionMode = ReportPdfActionMode.OPEN,
     val error: UiText? = null
 )
 
@@ -48,6 +60,8 @@ data class ReportsUiState(
     val fleetLockedByPlan: Boolean = false,
     val busy: ReportDownload? = null,
     val pdf: File? = null,
+    val pdfActionMode: ReportPdfActionMode = ReportPdfActionMode.OPEN,
+    val showCustomRangePicker: Boolean = false,
     val actionError: UiText? = null,
     val fleetSheet: FleetSheet? = null
 ) {

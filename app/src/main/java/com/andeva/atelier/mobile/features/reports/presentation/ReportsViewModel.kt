@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import javax.inject.Inject
 
 @HiltViewModel
@@ -82,15 +84,50 @@ class ReportsViewModel @Inject constructor(
     }
 
     fun onChoice(choice: PeriodChoice) {
-        if (choice == _uiState.value.choice) return
-        _uiState.update { it.copy(choice = choice, period = periodFor(choice, today), summary = null) }
+        if (choice == _uiState.value.choice && !_uiState.value.showCustomRangePicker) return
+        _uiState.update {
+            it.copy(
+                choice = choice,
+                period = periodFor(choice, today),
+                summary = null,
+                showCustomRangePicker = false
+            )
+        }
         load()
     }
 
-    fun onDownloadCashFlow() {
+    fun onOpenCustomRange() {
+        _uiState.update { it.copy(showCustomRangePicker = true) }
+    }
+
+    fun onDismissCustomRange() {
+        _uiState.update { it.copy(showCustomRangePicker = false) }
+    }
+
+    /**
+     * Convierte los milisegundos epoch UTC de [androidx.compose.material3.DateRangePickerState] en [LocalDate] usando
+     * estrictamente [ZoneOffset.UTC] para evitar el desfase de -1 día en `America/Lima`.
+     */
+    fun onCustomRangePicked(startMillisUtc: Long?, endMillisUtc: Long?) {
+        val startMs = startMillisUtc ?: return
+        val endMs = endMillisUtc ?: startMs
+        val firstDate = Instant.ofEpochMilli(startMs).atZone(ZoneOffset.UTC).toLocalDate()
+        val secondDate = Instant.ofEpochMilli(endMs).atZone(ZoneOffset.UTC).toLocalDate()
+        val from = minOf(firstDate, secondDate)
+        val to = maxOf(firstDate, secondDate)
+        onChoice(PeriodChoice.Custom(from, to))
+    }
+
+    fun onDownloadCashFlow(mode: ReportPdfActionMode = ReportPdfActionMode.OPEN) {
         val state = _uiState.value
         if (!state.canReadCashFlow || !state.isOnline || state.busy != null) return
-        _uiState.update { it.copy(busy = ReportDownload.CashFlow, actionError = null) }
+        _uiState.update {
+            it.copy(
+                busy = ReportDownload.CashFlow,
+                pdfActionMode = mode,
+                actionError = null
+            )
+        }
         viewModelScope.launch {
             downloadCashFlowPdf(state.period)
                 .onSuccess { file -> _uiState.update { it.copy(pdf = file) } }
@@ -99,10 +136,16 @@ class ReportsViewModel @Inject constructor(
         }
     }
 
+    fun onOpenCashFlowPdf() = onDownloadCashFlow(ReportPdfActionMode.OPEN)
+
+    fun onShareCashFlowPdf() = onDownloadCashFlow(ReportPdfActionMode.SHARE)
+
     fun onOpenFleet() {
         if (!_uiState.value.canDownloadFleet) return
         _uiState.update { it.copy(fleetSheet = FleetSheet(), actionError = null) }
     }
+
+    fun onFleetActionMode(mode: ReportPdfActionMode) = updateFleet { it.copy(actionMode = mode) }
 
     fun onFleetQuery(value: String) = updateFleet { it.copy(query = value, error = null) }
 
@@ -119,10 +162,11 @@ class ReportsViewModel @Inject constructor(
         }
     }
 
-    fun onFleetPick(customer: Customer) {
+    fun onFleetPick(customer: Customer, modeOverride: ReportPdfActionMode? = null) {
         val state = _uiState.value
         if (!state.canDownloadFleet || !state.isOnline || state.busy != null) return
-        _uiState.update { it.copy(busy = ReportDownload.FleetHealth) }
+        val mode = modeOverride ?: state.fleetSheet?.actionMode ?: ReportPdfActionMode.OPEN
+        _uiState.update { it.copy(busy = ReportDownload.FleetHealth, pdfActionMode = mode) }
         updateFleet { it.copy(error = null) }
         viewModelScope.launch {
             downloadFleetHealthPdf(customer.id)
