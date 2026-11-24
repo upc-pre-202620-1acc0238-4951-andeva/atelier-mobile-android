@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.Permission
+import com.andeva.atelier.mobile.core.notifications.PushInbox
+import com.andeva.atelier.mobile.features.main.application.ObservePendingOperationCountUseCase
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.ObserveMyTasksUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RefreshMyTasksUseCase
@@ -25,8 +27,17 @@ class MyTasksViewModel @Inject constructor(
     observeSession: ObserveSessionUseCase,
     observeMyTasks: ObserveMyTasksUseCase,
     private val refreshMyTasks: RefreshMyTasksUseCase,
-    connectivity: ConnectivityObserver
+    connectivity: ConnectivityObserver,
+    observePendingSyncCount: ObservePendingOperationCountUseCase? = null,
+    pushInbox: PushInbox? = null
 ) : ViewModel() {
+
+    constructor(
+        observeSession: ObserveSessionUseCase,
+        observeMyTasks: ObserveMyTasksUseCase,
+        refreshMyTasks: RefreshMyTasksUseCase,
+        connectivity: ConnectivityObserver
+    ) : this(observeSession, observeMyTasks, refreshMyTasks, connectivity, null, null)
 
     private val _uiState = MutableStateFlow(MyTasksUiState())
     val uiState: StateFlow<MyTasksUiState> = _uiState.asStateFlow()
@@ -34,17 +45,47 @@ class MyTasksViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeSession().collect { session ->
-                _uiState.update { it.copy(canRead = session?.has(Permission.TASKS_READ) == true) }
+                val isWorkshopSupervision = session != null &&
+                    !session.has(Permission.TASKS_TRACK_TIME) &&
+                    (session.has(Permission.WORK_ORDERS_UPDATE) ||
+                        session.has(Permission.TASKS_HOLD_VALIDATE) ||
+                        session.has(Permission.BAYS_REASSIGN))
+                _uiState.update {
+                    it.copy(
+                        canRead = session?.has(Permission.TASKS_READ) == true,
+                        isWorkshopScope = isWorkshopSupervision,
+                        tenantName = session?.tenantName.orEmpty()
+                    )
+                }
             }
         }
         viewModelScope.launch {
             observeMyTasks().collect { tasks -> _uiState.update { it.copy(tasks = tasks, isLoaded = true) } }
         }
+        if (observePendingSyncCount != null) {
+            viewModelScope.launch {
+                observePendingSyncCount().collect { count -> _uiState.update { it.copy(pendingSyncCount = count) } }
+            }
+        }
+        if (pushInbox != null) {
+            viewModelScope.launch {
+                pushInbox.history.collect { records ->
+                    _uiState.update { it.copy(unreadNotificationsCount = records.count { r -> !r.read }) }
+                }
+            }
+        }
         // D2: si la recarga falló sin red, al volver la conexión se actualiza sola y el aviso se quita.
         viewModelScope.launch {
-            connectivity.isOnline.collect { online -> if (online && _uiState.value.showingCache) refresh() }
+            connectivity.isOnline.collect { online ->
+                _uiState.update { it.copy(isOnline = online) }
+                if (online && _uiState.value.showingCache) refresh()
+            }
         }
         refresh()
+    }
+
+    fun onFilterChange(filter: TaskFilter) {
+        _uiState.update { it.copy(selectedFilter = filter) }
     }
 
     /** Al abrir, al deslizar y cuando llega el push `TASK_ASSIGNED`. */

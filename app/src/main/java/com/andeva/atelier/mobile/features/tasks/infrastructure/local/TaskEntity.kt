@@ -22,6 +22,7 @@ data class TaskEntity(
     @ColumnInfo(name = "hold_reason") val holdReason: String?,           // BREAK | END_OF_SHIFT | DEFECTIVE_PART | …
     @ColumnInfo(name = "missing_item_description") val missingItemDescription: String?,
     @ColumnInfo(name = "pending_suspension_reason") val pendingSuspensionReason: String?,
+    @ColumnInfo(name = "pending_suspension_requested_at") val pendingSuspensionRequestedAt: Long? = null,
     @ColumnInfo(name = "started_at") val startedAt: Long?,
     @ColumnInfo(name = "total_paused_seconds") val totalPausedSeconds: Long,
     @ColumnInfo(name = "synced_at") val syncedAt: Long

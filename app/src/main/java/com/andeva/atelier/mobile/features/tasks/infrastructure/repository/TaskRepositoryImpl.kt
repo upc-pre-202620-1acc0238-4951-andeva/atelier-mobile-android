@@ -7,6 +7,8 @@ import com.andeva.atelier.mobile.core.data.sync.CacheMetadataDao
 import com.andeva.atelier.mobile.core.data.sync.CacheMetadataEntity
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
 import com.andeva.atelier.mobile.core.data.sync.PendingUploadDao
+import com.andeva.atelier.mobile.core.data.sync.WorkshopCacheEvent
+import com.andeva.atelier.mobile.core.data.sync.WorkshopCacheEventBus
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.core.domain.Session
 import com.andeva.atelier.mobile.features.bays.infrastructure.local.BayDao
@@ -41,7 +43,11 @@ import com.andeva.atelier.mobile.features.bays.infrastructure.local.toEntity as 
 import com.andeva.atelier.mobile.features.bays.infrastructure.remote.WorkBayService
 import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderTaskDto
 import com.andeva.atelier.mobile.features.tasks.infrastructure.sync.AttachTaskEvidenceHandler
+import com.andeva.atelier.mobile.features.workorders.infrastructure.remote.WorkOrderService
 import com.google.gson.Gson
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -71,7 +77,9 @@ class TaskRepositoryImpl @Inject constructor(
     private val evidenceCapture: TaskEvidenceCapture,
     private val sessionManager: SessionManager,
     private val gson: Gson,
-    private val clock: Clock
+    private val clock: Clock,
+    private val cacheEventBus: WorkshopCacheEventBus = WorkshopCacheEventBus(),
+    private val workOrderService: WorkOrderService? = null
 ) : TaskRepository {
 
     override fun observeMyTasks(): Flow<List<Task>> = taskDao.observeAll().map { rows -> rows.map { it.toDomain() } }
@@ -79,23 +87,95 @@ class TaskRepositoryImpl @Inject constructor(
     override fun observeTask(id: TaskId): Flow<Task?> = taskDao.observeById(id.value).map { it?.toDomain() }
 
     /**
-     * Recarga `tasks:my` (al abrir y al tocar `TASK_ASSIGNED`). Sin N+1 de detalle (06 §4: el detalle se pide
-     * al abrir): después solo bahías por sede y vehículos que faltan, y solo con el permiso para leerlos.
-     * Si eso falla se sigue con lo que haya en caché.
+     * Recarga `tasks:my` (al abrir y al tocar `TASK_ASSIGNED`), o todas las tareas activas de las órdenes de la sede
+     * cuando la sesión es de supervisión del taller (Dueño, Administrador, Asesor) y no ejecuta cronómetro propio.
      */
     override suspend fun refreshMyTasks(): Result<Unit> {
         val session = sessionManager.getSession() ?: return Result.failure(IllegalStateException("Sin sesión"))
         if (!session.has(Permission.TASKS_READ)) return Result.success(Unit)
         val now = clock.millis()
+        val isWorkshopSupervisor = !session.has(Permission.TASKS_TRACK_TIME) &&
+            (session.has(Permission.WORK_ORDERS_UPDATE) ||
+                session.has(Permission.TASKS_HOLD_VALIDATE) ||
+                session.has(Permission.BAYS_REASSIGN))
+        if (isWorkshopSupervisor && workOrderService != null &&
+            session.has(Permission.WORK_ORDERS_READ) && !session.branchId.isNullOrBlank()
+        ) {
+            return refreshWorkshopTasks(session, session.branchId, now)
+        }
         return apiCall(gson, { taskService.getMyTasks() }) { it }
             .mapCatching { dtos ->
                 val rows = dtos.map { it.toEntity(now) }
+                if (rows.isEmpty() && workOrderService != null &&
+                    session.has(Permission.WORK_ORDERS_READ) &&
+                    session.has(Permission.TASKS_HOLD_VALIDATE) &&
+                    !session.branchId.isNullOrBlank()
+                ) {
+                    val fallback = loadWorkshopTaskEntities(session.branchId, now).getOrNull()
+                    if (!fallback.isNullOrEmpty()) {
+                        taskDao.replaceMine(fallback)
+                        cacheMetadataDao.upsert(CacheMetadataEntity(SCOPE_MY_TASKS, now, fallback.size))
+                        return@mapCatching fallback
+                    }
+                }
                 taskDao.replaceMine(rows)
                 cacheMetadataDao.upsert(CacheMetadataEntity(SCOPE_MY_TASKS, now, rows.size))
                 rows
             }
             .onSuccess { rows -> enrich(rows, session, now) }
             .map { }
+    }
+
+    private suspend fun refreshWorkshopTasks(session: Session, branchId: String, now: Long): Result<Unit> =
+        loadWorkshopTaskEntities(branchId, now)
+            .mapCatching { rows ->
+                taskDao.replaceMine(rows)
+                cacheMetadataDao.upsert(CacheMetadataEntity(SCOPE_MY_TASKS, now, rows.size))
+                rows
+            }
+            .onSuccess { rows -> enrich(rows, session, now) }
+            .map { }
+
+    private suspend fun loadWorkshopTaskEntities(branchId: String, now: Long): Result<List<TaskEntity>> {
+        val service = workOrderService ?: return Result.success(emptyList())
+        return apiCall(gson, { service.getWorkOrders(branchId = branchId) }) { it }
+            .mapCatching { summaries ->
+                val activeSummaries = summaries
+                    .filter { it.status !in listOf("PAID", "CANCELED", "COMPLETED") }
+                    .take(15)
+                val details = coroutineScope {
+                    activeSummaries.map { summary ->
+                        async { apiCall(gson, { service.getWorkOrder(summary.id) }) { it }.getOrNull() }
+                    }.awaitAll().filterNotNull()
+                }
+                details.flatMap { order ->
+                    order.tasks.orEmpty()
+                        .filter { it.status !in listOf(TaskStatus.COMPLETED.name, TaskStatus.CANCELLED.name) }
+                        .map { task ->
+                            TaskEntity(
+                                id = task.id,
+                                workOrderId = order.id,
+                                workOrderNumber = order.internalNumber,
+                                workOrderStatus = order.status,
+                                vehicleId = order.vehicleId,
+                                branchId = order.branchId,
+                                bayId = order.currentBayId,
+                                serviceName = task.serviceName?.takeIf { it.isNotBlank() && it != "Standard Service" },
+                                mechanicId = task.mechanicId,
+                                status = task.status.orEmpty(),
+                                description = task.description.orEmpty(),
+                                estimatedHours = null,
+                                holdReason = task.holdReason,
+                                missingItemDescription = task.missingItemDescription,
+                                pendingSuspensionReason = task.pendingSuspensionReason,
+                                pendingSuspensionRequestedAt = task.pendingSuspensionRequestedAt.toEpochMillis(),
+                                startedAt = task.startedAt.toEpochMillis(),
+                                totalPausedSeconds = task.totalPausedSeconds ?: 0,
+                                syncedAt = now
+                            )
+                        }
+                }
+            }
     }
 
     override suspend fun getDetail(id: TaskId): Result<TaskDetail> = act { taskService.getTask(id.value) }
@@ -107,15 +187,26 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun requestSuspension(id: TaskId, missingItemDescription: String, inventoryItemId: String?) =
         act { taskService.requestHold(id.value, HoldTaskRequestDto(missingItemDescription.trim(), inventoryItemId)) }
+            .onSuccess { cacheEventBus.tryEmit(WorkshopCacheEvent.WorkOrderMutated(it.workOrderId)) }
 
-    override suspend fun approveSuspension(id: TaskId) = act { taskService.approveHold(id.value) }
+    override suspend fun approveSuspension(id: TaskId) =
+        act { taskService.approveHold(id.value) }
+            .onSuccess { cacheEventBus.tryEmit(WorkshopCacheEvent.WorkOrderMutated(it.workOrderId)) }
 
-    override suspend fun rejectSuspension(id: TaskId) = act { taskService.rejectHold(id.value) }
+    override suspend fun rejectSuspension(id: TaskId) =
+        act { taskService.rejectHold(id.value) }
+            .onSuccess { cacheEventBus.tryEmit(WorkshopCacheEvent.WorkOrderMutated(it.workOrderId)) }
 
-    override suspend fun resume(id: TaskId) = act { taskService.resume(id.value) }
+    override suspend fun resume(id: TaskId) =
+        act { taskService.resume(id.value) }
+            .onSuccess { cacheEventBus.tryEmit(WorkshopCacheEvent.WorkOrderMutated(it.workOrderId)) }
 
     override suspend fun complete(id: TaskId, actualLaborHours: BigDecimal, notes: String?) =
         act { taskService.complete(id.value, CompleteTaskRequestDto(actualLaborHours, notes?.trim()?.takeIf { it.isNotEmpty() })) }
+            .onSuccess { cacheEventBus.tryEmit(WorkshopCacheEvent.WorkOrderMutated(it.workOrderId)) }
+
+    override suspend fun reopen(id: TaskId, reason: String?) =
+        act { taskService.reopen(id.value, reason?.trim()?.takeIf { it.isNotEmpty() }) }
 
     override suspend fun attachEvidence(id: TaskId, workOrderId: String, photo: File, description: String): Result<Unit> =
         evidenceCapture.capture(id.value, workOrderId, photo, description)
@@ -154,11 +245,35 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun removePart(id: TaskId, productId: String): Result<Unit> =
         apiCallUnit(gson) { taskService.removeProduct(id.value, productId) }
 
+    @Volatile
+    private var cachedPartNames: Pair<String, Map<String, String>>? = null
+
     /** Llama, y si la tarea está en `tasks:my` la actualiza (o la saca si quedó cerrada). */
     private suspend fun act(call: suspend () -> Response<WorkOrderTaskDto>): Result<TaskDetail> =
         apiCall(gson, call) { it }
             .onSuccess { saveIfMine(it) }
-            .map { it.toDomain() }
+            .map { enrichProducts(it.toDomain()) }
+
+    private suspend fun enrichProducts(detail: TaskDetail): TaskDetail {
+        if (detail.products.none { it.productName.isNullOrBlank() }) return detail
+        val session = sessionManager.getSession() ?: return detail
+        if (!session.has(Permission.PARTS_READ)) return detail
+        val names = cachedPartNames?.takeIf { it.first == session.tenantId }?.second ?: run {
+            val loaded = apiCall(gson, { inventoryService.getItems(search = null) }) { dtos ->
+                dtos.mapNotNull { dto -> dto.name?.takeIf { it.isNotBlank() }?.let { dto.id to it } }.toMap()
+            }.getOrNull().orEmpty()
+            if (loaded.isNotEmpty()) cachedPartNames = session.tenantId to loaded
+            loaded
+        }
+        if (names.isEmpty()) return detail
+        return detail.copy(
+            products = detail.products.map { product ->
+                if (product.productName.isNullOrBlank()) {
+                    product.copy(productName = names[product.productId])
+                } else product
+            }
+        )
+    }
 
     private suspend fun saveIfMine(dto: WorkOrderTaskDto) {
         if (dto.status == TaskStatus.COMPLETED.name || dto.status == TaskStatus.CANCELLED.name) {
@@ -174,6 +289,7 @@ class TaskRepositoryImpl @Inject constructor(
             holdReason = dto.holdReason,
             missingItemDescription = dto.missingItemDescription,
             pendingSuspensionReason = dto.pendingSuspensionReason,
+            pendingSuspensionRequestedAt = dto.pendingSuspensionRequestedAt.toEpochMillis(),
             startedAt = dto.startedAt.toEpochMillis(),
             totalPausedSeconds = dto.totalPausedSeconds ?: 0,
             syncedAt = clock.millis()

@@ -261,4 +261,43 @@ class TaskRepositoryImplTest {
         assertEquals("Desmontaje", pending.description)
         assertTrue(repository.observePendingEvidence(TaskId("t2")).first().isEmpty())
     }
+
+    @Test
+    fun `reabrir tarea envia reason opcional y devuelve el detalle actualizado`() = runTest {
+        env.signIn(listOf(Permission.TASKS_READ, Permission.WORK_ORDERS_UPDATE))
+        env.responses["POST /api/v1/tasks/t1/reopen"] = env.json(env.detail(status = "ASSIGNED"))
+
+        val reopened = repository.reopen(id, "Falla en prueba de ruta").getOrThrow()
+
+        assertEquals(TaskStatus.ASSIGNED, reopened.status)
+        val req = env.requested("POST", "/api/v1/tasks/t1/reopen").single()
+        assertEquals("Falla en prueba de ruta", req.requestUrl!!.queryParameter("reason"))
+    }
+
+    @Test
+    fun `ciclo completo de suspensiones US29 en repositorio`() = runTest {
+        env.signIn(listOf(Permission.TASKS_READ, Permission.TASKS_HOLD_REQUEST, Permission.TASKS_HOLD_VALIDATE))
+        stubMyTasks(env.assigned(status = "IN_PROGRESS"))
+        repository.refreshMyTasks().getOrThrow()
+
+        env.responses["POST /api/v1/tasks/t1/hold"] =
+            env.json(env.detail(status = "IN_PROGRESS", pendingSuspensionReason = "Retén defectuoso"))
+        val requested = repository.requestSuspension(id, "Retén defectuoso", "part-9").getOrThrow()
+        assertTrue(requested.hasPendingSuspension)
+        assertEquals(
+            """{"missingItemDescription":"Retén defectuoso","inventoryItemId":"part-9"}""",
+            env.requested("POST", "/api/v1/tasks/t1/hold").single().body.readUtf8()
+        )
+
+        env.responses["POST /api/v1/tasks/t1/hold/approve"] =
+            env.json(env.detail(status = "ON_HOLD", holdReason = "DEFECTIVE_PART"))
+        val approved = repository.approveSuspension(id).getOrThrow()
+        assertTrue(approved.isSuspended)
+        assertTrue(repository.observeTask(id).first()!!.isSuspended)
+
+        env.responses["POST /api/v1/tasks/t1/resume"] = env.json(env.detail(status = "IN_PROGRESS"))
+        val resumed = repository.resume(id).getOrThrow()
+        assertEquals(TaskStatus.IN_PROGRESS, resumed.status)
+        assertEquals(TaskStatus.IN_PROGRESS, repository.observeTask(id).first()!!.status)
+    }
 }

@@ -56,15 +56,20 @@ fun TaskWithRefs.toDomain() = Task(
     holdReason = task.holdReason.toHoldReason(),
     missingItemDescription = task.missingItemDescription,
     pendingSuspensionReason = task.pendingSuspensionReason,
+    pendingSuspensionRequestedAt = task.pendingSuspensionRequestedAt?.let { Instant.ofEpochMilli(it) },
     startedAt = task.startedAt?.let { Instant.ofEpochMilli(it) },
     totalPausedSeconds = task.totalPausedSeconds
 )
+
+private const val GENERIC_SERVICE_NAME = "Standard Service"
+private val ProductUuidPlaceholderRegex =
+    Regex("""^Product\s+[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$""")
 
 fun WorkOrderTaskDto.toDomain() = TaskDetail(
     id = TaskId(id),
     workOrderId = workOrderId,
     serviceId = serviceId,
-    serviceName = serviceName,
+    serviceName = serviceName?.takeIf { it.isNotBlank() && it != GENERIC_SERVICE_NAME },
     mechanicId = mechanicId,
     mechanicName = mechanicName,
     status = status.toTaskStatus(),
@@ -84,7 +89,7 @@ fun WorkOrderTaskDto.toDomain() = TaskDetail(
 fun TaskProductDto.toDomain() = TaskProduct(
     id = id,
     productId = productId,
-    productName = productName,
+    productName = productName?.takeUnless { ProductUuidPlaceholderRegex.matches(it.trim()) },
     quantity = quantity ?: BigDecimal.ZERO,
     unitPrice = money(unitPrice, currency),
     totalAmount = money(totalAmount, currency)

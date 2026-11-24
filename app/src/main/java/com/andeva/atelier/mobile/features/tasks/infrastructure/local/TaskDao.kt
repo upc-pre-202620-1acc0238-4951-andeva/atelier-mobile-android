@@ -42,8 +42,8 @@ abstract class TaskDao {
     @Query(
         "UPDATE tasks SET status = :status, description = :description, service_name = :serviceName, " +
             "mechanic_id = :mechanicId, hold_reason = :holdReason, missing_item_description = :missingItemDescription, " +
-            "pending_suspension_reason = :pendingSuspensionReason, started_at = :startedAt, " +
-            "total_paused_seconds = :totalPausedSeconds, synced_at = :syncedAt WHERE id = :id"
+            "pending_suspension_reason = :pendingSuspensionReason, pending_suspension_requested_at = :pendingSuspensionRequestedAt, " +
+            "started_at = :startedAt, total_paused_seconds = :totalPausedSeconds, synced_at = :syncedAt WHERE id = :id"
     )
     abstract suspend fun mergeDetail(
         id: String,
@@ -54,6 +54,7 @@ abstract class TaskDao {
         holdReason: String?,
         missingItemDescription: String?,
         pendingSuspensionReason: String?,
+        pendingSuspensionRequestedAt: Long? = null,
         startedAt: Long?,
         totalPausedSeconds: Long,
         syncedAt: Long
@@ -87,6 +88,7 @@ private fun TaskEntity.keepDetailOf(previous: TaskEntity): TaskEntity {
         mechanicId = mechanicId ?: previous.mechanicId,
         holdReason = holdReason ?: previous.holdReason.takeIf { sameStatus },
         missingItemDescription = missingItemDescription ?: previous.missingItemDescription.takeIf { sameStatus },
-        pendingSuspensionReason = pendingSuspensionReason ?: previous.pendingSuspensionReason.takeIf { sameStatus }
+        pendingSuspensionReason = pendingSuspensionReason ?: previous.pendingSuspensionReason.takeIf { sameStatus },
+        pendingSuspensionRequestedAt = pendingSuspensionRequestedAt ?: previous.pendingSuspensionRequestedAt.takeIf { sameStatus }
     )
 }

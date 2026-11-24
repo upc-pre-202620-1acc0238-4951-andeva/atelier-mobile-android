@@ -11,15 +11,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierChronometer
+import com.andeva.atelier.mobile.core.designsystem.component.ChronometerVisualState
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
+import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.LaborTime
+import com.andeva.atelier.mobile.features.tasks.domain.TaskStatus
+import com.andeva.atelier.mobile.features.tasks.presentation.taskStatusLabelRes
 import kotlinx.coroutines.delay
+import java.math.BigDecimal
 import java.time.Instant
 
 /** Segundos de labor efectiva: desde `startedAt` menos lo pausado; nunca negativo (US27). */
@@ -58,8 +62,8 @@ internal fun timerDisplay(
 internal const val UNKNOWN_ELAPSED = "--:--:--"
 
 /**
- * Cronómetro de la labor efectiva (US27 E1). Cuenta cada segundo mientras [running]; en pausa muestra el tiempo
- * guardado al pausar y el total de pausas.
+ * Cronómetro de la labor efectiva (US27 E1) sobre `AtelierChronometer` con cifras tabulares `tnum`.
+ * Cuenta cada segundo mientras [running]; en pausa muestra el tiempo guardado al pausar y el total de pausas.
  */
 @Composable
 internal fun ChronometerTimer(
@@ -69,6 +73,11 @@ internal fun ChronometerTimer(
     paused: Boolean,
     pausedElapsedSeconds: Long?,
     modifier: Modifier = Modifier,
+    status: TaskStatus? = null,
+    holdReason: HoldReason? = null,
+    suspended: Boolean = false,
+    estimatedHours: BigDecimal? = null,
+    loading: Boolean = false,
     nowProvider: () -> Instant = Instant::now
 ) {
     var now by remember { mutableStateOf(nowProvider()) }
@@ -79,33 +88,33 @@ internal fun ChronometerTimer(
         }
     }
     val display = timerDisplay(startedAt, totalPausedSeconds, running, paused, pausedElapsedSeconds, now)
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.task_timer_label),
-            style = MaterialTheme.typography.titleSmall,
-            color = AtelierTheme.colors.inkSecondary
+    val visualState = when {
+        suspended -> ChronometerVisualState.SUSPENDED
+        running -> ChronometerVisualState.RUNNING
+        paused -> ChronometerVisualState.PAUSED
+        else -> ChronometerVisualState.IDLE
+    }
+    val statusLabel = stringResource(taskStatusLabelRes(status, holdReason))
+    val caption = when {
+        totalPausedSeconds > 0 -> stringResource(R.string.task_timer_paused_total, formatElapsed(totalPausedSeconds))
+        estimatedHours != null -> stringResource(
+            R.string.tasks_seg2_timer_estimated,
+            estimatedHours.stripTrailingZeros().toPlainString()
         )
-        Text(
-            text = display.text,
-            style = MaterialTheme.typography.displayMedium,
-            color = if (display.unknown) AtelierTheme.colors.muted else MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
+        else -> null
+    }
+
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AtelierChronometer(
+            elapsedText = display.text,
+            statusLabel = statusLabel,
+            visualState = visualState,
+            caption = caption,
+            loading = loading
         )
         if (display.unknown) {
             Text(
                 text = stringResource(R.string.task_timer_unknown_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = AtelierTheme.colors.inkSecondary,
-                textAlign = TextAlign.Center
-            )
-        }
-        if (totalPausedSeconds > 0) {
-            Text(
-                text = stringResource(R.string.task_timer_paused_total, formatElapsed(totalPausedSeconds)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = AtelierTheme.colors.inkSecondary
             )

@@ -9,6 +9,7 @@ import com.andeva.atelier.mobile.features.auth.presentation.MainDispatcherRule
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.tasks.application.ObserveMyTasksUseCase
 import com.andeva.atelier.mobile.features.tasks.application.RefreshMyTasksUseCase
+import com.andeva.atelier.mobile.features.tasks.domain.HoldReason
 import com.andeva.atelier.mobile.features.tasks.domain.Task
 import com.andeva.atelier.mobile.features.tasks.domain.TaskId
 import com.andeva.atelier.mobile.features.tasks.domain.TaskRepository
@@ -37,11 +38,16 @@ class MyTasksViewModelTest {
     private val online = MutableStateFlow(true)
     private val connectivity = mockk<ConnectivityObserver> { every { isOnline } returns online }
 
-    private fun tarea(id: String, status: TaskStatus = TaskStatus.ASSIGNED) = Task(
+    private fun tarea(
+        id: String,
+        status: TaskStatus = TaskStatus.ASSIGNED,
+        holdReason: HoldReason? = null,
+        pendingSuspensionReason: String? = null
+    ) = Task(
         id = TaskId(id), workOrderId = "wo1", workOrderNumber = 10, workOrderStatus = null, vehicleId = "v1",
         plate = "ABC123", branchId = "b1", bayId = null, bayName = "B-1", serviceName = null, mechanicId = "m1",
-        status = status, description = "Cambio de pastillas", estimatedHours = null, holdReason = null,
-        missingItemDescription = null, pendingSuspensionReason = null, startedAt = null, totalPausedSeconds = 0
+        status = status, description = "Cambio de pastillas", estimatedHours = null, holdReason = holdReason,
+        missingItemDescription = null, pendingSuspensionReason = pendingSuspensionReason, startedAt = null, totalPausedSeconds = 0
     )
 
     private fun sessionWith(permissions: List<Permission>) = Session(
@@ -150,5 +156,37 @@ class MyTasksViewModelTest {
         online.value = true
         settle()
         coVerify(exactly = 1) { repository.refreshMyTasks() }
+    }
+
+    @Test
+    fun `filtros y conteos resumen clasifican cada estado de tarea`() = runTest(mainRule.dispatcher) {
+        coEvery { repository.refreshMyTasks() } returns Result.success(Unit)
+        tasks.value = listOf(
+            tarea("t1", TaskStatus.IN_PROGRESS),
+            tarea("t2", TaskStatus.ON_HOLD, HoldReason.BREAK),
+            tarea("t3", TaskStatus.ASSIGNED),
+            tarea("t4", TaskStatus.ON_HOLD, HoldReason.DEFECTIVE_PART),
+            tarea("t5", TaskStatus.IN_PROGRESS, pendingSuspensionReason = "Falta pieza")
+        )
+        val vm = viewModel()
+        settle()
+
+        val state = vm.uiState.value
+        assertEquals(1, state.pendingCount)
+        assertEquals(2, state.inProgressCount)
+        assertEquals(2, state.pausedCount)
+        assertEquals(5, state.visibleTasks.size)
+
+        vm.onFilterChange(TaskFilter.IN_PROGRESS)
+        assertEquals(listOf("t1", "t5"), vm.uiState.value.visibleTasks.map { it.id.value })
+
+        vm.onFilterChange(TaskFilter.PAUSED)
+        assertEquals(listOf("t2"), vm.uiState.value.visibleTasks.map { it.id.value })
+
+        vm.onFilterChange(TaskFilter.ASSIGNED)
+        assertEquals(listOf("t3"), vm.uiState.value.visibleTasks.map { it.id.value })
+
+        vm.onFilterChange(TaskFilter.SUSPENDED)
+        assertEquals(listOf("t4", "t5"), vm.uiState.value.visibleTasks.map { it.id.value })
     }
 }
