@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.andeva.atelier.mobile.core.designsystem.text.toUiText
 import com.andeva.atelier.mobile.core.domain.ApiException
+import com.andeva.atelier.mobile.features.auth.application.GetDevicePendingOperationCountUseCase
 import com.andeva.atelier.mobile.features.auth.application.SignInUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val signIn: SignInUseCase,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val getDevicePendingCount: GetDevicePendingOperationCountUseCase? = null
 ) : ViewModel() {
 
     /** Argumento `verifiedEmail` de `LoginRoute`: correo recién verificado en A4. */
@@ -34,6 +36,17 @@ class LoginViewModel @Inject constructor(
         )
     )
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    init {
+        if (getDevicePendingCount != null) {
+            viewModelScope.launch {
+                val count = runCatching { getDevicePendingCount() }.getOrDefault(0)
+                if (count > 0) {
+                    _uiState.update { it.copy(devicePendingCount = count) }
+                }
+            }
+        }
+    }
 
     fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, error = null) }
 

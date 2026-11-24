@@ -11,11 +11,24 @@ object AuthValidation {
     const val PASSWORD_MAX = 64
     const val NAME_MAX = 100
     const val OTP_LENGTH = 6
+    const val TOKEN_MAX_LENGTH = 512
 
     private val phonePattern = Regex("^\\+?[0-9]{9,15}$")
     private val otpPattern = Regex("^[0-9]{$OTP_LENGTH}$")
 
-    fun isEmail(value: String) = value.contains('@') && value.substringAfter('@').contains('.')
+    fun isEmail(value: String): Boolean {
+        val trimmed = value.trim()
+        val atIndex = trimmed.indexOf('@')
+        if (atIndex <= 0 || atIndex != trimmed.lastIndexOf('@')) return false
+        val local = trimmed.substring(0, atIndex)
+        val domain = trimmed.substring(atIndex + 1)
+        if (local.isBlank() || local.startsWith('.') || local.endsWith('.') || local.contains("..")) return false
+        if (domain.isBlank() || domain.startsWith('.') || domain.endsWith('.') || domain.contains("..")) return false
+        val parts = domain.split('.')
+        if (parts.size < 2 || parts.any { it.isBlank() || it.startsWith('-') || it.endsWith('-') }) return false
+        val tld = parts.last()
+        return tld.length >= 2 && tld.all { it.isLetterOrDigit() }
+    }
 
     fun isPassword(value: String) = value.length in PASSWORD_MIN..PASSWORD_MAX
 
@@ -26,13 +39,24 @@ object AuthValidation {
     fun isOtp(value: String) = otpPattern.matches(value)
 
     /**
-     * Token de invitación o de restablecimiento. Sin deep link (H1 de docs/03-traceability.md), el colaborador pega el
-     * token o el enlace completo del correo (`…/auth/accept-invitation?token=…`): de una URL se toma `token`.
+     * Token de invitación o de restablecimiento. Acepta el token directo o el enlace completo del correo
+     * (`…/auth/accept-invitation?token=…` o `…/auth/reset-password?token=…`): de una URL se toma `token`.
+     * Si la URL trae `?token=` vacío o malformado, devuelve cadena vacía sin lanzar excepción.
      */
     fun tokenFrom(input: String): String {
         val text = input.trim()
+        if (text.isEmpty()) return ""
+        val hasQuery = text.contains('?')
         val query = text.substringAfter('?', "").substringBefore('#')
-        val raw = query.split('&').firstOrNull { it.startsWith("token=") }?.substringAfter('=') ?: return text
-        return URLDecoder.decode(raw, Charsets.UTF_8.name())
+        val tokenParam = query.split('&').firstOrNull { it.startsWith("token=") }
+        if (tokenParam != null) {
+            val raw = tokenParam.substringAfter('=')
+            val decoded = runCatching { URLDecoder.decode(raw, Charsets.UTF_8.name()) }.getOrDefault(raw)
+            return decoded.trim().take(TOKEN_MAX_LENGTH)
+        }
+        if (hasQuery && (text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true))) {
+            return ""
+        }
+        return text.take(TOKEN_MAX_LENGTH)
     }
 }

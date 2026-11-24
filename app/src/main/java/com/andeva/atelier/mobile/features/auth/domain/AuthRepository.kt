@@ -26,6 +26,9 @@ interface AuthRepository {
     /** Operaciones de la cola del usuario actual que aún no se enviaron. */
     suspend fun pendingOperationCount(): Int
 
+    /** Conteo neutro de operaciones locales pendientes en el dispositivo (funciona sin sesión en Login, US04). */
+    suspend fun devicePendingOperationCount(): Int = 0
+
     /** Cierra sesión en el dispositivo. La cola `pending_operations` se conserva (docs/06-offline-sync.md §3). */
     suspend fun signOut()
 }

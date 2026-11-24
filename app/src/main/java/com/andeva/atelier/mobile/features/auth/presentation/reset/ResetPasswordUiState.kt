@@ -19,8 +19,10 @@ data class ResetPasswordUiState(
     val hasMinLength: Boolean get() = password.length >= AuthValidation.PASSWORD_MIN
     val hasUppercase: Boolean get() = password.any(Char::isUpperCase)
     val passwordsMatch: Boolean get() = confirmation.isNotEmpty() && password == confirmation
+    val hasValidExtractedToken: Boolean get() = AuthValidation.tokenFrom(token).isNotBlank()
+    val hasUnsavedChanges: Boolean get() = !done && (password.isNotEmpty() || confirmation.isNotEmpty())
 
     val canSubmit: Boolean
-        get() = !isLoading && token.isNotBlank() && AuthValidation.isPassword(password) &&
+        get() = !isLoading && hasValidExtractedToken && AuthValidation.isPassword(password) &&
             hasUppercase && passwordsMatch
 }

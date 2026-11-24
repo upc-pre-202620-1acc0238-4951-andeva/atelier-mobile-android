@@ -4,15 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,14 +45,17 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
-import com.andeva.atelier.mobile.core.designsystem.component.AtelierLogo
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierPasswordField
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.component.rise
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.features.auth.presentation.AuthHeroHeader
 
 /** A5 Iniciar sesión. Con sesión guardada `AppNavHost` cambia de grafo solo. */
 @Composable
@@ -96,32 +103,35 @@ internal fun LoginContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .heightIn(min = maxHeight)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            AtelierLogo(modifier = Modifier.padding(top = 24.dp).height(36.dp))
-            Spacer(Modifier.height(28.dp))
+            AuthHeroHeader(
+                title = stringResource(R.string.auth_login_title),
+                subtitle = stringResource(R.string.auth_login_subtitle),
+                modifier = Modifier.rise(0)
+            )
 
-            Column(modifier = Modifier.rise(0), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.auth_login_title),
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(R.string.auth_login_subtitle),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = atelier.inkSecondary
+            if (state.devicePendingCount > 0) {
+                AtelierBanner(
+                    message = pluralStringResource(
+                        R.plurals.auth_device_pending_banner,
+                        state.devicePendingCount,
+                        state.devicePendingCount
+                    ),
+                    icon = Icons.Outlined.Info,
+                    kind = BannerKind.Info
                 )
             }
-
             if (state.emailVerified) {
                 AtelierBanner(
                     message = stringResource(R.string.auth_email_verified),
@@ -140,33 +150,42 @@ internal fun LoginContent(
                 AtelierBanner(message = error.asString(), icon = Icons.Filled.Error, kind = BannerKind.Bad)
             }
 
-            Column(modifier = Modifier.rise(1), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AtelierTextField(
-                    label = stringResource(R.string.auth_email_label),
-                    value = state.email,
-                    onValueChange = onEmailChange,
-                    leadingIcon = Icons.Outlined.Email,
-                    enabled = !state.isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                    autofill = ContentType.EmailAddress + ContentType.Username
-                )
-                AtelierPasswordField(
-                    label = stringResource(R.string.auth_password_label),
-                    value = state.password,
-                    onValueChange = onPasswordChange,
-                    visible = state.passwordVisible,
-                    onVisibleChange = onPasswordVisibleChange,
-                    enabled = !state.isLoading,
-                    imeAction = ImeAction.Done,
-                    onImeAction = onSubmit
-                )
-                if (onForgotPassword != null) {
-                    AtelierButton(
-                        text = stringResource(R.string.auth_forgot_password),
-                        onClick = onForgotPassword,
-                        style = AtelierButtonStyle.Text,
-                        modifier = Modifier.offset(x = (-12).dp)
+            AtelierSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .rise(1),
+                tier = SurfaceTier.Elevated,
+                shape = CardLargeShape,
+                contentPadding = PaddingValues(20.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    AtelierTextField(
+                        label = stringResource(R.string.auth_email_label),
+                        value = state.email,
+                        onValueChange = onEmailChange,
+                        leadingIcon = Icons.Outlined.Email,
+                        enabled = !state.isLoading,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        autofill = ContentType.EmailAddress + ContentType.Username
                     )
+                    AtelierPasswordField(
+                        label = stringResource(R.string.auth_password_label),
+                        value = state.password,
+                        onValueChange = onPasswordChange,
+                        visible = state.passwordVisible,
+                        onVisibleChange = onPasswordVisibleChange,
+                        enabled = !state.isLoading,
+                        imeAction = ImeAction.Done,
+                        onImeAction = onSubmit
+                    )
+                    if (onForgotPassword != null) {
+                        AtelierButton(
+                            text = stringResource(R.string.auth_forgot_password),
+                            onClick = onForgotPassword,
+                            style = AtelierButtonStyle.Text,
+                            modifier = Modifier.offset(x = (-12).dp)
+                        )
+                    }
                 }
             }
 
@@ -175,7 +194,7 @@ internal fun LoginContent(
             Column(
                 modifier = Modifier
                     .rise(2)
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 AtelierButton(

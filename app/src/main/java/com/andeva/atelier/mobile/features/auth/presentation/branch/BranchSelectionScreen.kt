@@ -3,10 +3,12 @@ package com.andeva.atelier.mobile.features.auth.presentation.branch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -14,9 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -36,11 +37,15 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.component.rise
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
 import com.andeva.atelier.mobile.features.auth.domain.BranchOption
+import com.andeva.atelier.mobile.features.auth.presentation.AuthHeroHeader
 
 /** A5b Elegir sede. Solo la ven las cuentas que entraron sin perfil laboral (US03) o que cambian de sede (H33). */
 @Composable
@@ -78,65 +83,67 @@ internal fun BranchSelectionContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(top = 48.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(
-                modifier = Modifier.rise(0).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.branch_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    text = stringResource(R.string.branch_subtitle),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = AtelierTheme.colors.inkSecondary
-                )
-            }
+            AuthHeroHeader(
+                title = stringResource(R.string.branch_title),
+                subtitle = stringResource(R.string.branch_subtitle),
+                modifier = Modifier.rise(0)
+            )
 
             val loadingLabel = stringResource(R.string.branch_loading)
-            when {
-                state.isLoading -> Column(modifier = Modifier.semantics { contentDescription = loadingLabel }) {
-                    repeat(3) { AtelierListRow(title = "Sede San Isidro", subtitle = "Radio de 50 m", loading = true) }
-                }
-                state.error != null -> AtelierErrorState(
-                    message = state.error.asString(),
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    onRetry = onRetry
-                )
-                state.branches.isEmpty() -> AtelierEmptyState(
-                    text = stringResource(R.string.branch_empty_title) + " " + stringResource(R.string.branch_empty_body),
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                else -> Column(modifier = Modifier.rise(1).selectableGroup()) {
-                    state.branches.forEach { branch ->
-                        BranchRow(
-                            branch = branch,
-                            selected = branch.id == state.selectedId,
-                            isAssigned = branch.id == state.assignedBranchId,
-                            enabled = !state.isSaving,
-                            onClick = { onSelect(branch.id) }
-                        )
+            AtelierSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .rise(1),
+                tier = SurfaceTier.Elevated,
+                shape = CardLargeShape,
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                when {
+                    state.isLoading -> Column(modifier = Modifier.semantics { contentDescription = loadingLabel }) {
+                        repeat(3) { AtelierListRow(title = "Sede San Isidro", subtitle = "Radio de 50 m", loading = true) }
+                    }
+                    state.error != null -> AtelierErrorState(
+                        message = state.error.asString(),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        onRetry = onRetry
+                    )
+                    state.branches.isEmpty() -> AtelierEmptyState(
+                        text = stringResource(R.string.branch_empty_title) + " " + stringResource(R.string.branch_empty_body),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    else -> Column(modifier = Modifier.selectableGroup()) {
+                        state.branches.forEachIndexed { index, branch ->
+                            BranchRow(
+                                branch = branch,
+                                selected = branch.id == state.selectedId,
+                                isAssigned = branch.id == state.assignedBranchId,
+                                enabled = !state.isSaving,
+                                showDivider = index < state.branches.lastIndex,
+                                onClick = { onSelect(branch.id) }
+                            )
+                        }
                     }
                 }
             }
         }
 
+        HorizontalDivider(color = AtelierTheme.colors.outlineSoft)
         Column(
             modifier = Modifier
                 .rise(2)
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                .background(MaterialTheme.colorScheme.background)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             val selected = state.selected
@@ -166,6 +173,7 @@ private fun BranchRow(
     selected: Boolean,
     isAssigned: Boolean,
     enabled: Boolean,
+    showDivider: Boolean,
     onClick: () -> Unit
 ) {
     val line = listOfNotNull(
@@ -175,6 +183,7 @@ private fun BranchRow(
     AtelierListRow(
         title = branch.name,
         subtitle = line.ifEmpty { null },
+        showDivider = showDivider,
         modifier = Modifier.selectable(
             selected = selected,
             enabled = enabled,
