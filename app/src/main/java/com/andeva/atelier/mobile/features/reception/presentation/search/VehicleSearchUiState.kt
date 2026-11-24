@@ -14,6 +14,40 @@ enum class SearchMode { PLATE, DOCUMENT }
 /** Secciones del módulo de Recepción y CRM (EP03). */
 enum class ReceptionSection { SEARCH_AND_TODAY, CUSTOMERS, VEHICLES }
 
+/** Rango visible de la agenda de citas. */
+enum class AppointmentRange(val spanDays: Long) {
+    TODAY(0L),
+    WEEK(6L),
+    MONTH(29L);
+
+    fun endDate(from: java.time.LocalDate): java.time.LocalDate = from.plusDays(spanDays)
+}
+
+/** Formulario de la hoja inferior para agendar una cita (`POST /appointments`). */
+data class CreateAppointmentForm(
+    val customerQuery: String = "",
+    val selectedCustomer: Customer? = null,
+    val vehicles: List<Vehicle> = emptyList(),
+    val isLoadingVehicles: Boolean = false,
+    val selectedVehicleId: String? = null,
+    val dateText: String = "",
+    val timeText: String = "10:00",
+    val durationText: String = "60",
+    val reason: String = "",
+    val isSaving: Boolean = false,
+    val invalidField: String? = null
+)
+
+/** Formulario de la hoja inferior para editar el contacto de un cliente (`PUT /customers/{id}/contact`). */
+data class EditContactForm(
+    val customerId: String,
+    val customerName: String,
+    val email: String = "",
+    val phone: String = "",
+    val isSaving: Boolean = false,
+    val invalidField: String? = null
+)
+
 data class VehicleSearchUiState(
     val section: ReceptionSection = ReceptionSection.SEARCH_AND_TODAY,
     val mode: SearchMode = SearchMode.PLATE,
@@ -33,14 +67,25 @@ data class VehicleSearchUiState(
     val workshopVehicles: List<VehicleWithOwner> = emptyList(),
     val vehicleFilterQuery: String = "",
     val appointments: List<Appointment> = emptyList(),
+    val appointmentRange: AppointmentRange = AppointmentRange.TODAY,
     val isRefreshingAppointments: Boolean = false,
     /** Cita cuya llegada se está registrando. */
     val arrivingId: String? = null,
+    /** Cita abierta en la hoja de acciones (`AppointmentActionsSheet`). */
+    val actionAppointmentId: String? = null,
+    /** Cita que está ejecutando confirmación, reprogramación o cancelación. */
+    val updatingAppointmentId: String? = null,
+    val createAppointmentForm: CreateAppointmentForm? = null,
+    val editContactForm: EditContactForm? = null,
     val arrival: ArrivalResult? = null,
+    val notice: UiText? = null,
     val error: UiText? = null,
+    val isOnline: Boolean = true,
     val canSearch: Boolean = false,
     val canReadCustomers: Boolean = false,
+    val canUpdateCustomer: Boolean = false,
     val canViewAppointments: Boolean = false,
+    val canCreateAppointments: Boolean = false,
     val canMarkArrival: Boolean = false,
     val canRegister: Boolean = false,
     val canCreateVehicles: Boolean = false,

@@ -30,7 +30,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -137,10 +137,11 @@ dependencies {
     // Ubicación (asistencia con geocerca)
     implementation(libs.play.services.location)
 
-    // Cámara (evidencias)
+    // Cámara (evidencias y lector de código de barras SKU)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.compose)
+    implementation(libs.mlkit.barcode.scanning)
 
     // Google Sign-In
     implementation(libs.androidx.credentials)

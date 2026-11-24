@@ -4,6 +4,7 @@ import com.andeva.atelier.mobile.features.tasks.infrastructure.remote.WorkOrderT
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -30,6 +31,9 @@ interface WorkOrderService {
 
     @PUT("api/v1/tasks/{taskId}")
     suspend fun updateTask(@Path("taskId") taskId: String, @Body body: UpdateWorkOrderTaskRequestDto): Response<WorkOrderTaskDto>
+
+    @DELETE("api/v1/tasks/{taskId}")
+    suspend fun deleteTask(@Path("taskId") taskId: String): Response<Unit>
 
     @POST("api/v1/work-orders/{workOrderId}/intake-images")
     suspend fun attachIntakeImage(@Path("workOrderId") id: String, @Body body: AttachImageRequestDto): Response<WorkOrderImageDto>
@@ -83,8 +87,20 @@ interface WorkOrderService {
     suspend fun getProfitability(@Path("workOrderId") id: String): Response<WorkOrderProfitabilityDto>
 }
 
-/** Catálogo de servicios del taller (`operations:services:read`). */
+/** Catálogo de servicios del taller (`operations:services:read` / `operations:services:manage`). */
 interface ServiceCatalogService {
     @GET("api/v1/services")
     suspend fun getServices(): Response<List<ServiceDto>>
+
+    @POST("api/v1/services")
+    suspend fun createService(@Body body: CreateServiceRequestDto): Response<ServiceDto>
+
+    @PUT("api/v1/services/{serviceId}")
+    suspend fun updateService(
+        @Path("serviceId") serviceId: String,
+        @Body body: UpdateServiceRequestDto
+    ): Response<ServiceDto>
+
+    @DELETE("api/v1/services/{serviceId}")
+    suspend fun deleteService(@Path("serviceId") serviceId: String): Response<Unit>
 }

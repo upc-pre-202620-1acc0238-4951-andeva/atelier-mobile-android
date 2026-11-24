@@ -24,3 +24,8 @@ data class CreateWorkBayRequestDto(
     @SerializedName("name") val name: String,
     @SerializedName("bayType") val bayType: String
 )
+
+/** `MaintenanceBayResource` de docs/api/operations.md. */
+data class MaintenanceBayRequestDto(
+    @SerializedName("reason") val reason: String
+)

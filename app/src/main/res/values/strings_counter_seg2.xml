@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Recepción, citas y contacto (Segmento 2: Mostrador) -->
+    <string name="reception_new_appointment">Nueva cita</string>
+    <string name="reception_create_appointment_title">Agendar cita</string>
+    <string name="reception_appointment_customer_label">Cliente</string>
+    <string name="reception_appointment_select_customer">Elige un cliente</string>
+    <string name="reception_appointment_vehicle_label">Vehículo</string>
+    <string name="reception_appointment_select_vehicle">Elige un vehículo</string>
+    <string name="reception_appointment_no_vehicles">Este cliente no tiene vehículos registrados.</string>
+    <string name="reception_appointment_date_label">Fecha (AAAA-MM-DD)</string>
+    <string name="reception_appointment_time_label">Hora (HH:MM)</string>
+    <string name="reception_appointment_today_chip">Hoy</string>
+    <string name="reception_appointment_tomorrow_chip">Mañana</string>
+    <string name="reception_appointment_duration_label">Duración estimada (min)</string>
+    <string name="reception_appointment_reason_label">Motivo de la cita (opcional)</string>
+    <string name="reception_appointment_reason_hint">Ej. Mantenimiento 40,000 km o revisión de frenos</string>
+    <string name="reception_appointment_schedule_btn">Agendar cita</string>
+    <string name="reception_appointment_scheduled_notice">Cita agendada correctamente.</string>
+    <string name="reception_appointments_section_title">Agenda de citas</string>
+    <string name="reception_appointments_range_today">Hoy</string>
+    <string name="reception_appointments_range_week">7 días</string>
+    <string name="reception_appointments_range_month">30 días</string>
+    <string name="reception_appointments_empty_week">No hay citas en los próximos 7 días.</string>
+    <string name="reception_appointments_empty_month">No hay citas en los próximos 30 días.</string>
+
+    <string name="reception_appointment_actions_title">Gestionar cita</string>
+    <string name="reception_appointment_confirm_btn">Confirmar cita</string>
+    <string name="reception_appointment_confirmed_notice">Cita confirmada.</string>
+    <string name="reception_appointment_reschedule_btn">Reprogramar</string>
+    <string name="reception_appointment_reschedule_confirm">Guardar nueva fecha</string>
+    <string name="reception_appointment_rescheduled_notice">Cita reprogramada.</string>
+    <string name="reception_appointment_cancel_btn">Cancelar cita</string>
+    <string name="reception_appointment_cancel_reason_label">Motivo de cancelación</string>
+    <string name="reception_appointment_cancel_reason_hint">Ej. El cliente reprogramará más adelante</string>
+    <string name="reception_appointment_cancel_confirm">Sí, cancelar cita</string>
+    <string name="reception_appointment_canceled_notice">Cita cancelada.</string>
+    <string name="reception_appointment_invalid_datetime">Ingresa una fecha (AAAA-MM-DD) y hora (HH:MM) válidas.</string>
+    <string name="reception_appointment_invalid_duration">La duración mínima es de 15 minutos.</string>
+    <string name="reception_appointment_invalid_cancel_reason">Ingresa el motivo de cancelación (máximo 500 caracteres).</string>
+
+    <string name="reception_edit_contact_btn">Editar contacto</string>
+    <string name="reception_edit_contact_title">Editar contacto del cliente</string>
+    <string name="reception_edit_contact_email_label">Correo electrónico</string>
+    <string name="reception_edit_contact_phone_label">Teléfono</string>
+    <string name="reception_edit_contact_save">Guardar contacto</string>
+    <string name="reception_edit_contact_notice">Contacto actualizado.</string>
+
+    <string name="affiliation_vehicles_header">Vehículos que se vincularán</string>
+    <string name="affiliation_searching_label">Buscando cuenta en Atelier…</string>
+
+    <!-- Bahías (Segmento 2: Mecánico Jefe) -->
+    <string name="bays_filter_maintenance">Mantenimiento (%1$d)</string>
+    <string name="bays_occupied_sheet_title">Bahía ocupada</string>
+    <string name="bays_available_sheet_title">Bahía libre</string>
+    <string name="bays_maintenance_sheet_title">Bahía en mantenimiento</string>
+    <string name="bays_open_order_btn">Abrir orden de trabajo</string>
+    <string name="bays_release_btn">Liberar bahía</string>
+    <string name="bays_released_notice">Bahía %1$s liberada.</string>
+    <string name="bays_reassign_section">Mover orden a otra bahía libre</string>
+    <string name="bays_set_maintenance_btn">Poner en mantenimiento</string>
+    <string name="bays_maintenance_reason_label">Motivo del mantenimiento</string>
+    <string name="bays_maintenance_reason_hint">Ej. Calibración de elevador hidráulico</string>
+    <string name="bays_maintenance_confirm_btn">Confirmar mantenimiento</string>
+    <string name="bays_maintenance_notice">Bahía %1$s puesta en mantenimiento.</string>
+    <string name="bays_restore_btn">Restaurar bahía</string>
+    <string name="bays_restored_notice">Bahía %1$s restaurada y disponible.</string>
+    <string name="bays_maintenance_field_error">Escribe el motivo del mantenimiento (máximo 1000 caracteres).</string>
+
+    <!-- Órdenes de trabajo (Segmento 2: Transversal) -->
+    <string name="orders_filter_to_collect">Por cobrar</string>
+    <string name="orders_obd_diagnostic_btn">Diagnóstico OBD-II</string>
+</resources>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bandeja de Mis tareas (Segmento 2) y Tareas del taller (Segmento 1) -->
+    <string name="tasks_workshop_title">Tareas del taller</string>
+    <string name="tasks_workshop_panel_caption">activas en la sede</string>
+    <string name="tasks_workshop_empty">No hay tareas activas en las órdenes de la sede.</string>
+    <string name="tasks_seg2_panel_context">Bandeja de bahía</string>
+    <string name="tasks_seg2_panel_caption">asignadas en tu turno</string>
+    <plurals name="tasks_seg2_legend_count">
+        <item quantity="one">%1$d tarea</item>
+        <item quantity="other">%1$d tareas</item>
+    </plurals>
+    <string name="tasks_seg2_figure_pending">pendientes</string>
+    <string name="tasks_seg2_figure_in_progress">en curso</string>
+    <string name="tasks_seg2_figure_paused">en pausa</string>
+    <string name="tasks_seg2_filter_assigned">Asignadas</string>
+    <string name="tasks_seg2_filter_suspended">Suspendidas</string>
+    <string name="tasks_seg2_empty_filtered">Ninguna tarea coincide con este filtro.</string>
+    <string name="tasks_seg2_meta_no_plate">Sin placa</string>
+
+    <!-- Detalle de tarea: cabecera, cronómetro y accesos rápidos -->
+    <string name="tasks_seg2_quick_actions">Accesos rápidos</string>
+    <string name="tasks_seg2_action_obd">Escáner OBD-II</string>
+    <string name="tasks_seg2_action_finding">Reportar hallazgo</string>
+    <string name="tasks_seg2_controls_section">Control de labor</string>
+    <string name="tasks_seg2_description_section">Detalle técnico</string>
+    <string name="tasks_seg2_timer_estimated">Est. %1$s h</string>
+
+    <!-- US28: evidencias fotográficas de desmontaje / montaje -->
+    <string name="tasks_seg2_evidence_section">Evidencias fotográficas</string>
+    <string name="tasks_seg2_evidence_kind_label">Momento de la foto</string>
+    <string name="tasks_seg2_evidence_disassembly">Desmontaje</string>
+    <string name="tasks_seg2_evidence_assembly">Montaje</string>
+    <string name="tasks_seg2_evidence_note_label">Nota de evidencia (opcional)</string>
+    <string name="tasks_seg2_evidence_note_hint">Ej. pastilla desgastada al 10 %</string>
+    <string name="tasks_seg2_evidence_take_photo">Tomar foto</string>
+    <string name="tasks_seg2_evidence_empty">Aún no hay fotos de desmontaje o montaje.</string>
+    <string name="tasks_seg2_evidence_queued">Foto guardada. Se subirá al recuperar señal.</string>
+    <string name="tasks_seg2_evidence_field_error">La nota supera los 500 caracteres.</string>
+
+    <!-- US29: suspensiones mecánico y supervisor -->
+    <string name="tasks_seg2_suspension_section">Suspensión de tarea</string>
+    <string name="tasks_seg2_suspension_request_btn">Solicitar suspensión</string>
+    <string name="tasks_seg2_suspension_request_title">Solicitar suspensión</string>
+    <string name="tasks_seg2_suspension_request_body">Indica el repuesto faltante o defectuoso para que el supervisor valide la pausa.</string>
+    <string name="tasks_seg2_suspension_item_label">Descripción de la pieza o motivo</string>
+    <string name="tasks_seg2_suspension_item_hint">Ej. Retén de cigüeñal con fuga</string>
+    <string name="tasks_seg2_suspension_item_error">Describe el ítem faltante o defectuoso (máx. 500 caracteres).</string>
+    <string name="tasks_seg2_suspension_part_optional">Repuesto del catálogo (opcional)</string>
+    <string name="tasks_seg2_suspension_part_clear">Quitar repuesto seleccionado</string>
+    <string name="tasks_seg2_suspension_request_confirm">Enviar solicitud</string>
+    <string name="tasks_seg2_suspension_requested_notice">Solicitud enviada. Espera la validación del supervisor.</string>
+    <string name="tasks_seg2_suspension_pending_title">Suspensión solicitada.</string>
+    <string name="tasks_seg2_suspension_pending_body">Esperando aprobación del supervisor.</string>
+    <string name="tasks_seg2_suspension_review_hint">Toca para aprobar o rechazar la solicitud</string>
+    <string name="tasks_seg2_suspension_resume_row_title">Suspensión activa por repuesto</string>
+    <string name="tasks_seg2_suspension_resume_row_hint">Toca para reanudar la tarea cuando llegue el repuesto</string>
+    <string name="tasks_seg2_suspension_resume_sheet_title">Levantar suspensión</string>
+    <string name="tasks_seg2_suspension_resume_sheet_body">Confirma que el repuesto ya está conforme para que el mecánico reanude la labor.</string>
+    <string name="tasks_seg2_suspension_requested_at">Solicitada: %1$s</string>
+
+    <!-- Reabrir tarea cerrada -->
+    <string name="tasks_seg2_reopen_btn">Reabrir tarea</string>
+    <string name="tasks_seg2_reopen_title">¿Reabrir tarea cerrada?</string>
+    <string name="tasks_seg2_reopen_body">La tarea volverá a estado abierto para retrabajo de calidad.</string>
+    <string name="tasks_seg2_reopen_reason_label">Motivo de reapertura (opcional)</string>
+    <string name="tasks_seg2_reopen_reason_hint">Ej. Verificar ajuste de torque</string>
+    <string name="tasks_seg2_reopen_confirm">Confirmar reapertura</string>
+    <string name="tasks_seg2_reopened_notice">Tarea reabierta para retrabajo.</string>
+
+    <!-- US28 / US30 mejoras Sprint 3 -->
+    <string name="tasks_seg2_evidence_note_counter">%1$d / %2$d caracteres disponibles</string>
+    <string name="tasks_seg2_evidence_failed_sheet_title">Foto con error de envío</string>
+    <string name="tasks_seg2_evidence_failed_retry_notice">Reintento de subida encolado.</string>
+    <string name="tasks_seg2_evidence_failed_discard_notice">Foto descartada de la cola.</string>
+    <string name="tasks_seg2_complete_missing_assembly_warning">Sube al menos una foto de Montaje antes de completar esta tarea.</string>
+    <string name="tasks_seg2_unsaved_exit_title">¿Salir con nota sin guardar?</string>
+    <string name="tasks_seg2_unsaved_exit_body">Tienes una nota de evidencia escrita que aún no has adjuntado con una foto.</string>
+    <string name="tasks_seg2_unsaved_exit_confirm">Salir sin guardar</string>
+</resources>

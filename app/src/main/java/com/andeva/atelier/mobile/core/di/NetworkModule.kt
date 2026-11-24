@@ -2,10 +2,12 @@ package com.andeva.atelier.mobile.core.di
 
 import com.andeva.atelier.mobile.BuildConfig
 import com.andeva.atelier.mobile.core.data.remote.AuthInterceptor
+import com.andeva.atelier.mobile.core.data.remote.IdempotentGetRetryInterceptor
 import com.andeva.atelier.mobile.core.data.remote.TokenAuthenticator
 import com.andeva.atelier.mobile.core.data.remote.employee.EmployeeService
 import com.andeva.atelier.mobile.core.data.remote.session.AuthRefreshService
 import com.andeva.atelier.mobile.core.data.remote.session.DeviceTokenService
+import com.andeva.atelier.mobile.core.data.remote.tenant.TenantService
 import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
@@ -35,6 +37,8 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(authInterceptor: AuthInterceptor, tokenAuthenticator: TokenAuthenticator): OkHttpClient =
         OkHttpClient.Builder()
+            .retryOnConnectionFailure(false)
+            .addInterceptor(IdempotentGetRetryInterceptor())
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .addInterceptor(loggingInterceptor(HttpLoggingInterceptor.Level.BODY))
@@ -47,6 +51,7 @@ object NetworkModule {
     @RefreshClient
     fun provideRefreshOkHttpClient(): OkHttpClient =
         OkHttpClient.Builder()
+            .retryOnConnectionFailure(false)
             .addInterceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("Accept-Language", "es").build())
             }
@@ -100,4 +105,9 @@ object NetworkModule {
     @Singleton
     fun provideEmployeeService(retrofit: Retrofit): EmployeeService =
         retrofit.create(EmployeeService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTenantService(retrofit: Retrofit): TenantService =
+        retrofit.create(TenantService::class.java)
 }

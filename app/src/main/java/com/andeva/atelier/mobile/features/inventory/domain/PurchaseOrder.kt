@@ -21,7 +21,16 @@ data class PurchaseOrder(
     val lines: List<PurchaseOrderLine>
 ) {
     val canBeReceived: Boolean get() = status == PurchaseOrderStatus.ISSUED
+    val isDraft: Boolean get() = status == PurchaseOrderStatus.DRAFT
+    val canBeCanceled: Boolean get() = status == PurchaseOrderStatus.DRAFT || status == PurchaseOrderStatus.ISSUED
 }
+
+/** Línea al crear o agregar ítems a una orden de compra (`CreatePurchaseOrderItemResource`). */
+data class PurchaseOrderLineInput(
+    val itemId: String,
+    val quantity: BigDecimal,
+    val unitCost: BigDecimal
+)
 
 /** Línea de la orden: al recibir, cada una crea un lote con su cantidad y costo. */
 data class PurchaseOrderLine(

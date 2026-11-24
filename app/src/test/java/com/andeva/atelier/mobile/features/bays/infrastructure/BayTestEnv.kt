@@ -80,7 +80,8 @@ class BayTestEnv {
         cacheMetadataDao = db.cacheMetadataDao(),
         sessionManager = sessionManager,
         gson = gson,
-        clock = clock
+        clock = clock,
+        taskDao = db.taskDao()
     )
 
     /** Supervisor con sede `b1` (o sin sede si [branchId] es null). */

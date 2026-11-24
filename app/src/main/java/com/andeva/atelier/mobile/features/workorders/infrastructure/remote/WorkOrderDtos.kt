@@ -62,6 +62,22 @@ data class ServiceDto(
     @SerializedName("estimatedMinutes") val estimatedMinutes: Int?
 )
 
+/** `CreateServiceResource`. */
+data class CreateServiceRequestDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("basePrice") val basePrice: BigDecimal,
+    @SerializedName("currency") val currency: String,
+    @SerializedName("estimatedMinutes") val estimatedMinutes: Int
+)
+
+/** `UpdateServiceResource`. */
+data class UpdateServiceRequestDto(
+    @SerializedName("name") val name: String,
+    @SerializedName("basePrice") val basePrice: BigDecimal,
+    @SerializedName("currency") val currency: String,
+    @SerializedName("estimatedMinutes") val estimatedMinutes: Int
+)
+
 /** `PartMovementResource`. */
 data class PartMovementDto(
     @SerializedName("allocationId") val allocationId: String,

@@ -88,6 +88,8 @@ class FakePendingOperationDao : PendingOperationDao {
 
     override fun countPending(userId: String): Flow<Int> = rows.map { map -> map.values.count { it.userId == userId } }
 
+    override suspend fun countAll(): Int = rows.value.size
+
     override fun observeForUser(userId: String): Flow<List<PendingOperationEntity>> =
         rows.map { map -> map.values.filter { it.userId == userId }.sortedBy { it.createdAt } }
 

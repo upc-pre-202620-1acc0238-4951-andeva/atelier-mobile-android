@@ -52,7 +52,7 @@ class TaskDaoTest {
     fun `recargar conserva el detalle y solo descarta el motivo de pausa si cambio el estado`() = runTest {
         dao.replaceMine(listOf(row("t1", "ON_HOLD", 1), row("t2", "ON_HOLD", 2)))
         listOf("t1", "t2").forEach {
-            dao.mergeDetail(it, "ON_HOLD", "", "Frenos", "u1", "BREAK", null, null, null, 0, 1)
+            dao.mergeDetail(it, "ON_HOLD", "", "Frenos", "u1", "BREAK", null, null, null, null, 0, 1)
         }
 
         dao.replaceMine(listOf(row("t1", "ON_HOLD", 1), row("t2", "IN_PROGRESS", 2)))
@@ -71,6 +71,6 @@ class TaskDaoTest {
         dao.replaceMine(listOf(row("t2", "ASSIGNED", 2)))
 
         assertEquals(listOf("t2"), dao.observeAll().first().map { it.task.id })
-        assertEquals(0, dao.mergeDetail("t1", "IN_PROGRESS", "", null, null, null, null, null, null, 0, 1))
+        assertEquals(0, dao.mergeDetail("t1", "IN_PROGRESS", "", null, null, null, null, null, null, null, 0, 1))
     }
 }

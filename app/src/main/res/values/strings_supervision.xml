@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Equipo -->
+    <string name="team_title">Equipo</string>
+    <string name="team_no_permission">Tu cuenta no puede ver la asistencia del equipo.</string>
+    <string name="team_tab_team">Equipo</string>
+    <string name="team_tab_mine">Mi asistencia</string>
+    <string name="team_offline">Sin conexión. La asistencia del equipo necesita red para actualizarse.</string>
+    <string name="team_legend">%1$d de %2$d</string>
+    <string name="team_caption">en turno ahora</string>
+    <string name="team_figure_on_time">puntuales</string>
+    <string name="team_figure_late">tardanzas</string>
+    <string name="team_figure_absent">faltas</string>
+    <string name="team_today">Asistencia de hoy</string>
+    <string name="team_empty">Nadie ha marcado asistencia hoy en esta sede.</string>
+    <string name="team_no_clock_in">Sin entrada registrada</string>
+    <string name="team_clock_range">Entró %1$s · salió %2$s</string>
+    <string name="team_clock_in_open">Entró %1$s · en turno</string>
+    <string name="team_status_on_time">Puntual</string>
+    <string name="team_status_late">Tarde</string>
+    <string name="team_status_absent">Falta</string>
+    <string name="team_status_excused">Justificada</string>
+
+    <!-- Bahías -->
+    <string name="bays_offline">Sin conexión. Ves el último tablero guardado; reasignar y crear bahías necesita red.</string>
+    <string name="bays_labor">Mano de obra %1$s</string>
+    <string name="bays_tap_to_assign">Toca para ingresar una orden</string>
+    <string name="bays_mechanics_section">Mecánicos y faenas en bahía</string>
+
+    <!-- Notificaciones -->
+    <string name="notif_title">Notificaciones</string>
+    <string name="notif_section_attention">Piden tu atención</string>
+    <string name="notif_section_received">Avisos de esta sesión</string>
+    <string name="notif_empty">Aquí verás los avisos de tareas, stock y asistencia cuando lleguen.</string>
+    <string name="notif_unread">Nuevo</string>
+    <string name="notif_draft_chip">Sin iniciar</string>
+    <string name="notif_sync_pending_body">Toca para revisarlos o reenviarlos.</string>
+    <plurals name="notif_sync_pending">
+        <item quantity="one">%1$d registro sin enviar</item>
+        <item quantity="other">%1$d registros sin enviar</item>
+    </plurals>
+
+    <!-- Cola de sincronización -->
+    <string name="sync_empty_line">Todo sincronizado. No hay nada pendiente de envío.</string>
+    <string name="sync_discard_warning">Si lo descartas, este registro se borra del teléfono y no llega al servidor.</string>
+
+    <!-- Perfil -->
+    <string name="profile_section_workshop">Mi taller</string>
+    <string name="profile_label_workshop">Taller</string>
+    <string name="profile_label_branch">Sede actual</string>
+    <string name="profile_branch_change">Sede actual · Cambiar sede</string>
+    <string name="profile_branch_unknown">Sin sede elegida</string>
+    <string name="profile_module_obd">Escáneres OBD-II</string>
+    <string name="profile_module_ai">Diagnóstico con IA</string>
+    <string name="profile_module_none">Módulos básicos</string>
+    <string name="profile_no_unread">Sin avisos nuevos</string>
+    <plurals name="profile_unread_count">
+        <item quantity="one">%1$d aviso sin leer</item>
+        <item quantity="other">%1$d avisos sin leer</item>
+    </plurals>
+    <string name="profile_sign_out_sub">Salir de Atelier en este teléfono</string>
+    <string name="profile_sign_out_plain">Vas a salir de Atelier en este teléfono. Para volver a entrar necesitarás tu correo y tu contraseña.</string>
+
+    <!-- Escáneres OBD-II -->
+    <string name="obd_plan_locked">Los escáneres OBD-II no están incluidos en el plan de este taller.</string>
+    <string name="obd_no_permission">Tu cuenta no puede ver los escáneres del taller.</string>
+    <string name="obd_offline">Sin conexión. Registrar, vincular y cambiar el estado de un escáner necesita red.</string>
+    <string name="obd_no_vehicles">No hay vehículos del taller guardados en este teléfono.</string>
+    <string name="obd_vehicle_has_scanner">Ya tiene un escáner vinculado</string>
+    <string name="obd_firmware_format">FW %1$s</string>
+    <string name="obd_hint_identifier">Ej. AA:BB:CC:11:22:33</string>
+    <string name="obd_hint_model">Ej. ELM327 v1.5 u OBDLink MX+</string>
+    <string name="obd_hint_firmware">Ej. 2.1</string>
+    <string name="obd_conn_bluetooth">Bluetooth</string>
+    <string name="obd_conn_wifi">Wi-Fi</string>
+    <string name="obd_conn_usb">USB</string>
+</resources>

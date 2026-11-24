@@ -159,6 +159,35 @@ class ProposalsPanelViewModelTest {
 
         assertEquals("s1", vm.uiState.value.form?.serviceId)
         assertEquals(ProposalAction.APPROVE, vm.uiState.value.form?.action)
+        assertEquals("1.5", vm.uiState.value.form?.laborHours)
+    }
+
+    @Test
+    fun `un servicio con tarifa consolidada precarga y bloquea el precio del catalogo`() = runTest(mainRule.dispatcher) {
+        val frenos = ServiceOption("s2", "Cambio de frenos", com.andeva.atelier.mobile.core.domain.Money(BigDecimal("180.00"), "PEN"), 90)
+        conPropuestas(propuesta("p1", serviceId = "s2"))
+        val observeSession = mockk<ObserveSessionUseCase>()
+        every { observeSession() } returns flowOf(sessionWith(allPermissions))
+        coEvery { repository.getServiceCatalog() } returns Result.success(listOf(empaque, frenos))
+        val vm = ProposalsPanelViewModel(
+            observeSession,
+            GetWorkOrderDetailUseCase(repository),
+            GetServiceCatalogUseCase(repository),
+            NotifyProposalUseCase(repository),
+            ApproveProposalUseCase(repository),
+            RejectProposalUseCase(repository),
+            SavedStateHandle(mapOf("workOrderId" to "wo1"))
+        )
+        vm.settle()
+
+        vm.onOpenForm("p1", ProposalAction.APPROVE)
+        assertEquals("180.00", vm.uiState.value.form?.finalPrice)
+        assertEquals("1.5", vm.uiState.value.form?.laborHours)
+        assertTrue(vm.uiState.value.isPriceLockedByCatalog)
+
+        // Intentar cambiar manualmente el precio consolidado no lo altera
+        vm.onFinalPriceChange("999.00")
+        assertEquals("180.00", vm.uiState.value.form?.finalPrice)
     }
 
     @Test
@@ -237,6 +266,7 @@ class ProposalsPanelViewModelTest {
         vm.settle()
         vm.onOpenForm("p1", ProposalAction.APPROVE)
         vm.onFinalPriceChange("100")
+        vm.onLaborHoursChange("")
         assertFalse(vm.uiState.value.canConfirm)
         vm.onLaborHoursChange("2")
         assertTrue(vm.uiState.value.canConfirm)

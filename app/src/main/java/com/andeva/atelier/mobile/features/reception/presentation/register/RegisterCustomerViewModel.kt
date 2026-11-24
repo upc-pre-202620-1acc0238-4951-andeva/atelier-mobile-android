@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.reception.presentation.register
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.reception.application.RegisterCompanyCustomerUseCase
@@ -32,7 +33,8 @@ class RegisterCustomerViewModel @Inject constructor(
     private val registerIndividual: RegisterIndividualCustomerUseCase,
     private val registerCompany: RegisterCompanyCustomerUseCase,
     private val registerVehicle: RegisterVehicleUseCase,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    connectivity: ConnectivityObserver? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -46,6 +48,11 @@ class RegisterCustomerViewModel @Inject constructor(
     val uiState: StateFlow<RegisterCustomerUiState> = _uiState.asStateFlow()
 
     init {
+        if (connectivity != null) {
+            viewModelScope.launch {
+                connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } }
+            }
+        }
         viewModelScope.launch {
             observeSession().collect { session ->
                 val onlyVehicle = _uiState.value.registeredCustomerId != null

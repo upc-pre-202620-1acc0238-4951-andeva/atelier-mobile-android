@@ -7,6 +7,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /** Endpoints de tareas de docs/api/operations.md. */
 interface TaskService {
@@ -39,6 +40,13 @@ interface TaskService {
 
     @POST("api/v1/tasks/{taskId}/complete")
     suspend fun complete(@Path("taskId") taskId: String, @Body body: CompleteTaskRequestDto): Response<WorkOrderTaskDto>
+
+    /** Reabre una tarea completada para retrabajo de calidad (`operations:work_orders:update`). */
+    @POST("api/v1/tasks/{taskId}/reopen")
+    suspend fun reopen(
+        @Path("taskId") taskId: String,
+        @Query("reason") reason: String? = null
+    ): Response<WorkOrderTaskDto>
 
     @POST("api/v1/tasks/{taskId}/evidence-images")
     suspend fun attachEvidence(

@@ -8,9 +8,13 @@ import com.andeva.atelier.mobile.core.data.remote.session.AuthenticatedUserDto
 import com.andeva.atelier.mobile.core.data.remote.session.RefreshTokenRequestDto
 import com.andeva.atelier.mobile.core.data.sync.CacheMaintenanceDao
 import com.andeva.atelier.mobile.core.data.sync.PendingOperationDao
+import com.andeva.atelier.mobile.core.data.sync.PreSyncHook
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.di.RefreshClient
+import com.andeva.atelier.mobile.core.media.NoOpTempCacheCleaner
+import com.andeva.atelier.mobile.core.media.TempCacheCleaner
 import com.andeva.atelier.mobile.core.notifications.DeviceTokenRegistrar
+import com.andeva.atelier.mobile.core.notifications.PushInbox
 import com.andeva.atelier.mobile.features.auth.domain.AcceptInvitation
 import com.andeva.atelier.mobile.features.auth.domain.AuthRepository
 import com.andeva.atelier.mobile.features.auth.domain.InvalidInvitationException
@@ -39,7 +43,10 @@ class AuthRepositoryImpl @Inject constructor(
     private val deviceTokenRegistrar: DeviceTokenRegistrar,
     private val cacheMaintenanceDao: CacheMaintenanceDao,
     private val pendingOperationDao: PendingOperationDao,
-    private val gson: Gson
+    private val gson: Gson,
+    private val pushInbox: PushInbox = PushInbox(),
+    private val preSyncHooks: Set<@JvmSuppressWildcards PreSyncHook> = emptySet(),
+    private val tempCacheCleaner: TempCacheCleaner = NoOpTempCacheCleaner
 ) : AuthRepository {
 
     override suspend fun signIn(email: String, password: String): Result<Unit> =
@@ -90,17 +97,29 @@ class AuthRepositoryImpl @Inject constructor(
         return pendingOperationDao.countPending(userId).first()
     }
 
+    override suspend fun devicePendingOperationCount(): Int = pendingOperationDao.countAll()
+
     /**
-     * Orden de docs/07-roadmap.md (Paso 2): token FCM → sign-out → cachés → sesión. Los fallos de
-     * red se ignoran: sin conexión igual se sale. La cola `pending_operations` no se toca.
+     * Orden de docs/07-roadmap.md (Paso 2) y US04/US19:
+     * flush de lecturas locales del usuario saliente → token FCM (2 s) → sign-out (4 s) →
+     * limpiar PushInbox + archivos temporales + cachés Room → borrar sesión. La cola `pending_operations` se conserva.
      */
     override suspend fun signOut() = withContext(NonCancellable) {
+        val departingUserId = sessionManager.getSession()?.userId
         val refreshToken = sessionManager.getRefreshToken()
-        // Con el servidor dormido (arranque en frío de Render) estas llamadas pueden tardar más de un minuto: se
-        // les da un tope y, si no responden, se sale igual. El refresh token vence solo.
-        withTimeoutOrNull(REMOTE_SIGN_OUT_TIMEOUT_MS) {
-            deviceTokenRegistrar.clear()
-            if (refreshToken != null) {
+        if (departingUserId != null) {
+            withTimeoutOrNull(PRE_SIGN_OUT_FLUSH_TIMEOUT_MS) {
+                preSyncHooks.forEach { hook ->
+                    runCatching { hook.beforeSync(departingUserId, forceFlushAll = true) }
+                }
+            }
+        }
+        // Presupuestos independientes: un refresh vencido en deviceTokenRegistrar no bloquea la revocación del refresh token.
+        withTimeoutOrNull(FCM_CLEAR_TIMEOUT_MS) {
+            runCatching { deviceTokenRegistrar.clear() }
+        }
+        if (refreshToken != null) {
+            withTimeoutOrNull(REMOTE_SIGN_OUT_TIMEOUT_MS) {
                 try {
                     refreshService.signOut(RefreshTokenRequestDto(refreshToken))
                 } catch (_: IOException) {
@@ -108,6 +127,8 @@ class AuthRepositoryImpl @Inject constructor(
                 }
             }
         }
+        pushInbox.clear()
+        tempCacheCleaner.clearSensitiveTempFiles()
         cacheMaintenanceDao.clearCaches()
         sessionManager.clear()
     }
@@ -137,7 +158,9 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     private companion object {
-        /** Tope para revocar el token FCM y el refresh token al cerrar sesión. */
-        const val REMOTE_SIGN_OUT_TIMEOUT_MS = 5_000L
+        const val PRE_SIGN_OUT_FLUSH_TIMEOUT_MS = 1_500L
+        const val FCM_CLEAR_TIMEOUT_MS = 2_000L
+        /** Tope para revocar el refresh token al cerrar sesión. */
+        const val REMOTE_SIGN_OUT_TIMEOUT_MS = 4_000L
     }
 }

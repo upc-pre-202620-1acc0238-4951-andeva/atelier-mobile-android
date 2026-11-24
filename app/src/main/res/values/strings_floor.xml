@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FloorHub & Mi Jornada (Segmento 2: personal de piso y mostrador) -->
+    <string name="floor_hub_shift_active">En turno</string>
+    <string name="floor_hub_shift_pending">Ingreso pendiente</string>
+    <string name="floor_hub_shift_closed">Jornada cerrada</string>
+    <string name="floor_hub_shift_idle">Sin marcar</string>
+    <string name="floor_hub_clock_in_cta">Marcar ingreso</string>
+    <string name="floor_hub_clock_out_cta">Marcar salida</string>
+    <string name="floor_hub_attendance_detail">Ver turno y descargos</string>
+    <string name="floor_hub_active_task_section">Tarea en curso</string>
+    <string name="floor_hub_open_task">Abrir tarea</string>
+    <string name="floor_hub_no_active_task">Sin tarea iniciada. Elige una de tu lista.</string>
+    <string name="floor_hub_tasks_queue_section">Mis tareas de hoy</string>
+    <string name="floor_hub_tasks_empty">No tienes tareas asignadas por ahora.</string>
+    <string name="floor_hub_tasks_legend_active">En fosa</string>
+    <string name="floor_hub_tasks_caption_format">%1$d pendientes · %2$d cerradas</string>
+    <string name="floor_hub_figure_pending">pendientes</string>
+    <string name="floor_hub_figure_in_progress">en curso</string>
+    <string name="floor_hub_figure_obd">OBD activos</string>
+    <string name="floor_hub_quick_section">Accesos de piso</string>
+    <string name="floor_hub_quick_obd">Diagnóstico OBD-II</string>
+    <string name="floor_hub_quick_obd_sub">Telemetría en vivo, DTC e informe IA</string>
+    <string name="floor_hub_quick_finding">Reportar hallazgo</string>
+    <string name="floor_hub_quick_finding_sub">Propuesta con foto en la orden activa</string>
+    <string name="floor_hub_quick_parts">Consultar repuestos</string>
+    <string name="floor_hub_quick_parts_sub">Stock disponible por nombre o SKU</string>
+    <string name="floor_hub_quick_bays">Tablero de bahías</string>
+    <string name="floor_hub_quick_bays_sub">Vehículos asignados por elevador</string>
+
+    <!-- Mostrador / Recepcionista -->
+    <string name="floor_hub_counter_caption">citas agendadas hoy</string>
+    <string name="floor_hub_counter_section">Agenda de hoy</string>
+    <string name="floor_hub_counter_empty">Sin citas agendadas para hoy.</string>
+    <string name="floor_hub_counter_open_reception">Buscar placa o cliente</string>
+    <string name="floor_hub_counter_new_customer">Registrar cliente</string>
+    <string name="floor_hub_figure_arrived">llegaron</string>
+    <string name="floor_hub_figure_waiting">por llegar</string>
+    <string name="floor_hub_figure_orders">órdenes hoy</string>
+
+    <!-- Almacén / Encargado de inventario -->
+    <string name="floor_hub_stock_caption">alertas de stock mínimo</string>
+    <string name="floor_hub_stock_decisions">Requieren reposición</string>
+    <string name="floor_hub_stock_empty">Todo el catálogo está sobre el mínimo.</string>
+    <string name="floor_hub_stock_pos_section">Órdenes de compra emitidas</string>
+    <string name="floor_hub_stock_pos_empty">Sin órdenes de compra pendientes de recibir.</string>
+    <string name="floor_hub_stock_open_catalog">Abrir catálogo</string>
+    <string name="floor_hub_figure_out_of_stock">agotados</string>
+    <string name="floor_hub_figure_open_pos">OC emitidas</string>
+    <string name="floor_hub_figure_catalog">repuestos</string>
+
+    <!-- Caja / Cajero -->
+    <string name="floor_hub_cash_caption">órdenes listas para cobrar</string>
+    <string name="floor_hub_cash_decisions">Listas para cobrar</string>
+    <string name="floor_hub_cash_empty">No hay órdenes terminadas esperando cobro.</string>
+    <string name="floor_hub_cash_open_daily">Ver caja del día</string>
+    <string name="floor_hub_figure_collected">cobrado hoy</string>
+    <string name="floor_hub_figure_payments">cobros hoy</string>
+
+    <!-- Mi jornada en AdminDashboard (Mecánico Jefe / Asesor) -->
+    <string name="dashboard_my_shift_title">Mi jornada</string>
+    <string name="dashboard_my_shift_clocked_in">En turno hoy · toca para ver horario o marcar salida</string>
+    <string name="dashboard_my_shift_not_clocked_in">Sin ingreso marcado · toca para marcar asistencia</string>
+    <string name="dashboard_my_shift_queued">Marcación pendiente de sincronizar</string>
+    <string name="dashboard_my_shift_completed">Jornada del día completada</string>
+    <string name="dashboard_my_tasks_title">Mis tareas asignadas</string>
+    <string name="dashboard_my_tasks_sub">%1$d activas · toca para abrir tu bandeja</string>
+
+    <!-- AttendanceScreen remodelada -->
+    <string name="attendance_geofence_inside">Dentro de geocerca (%1$d m)</string>
+    <string name="attendance_geofence_outside">Fuera de geocerca (%1$d m / máx. %2$d m)</string>
+    <string name="attendance_geofence_mock">Ubicación simulada detectada</string>
+    <string name="attendance_geofence_pending">Sin lectura GPS todavía</string>
+    <string name="attendance_schedule_section">Mi turno semanal</string>
+    <string name="attendance_schedule_tolerance">Tolerancia de ingreso: %1$d min</string>
+    <string name="attendance_schedule_workday">Laborable</string>
+    <string name="attendance_schedule_restday">Descanso</string>
+    <string name="attendance_history_section">Historial de los últimos 30 días</string>
+    <string name="attendance_worked_summary">%1$dh %2$dm trabajados</string>
+    <string name="attendance_overtime_summary"> · +%1$dm extra</string>
+    <string name="attendance_justification_sheet_title">Enviar descargo</string>
+    <string name="attendance_justification_field_label">Motivo del descargo</string>
+    <string name="attendance_justification_field_hint">Explica brevemente la tardanza o ausencia (máx. 500 caracteres)</string>
+    <string name="attendance_clock_out_sheet_title">¿Cerrar jornada de hoy?</string>
+    <string name="attendance_clock_out_sheet_body">Se registrará tu hora de salida y se calcularán tus horas efectivas del turno.</string>
+    <string name="attendance_clock_out_confirm">Sí, marcar salida</string>
+    <string name="attendance_no_branch_assigned">Aún no tienes sede ni turno asignados. Pide al administrador que configure tu perfil laboral.</string>
+</resources>

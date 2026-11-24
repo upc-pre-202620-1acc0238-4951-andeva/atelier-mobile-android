@@ -21,6 +21,7 @@ class SyncWorker @AssistedInject constructor(
     private val sessionManager: SessionManager,
     private val tokenRefresher: TokenRefresher,
     private val handlers: Map<String, @JvmSuppressWildcards OperationHandler>,
+    private val preSyncHooks: Set<@JvmSuppressWildcards PreSyncHook>,
     private val syncScheduler: SyncScheduler
 ) : CoroutineWorker(context, params) {
 
@@ -29,7 +30,12 @@ class SyncWorker @AssistedInject constructor(
         // Sin sesión renovable: las operaciones quedan PENDING para cuando el usuario vuelva a entrar.
         withContext(Dispatchers.IO) { tokenRefresher.ensureFresh() } ?: return Result.success()
 
-        val processor = SyncProcessor(dao, handlers, applicationContext.getString(R.string.sync_failed_max_attempts))
+        val processor = SyncProcessor(
+            dao = dao,
+            handlers = handlers,
+            maxAttemptsMessage = applicationContext.getString(R.string.sync_failed_max_attempts),
+            preSyncHooks = preSyncHooks
+        )
         val outcome = processor.run(session.userId)
 
         if (outcome == SyncProcessor.Outcome.COMPLETED) {

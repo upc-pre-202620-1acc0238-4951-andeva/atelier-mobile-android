@@ -4,17 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,12 +42,15 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOtpField
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.component.rise
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
-import com.andeva.atelier.mobile.core.designsystem.theme.JetBrainsMono
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.features.auth.presentation.AuthHeroHeader
 import java.util.Locale
 
 /** A4 Verificar correo · código de 6 dígitos. */
@@ -85,7 +91,8 @@ internal fun VerifyEmailContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         AtelierTopBar(title = stringResource(R.string.auth_verify_title), onBack = onBack)
 
@@ -93,86 +100,76 @@ internal fun VerifyEmailContent(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(modifier = Modifier.rise(0), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.auth_otp_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                val sentTo = stringResource(R.string.auth_otp_sent_to, state.maskedEmail)
-                val onBackground = MaterialTheme.colorScheme.onBackground
-                Text(
-                    text = buildAnnotatedString {
-                        append(sentTo)
-                        val start = sentTo.indexOf(state.maskedEmail)
-                        if (start >= 0) {
-                            addStyle(
-                                SpanStyle(fontWeight = FontWeight.Bold, color = onBackground),
-                                start,
-                                start + state.maskedEmail.length
-                            )
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = atelier.inkSecondary
-                )
-            }
+            AuthHeroHeader(
+                title = stringResource(R.string.auth_otp_title),
+                subtitle = stringResource(R.string.auth_otp_sent_to, state.maskedEmail),
+                modifier = Modifier.rise(0)
+            )
 
             state.info?.let {
                 AtelierBanner(message = it.asString(), icon = Icons.Filled.Info, kind = BannerKind.Info)
             }
 
-            AtelierOtpField(
-                value = state.code,
-                onValueChange = onCodeChange,
-                contentDescription = stringResource(R.string.auth_otp_label, 6),
-                modifier = Modifier.rise(1),
-                isError = state.error != null,
-                enabled = !state.isVerifying,
-                onDone = onVerify
-            )
-
-            state.error?.let { error ->
-                Row(
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Error, contentDescription = null, modifier = Modifier.size(18.dp), tint = atelier.bad)
-                    Text(text = error.asString(), style = MaterialTheme.typography.bodyMedium, color = atelier.bad)
-                }
-            }
-
-            Row(
+            AtelierSurface(
                 modifier = Modifier
-                    .rise(2)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .rise(1),
+                tier = SurfaceTier.Elevated,
+                shape = CardLargeShape,
+                contentPadding = PaddingValues(20.dp)
             ) {
-                ExpiryLabel(state.expiresSecondsLeft)
-                AtelierButton(
-                    text = if (state.canResend || state.isResending) {
-                        stringResource(R.string.auth_resend)
-                    } else {
-                        stringResource(R.string.auth_resend_in, formatClock(state.resendSecondsLeft, pad = false))
-                    },
-                    onClick = onResend,
-                    style = AtelierButtonStyle.Text,
-                    enabled = state.canResend,
-                    loading = state.isResending
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    AtelierOtpField(
+                        value = state.code,
+                        onValueChange = onCodeChange,
+                        contentDescription = stringResource(R.string.auth_otp_label, 6),
+                        isError = state.error != null,
+                        enabled = !state.isVerifying,
+                        onDone = onVerify
+                    )
+
+                    state.error?.let { error ->
+                        Row(
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Error, contentDescription = null, modifier = Modifier.size(18.dp), tint = atelier.bad)
+                            Text(text = error.asString(), style = MaterialTheme.typography.bodyMedium, color = atelier.bad)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ExpiryLabel(state.expiresSecondsLeft)
+                        AtelierButton(
+                            text = if (state.canResend || state.isResending) {
+                                stringResource(R.string.auth_resend)
+                            } else {
+                                stringResource(R.string.auth_resend_in, formatClock(state.resendSecondsLeft, pad = false))
+                            },
+                            onClick = onResend,
+                            style = AtelierButtonStyle.Text,
+                            enabled = state.canResend,
+                            loading = state.isResending
+                        )
+                    }
+                }
             }
         }
 
+        HorizontalDivider(color = atelier.outlineSoft)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp)
         ) {
             AtelierButton(
                 text = stringResource(R.string.auth_verify_action),
@@ -210,7 +207,7 @@ private fun ExpiryLabel(secondsLeft: Int?) {
             val start = text.indexOf(clock)
             if (start >= 0) {
                 addStyle(
-                    SpanStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, color = onBackground),
+                    SpanStyle(fontWeight = FontWeight.Bold, color = onBackground),
                     start,
                     start + clock.length
                 )

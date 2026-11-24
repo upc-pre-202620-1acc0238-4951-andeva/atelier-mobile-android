@@ -1,5 +1,6 @@
 package com.andeva.atelier.mobile.features.diagnostics.domain
 
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -31,9 +32,16 @@ interface DiagnosticsRepository {
 
     /**
      * Arma `TELEMETRY_BATCH` de hasta 200 lecturas sin lote. Con [onlyFull] solo los lotes completos (durante el
-     * muestreo); sin él, también el resto (al iniciar y al cerrar). Devuelve cuántos lotes encoló.
+     * muestreo); sin él, también el resto (al iniciar, al cerrar y en el pre-sync del worker).
+     * [userId] aísla las lecturas del técnico propietario; [excludeVehicleId] omite un vehículo en muestreo activo y
+     * [minIdleMs] exige que hayan pasado al menos esos ms desde la última muestra para empaquetar remanentes `< 200`.
      */
-    suspend fun enqueueUnbatchedReadings(onlyFull: Boolean): Int
+    suspend fun enqueueUnbatchedReadings(
+        onlyFull: Boolean,
+        userId: String? = null,
+        excludeVehicleId: String? = null,
+        minIdleMs: Long = 0L
+    ): Int
 
     /** Borra las lecturas ya confirmadas por el backend con más de 7 días (docs/06-offline-sync.md §6). */
     suspend fun purgeConfirmedReadings()
@@ -62,4 +70,28 @@ interface DiagnosticsRepository {
     fun observePredictiveAlerts(vehicleId: String): Flow<List<PredictiveAlert>>
 
     suspend fun acknowledgePredictiveAlert(id: String): Result<PredictiveAlert>
+
+    /** `GET /iot/alerts/tenant` (`iot:alerts:read`): alertas activas del taller. */
+    suspend fun getTenantPredictiveAlerts(): Result<List<PredictiveAlert>>
+
+    fun observeAllPredictiveAlerts(): Flow<List<PredictiveAlert>>
+
+    /** `POST /iot/alerts/{id}/convert-to-appointment` (`crm:appointments:create`). */
+    suspend fun convertAlertToAppointment(
+        alertId: String,
+        scheduledAt: Instant? = null,
+        estimatedDurationMinutes: Int? = null,
+        reason: String? = null
+    ): Result<ConvertedAppointment>
+
+    /** `GET /iot/telemetry/vehicle/{vehicleId}/latest` (`iot:telemetry:read`); null si 404. */
+    suspend fun getLatestVehicleTelemetry(vehicleId: String): Result<LatestVehicleTelemetry?>
+
+    /** `GET /iot/telemetry/vehicle/{vehicleId}/history` (`iot:telemetry:read`). */
+    suspend fun getVehicleTelemetryHistory(
+        vehicleId: String,
+        from: Instant? = null,
+        to: Instant? = null,
+        bucket: String? = null
+    ): Result<List<TelemetryHistoryBucket>>
 }

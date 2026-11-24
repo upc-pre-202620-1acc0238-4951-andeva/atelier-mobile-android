@@ -68,13 +68,22 @@ object ObdResponseParser {
     fun data(raw: String, prefix: String): List<Int>? =
         messages(raw).firstOrNull { it.hex.startsWith(prefix) }?.let { bytes(it.hex.substring(prefix.length)) }
 
-    /** Modo 03 (y la re-lectura de US20): códigos almacenados, sin repetir. */
-    fun dtcs(raw: String): List<Dtc> = messages(raw)
+    /**
+     * Modo 03 (y la re-lectura de US20): códigos almacenados, sin repetir.
+     * [isCanProtocol] viene de `ATDPN` (`true` para CAN `6`–`C`, `false` para ISO 9141-2 / KWP / J1850 `1`–`5`,
+     * `null` si el adaptador no informó protocolo): en CAN siempre precede el byte de cantidad de códigos, mientras que
+     * en protocolos anteriores a CAN los pares DTC van directo tras `43` sin byte de conteo.
+     */
+    fun dtcs(raw: String, isCanProtocol: Boolean? = null): List<Dtc> = messages(raw)
         .filter { it.hex.startsWith("43") }
         .flatMap { message ->
             val data = bytes(message.hex).drop(1)
-            // CAN antepone la cantidad de códigos (y en varias tramas rellena con ceros); los demás protocolos no.
-            val pairs = if (message.isMultiFrame || data.size % 2 == 1) {
+            val hasCountByte = when (isCanProtocol) {
+                true -> true
+                false -> false
+                null -> message.isMultiFrame || data.size % 2 == 1
+            }
+            val pairs = if (hasCountByte) {
                 data.drop(1).take((data.firstOrNull() ?: 0) * 2)
             } else {
                 data
@@ -105,6 +114,12 @@ object ObdResponseParser {
     /** `010B`: A kPa (presión absoluta del múltiple de admisión). */
     fun intakePressure(raw: String): Int? = data(raw, "410B")?.firstOrNull()
 
+    /** `0104`: A × 100 / 255 % (carga calculada del motor). */
+    fun engineLoad(raw: String): Double? = data(raw, "4104")?.firstOrNull()?.let { it * 100.0 / 255.0 }
+
+    /** `0111`: A × 100 / 255 % (posición del acelerador). */
+    fun throttlePosition(raw: String): Double? = data(raw, "4111")?.firstOrNull()?.let { it * 100.0 / 255.0 }
+
     /** `ATRV`: "12.6V". */
     fun voltage(raw: String): Double? = lines(raw).firstNotNullOfOrNull { VOLTAGE.matchEntire(it)?.groupValues?.get(1)?.toDouble() }
 
@@ -123,6 +138,16 @@ object ObdResponseParser {
     fun protocol(raw: String): String? {
         val code = lines(raw).firstOrNull()?.removePrefix("A") ?: return null
         return PROTOCOLS[code]
+    }
+
+    /** `ATDPN`: `true` si el protocolo activo es CAN (`6`..`C`), `false` si es legado (`1`..`5`), `null` si desconocido. */
+    fun isCanProtocol(raw: String): Boolean? {
+        val code = lines(raw).firstOrNull()?.removePrefix("A") ?: return null
+        return when (code) {
+            "6", "7", "8", "9", "A", "B", "C" -> true
+            "1", "2", "3", "4", "5" -> false
+            else -> null
+        }
     }
 
     /** Cuadro congelado (modo 02, cuadro 00): los datos van después del número de cuadro. */

@@ -3,10 +3,12 @@ package com.andeva.atelier.mobile.features.auth.presentation.forgot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,8 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -32,13 +34,17 @@ import com.andeva.atelier.mobile.R
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
 import com.andeva.atelier.mobile.core.designsystem.component.rise
 import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.features.auth.presentation.AuthHeroHeader
 
 /** A6 Recuperar contraseña · paso 1: pedir el enlace por correo. */
 @Composable
@@ -75,7 +81,8 @@ internal fun ForgotPasswordContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         AtelierTopBar(title = stringResource(R.string.auth_forgot_title), onBack = onBack)
 
@@ -83,51 +90,55 @@ internal fun ForgotPasswordContent(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            if (state.sent) {
-                Text(
-                    text = stringResource(R.string.auth_forgot_sent_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.rise(0)
-                )
-                AtelierBanner(
-                    message = stringResource(R.string.auth_forgot_sent),
-                    icon = Icons.Filled.CheckCircle,
-                    kind = BannerKind.Ok,
-                    modifier = Modifier.rise(1)
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.auth_forgot_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = atelier.inkSecondary,
-                    modifier = Modifier.rise(0)
-                )
-                state.error?.let { error ->
-                    AtelierBanner(message = error.asString(), icon = Icons.Filled.Error, kind = BannerKind.Bad)
+            AuthHeroHeader(
+                title = stringResource(if (state.sent) R.string.auth_forgot_sent_title else R.string.auth_forgot_title),
+                subtitle = if (!state.sent) stringResource(R.string.auth_forgot_body) else null,
+                modifier = Modifier.rise(0)
+            )
+
+            AtelierSurface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .rise(1),
+                tier = SurfaceTier.Elevated,
+                shape = CardLargeShape,
+                contentPadding = PaddingValues(20.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (state.sent) {
+                        AtelierBanner(
+                            message = stringResource(R.string.auth_forgot_sent),
+                            icon = Icons.Filled.CheckCircle,
+                            kind = BannerKind.Ok
+                        )
+                    } else {
+                        state.error?.let { error ->
+                            AtelierBanner(message = error.asString(), icon = Icons.Filled.Error, kind = BannerKind.Bad)
+                        }
+                        AtelierTextField(
+                            label = stringResource(R.string.auth_email_label),
+                            value = state.email,
+                            onValueChange = onEmailChange,
+                            leadingIcon = Icons.Outlined.Email,
+                            enabled = !state.isLoading,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                            autofill = ContentType.EmailAddress
+                        )
+                    }
                 }
-                AtelierTextField(
-                    label = stringResource(R.string.auth_email_label),
-                    value = state.email,
-                    onValueChange = onEmailChange,
-                    modifier = Modifier.rise(1),
-                    leadingIcon = Icons.Outlined.Email,
-                    enabled = !state.isLoading,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { onSubmit() }),
-                    autofill = ContentType.EmailAddress
-                )
             }
         }
 
+        HorizontalDivider(color = atelier.outlineSoft)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+                .background(MaterialTheme.colorScheme.background)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (state.sent) {

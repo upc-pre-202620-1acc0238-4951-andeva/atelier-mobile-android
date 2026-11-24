@@ -9,4 +9,6 @@ class ObserveAppointmentsUseCase @Inject constructor(
     private val receptionRepository: ReceptionRepository
 ) {
     operator fun invoke(date: LocalDate) = receptionRepository.observeAppointments(date)
+
+    operator fun invoke(from: LocalDate, to: LocalDate) = receptionRepository.observeAppointments(from, to)
 }

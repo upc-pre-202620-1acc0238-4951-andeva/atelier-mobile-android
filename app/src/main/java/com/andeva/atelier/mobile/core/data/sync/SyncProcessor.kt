@@ -11,6 +11,7 @@ class SyncProcessor(
     private val dao: PendingOperationDao,
     private val handlers: Map<String, OperationHandler>,
     private val maxAttemptsMessage: String,
+    private val preSyncHooks: Set<PreSyncHook> = emptySet(),
     private val now: () -> Long = System::currentTimeMillis
 ) {
     enum class Outcome { COMPLETED, STOPPED_UNAUTHORIZED }
@@ -19,38 +20,48 @@ class SyncProcessor(
      * Un solo envío a la vez en el proceso: `atelier-sync`, `atelier-sync-retry` y el periódico pueden arrancar juntos,
      * y `resetSyncing` de uno devolvería a PENDING lo que el otro está enviando (doble POST).
      */
-    suspend fun run(userId: String): Outcome = runLock.withLock { runLocked(userId) }
+    suspend fun run(userId: String): Outcome = runLock.withLock {
+        preSyncHooks.forEach { hook -> runCatching { hook.beforeSync(userId, forceFlushAll = false) } }
+        runLocked(userId)
+    }
 
     private suspend fun runLocked(userId: String): Outcome {
         dao.resetSyncing(userId)
-        for (operation in dao.nextBatch(userId, now())) {
-            val parentId = operation.dependsOn
-            if (parentId != null && dao.findById(parentId) != null) continue     // el padre aún no se completó
-            val handler = handlers[operation.type] ?: continue                     // tipo sin handler: queda PENDING
+        repeat(MAX_CHAIN_PASSES) {
+            var appliedInPass = false
+            for (operation in dao.nextBatch(userId, now())) {
+                val parentId = operation.dependsOn
+                if (parentId != null && dao.findById(parentId) != null) continue     // el padre aún no se completó
+                val handler = handlers[operation.type] ?: continue                     // tipo sin handler: queda PENDING
 
-            dao.markSyncing(operation.id)
-            val result = try {
-                handler.send(operation)
-            } catch (e: Exception) {
-                OperationResult.Retry(message = e.message)
-            }
-
-            when (result) {
-                OperationResult.Applied -> dao.delete(operation.id)
-                OperationResult.Unauthorized -> {
-                    dao.markRetry(operation.id, operation.attempts, operation.nextAttemptAt, 401, null, null)
-                    return Outcome.STOPPED_UNAUTHORIZED
+                dao.markSyncing(operation.id)
+                val result = try {
+                    handler.send(operation)
+                } catch (e: Exception) {
+                    OperationResult.Retry(message = e.message)
                 }
-                is OperationResult.Retry -> {
-                    val attempts = operation.attempts + 1
-                    if (attempts >= MAX_ATTEMPTS) {
-                        fail(operation.id, attempts, result.httpStatus, result.code, maxAttemptsMessage)
-                    } else {
-                        dao.markRetry(operation.id, attempts, now() + backoffMillis(attempts), result.httpStatus, result.code, result.message)
+
+                when (result) {
+                    OperationResult.Applied -> {
+                        dao.delete(operation.id)
+                        appliedInPass = true
                     }
+                    OperationResult.Unauthorized -> {
+                        dao.markRetry(operation.id, operation.attempts, operation.nextAttemptAt, 401, null, null)
+                        return Outcome.STOPPED_UNAUTHORIZED
+                    }
+                    is OperationResult.Retry -> {
+                        val attempts = operation.attempts + 1
+                        if (attempts >= MAX_ATTEMPTS) {
+                            fail(operation.id, attempts, result.httpStatus, result.code, maxAttemptsMessage)
+                        } else {
+                            dao.markRetry(operation.id, attempts, now() + backoffMillis(attempts), result.httpStatus, result.code, result.message)
+                        }
+                    }
+                    is OperationResult.Failed -> fail(operation.id, operation.attempts + 1, result.httpStatus, result.code, result.message)
                 }
-                is OperationResult.Failed -> fail(operation.id, operation.attempts + 1, result.httpStatus, result.code, result.message)
             }
+            if (!appliedInPass) return Outcome.COMPLETED
         }
         return Outcome.COMPLETED
     }
@@ -68,6 +79,7 @@ class SyncProcessor(
 
     companion object {
         const val MAX_ATTEMPTS = 8
+        private const val MAX_CHAIN_PASSES = 6
 
         private val runLock = Mutex()
 

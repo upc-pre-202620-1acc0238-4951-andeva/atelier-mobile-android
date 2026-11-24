@@ -33,6 +33,25 @@ interface CashierRepository {
     /** Lee un comprobante en la red y deja su cabecera en la caché. */
     suspend fun getVoucher(id: String): Result<Voucher>
 
+    /** Lista comprobantes de la sede de la sesión con filtros opcionales; falla con `MissingBranchException` sin sede. */
+    suspend fun getVouchers(
+        type: VoucherType? = null,
+        status: VoucherStatus? = null,
+        from: LocalDate? = null,
+        to: LocalDate? = null
+    ): Result<List<Voucher>>
+
+    /** Anula un comprobante electrónico (`POST /invoicing/vouchers/{id}/void`). */
+    suspend fun voidVoucher(voucherId: String, reason: String): Result<Voucher>
+
+    /** Emite una nota de crédito electrónica referenciando un comprobante vigente (`POST /invoicing/vouchers/credit-notes`). */
+    suspend fun issueCreditNote(
+        referenceVoucher: Voucher,
+        serie: String,
+        reason: String,
+        amount: BigDecimal
+    ): Result<Voucher>
+
     /** Series de la sede de la sesión; falla con `MissingBranchException` si la sesión no tiene sede. */
     suspend fun getBranchSeries(): Result<List<FiscalSeries>>
 
@@ -89,4 +108,18 @@ interface CashierRepository {
 
     /** Entrega el vehículo. Guarda la cabecera (mejor esfuerzo); una orden cerrada sale de la caché de la sede. */
     suspend fun deliver(workOrderId: String): Result<WorkOrder>
+
+    /** Descarga un archivo fiscal del comprobante (`pdfUrl`, `xmlUrl`, `cdrUrl`) a `cacheDir/pdfs`. */
+    suspend fun downloadVoucherDocument(url: String, fileNamePrefix: String): Result<File> =
+        Result.failure(UnsupportedOperationException())
+
+    /** Lee el perfil fiscal del taller (`GET /api/v1/tenants/current`, US42). */
+    suspend fun getTenantFiscalProfile(): Result<TenantFiscalProfile> =
+        Result.failure(UnsupportedOperationException())
+
+    /** Actualiza el perfil fiscal del taller (`PUT /api/v1/tenants/current`, US42). */
+    suspend fun updateTenantFiscalProfile(
+        name: String,
+        legalName: String
+    ): Result<TenantFiscalProfile> = Result.failure(UnsupportedOperationException())
 }

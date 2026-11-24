@@ -13,6 +13,9 @@ object ReceptionValidation {
     const val BRAND_MODEL_MAX = 50
     const val VIN_MAX = 17
     const val YEAR_MIN = 1950
+    const val APPOINTMENT_REASON_MAX = 1000
+    const val APPOINTMENT_CANCEL_REASON_MAX = 500
+    const val APPOINTMENT_DURATION_MIN = 15
 
     private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
@@ -40,4 +43,12 @@ object ReceptionValidation {
     fun isOptionalVin(value: String?) = value.isNullOrBlank() || value.trim().length <= VIN_MAX
 
     fun isOptionalYear(value: Int?) = value == null || value >= YEAR_MIN
+
+    fun isOptionalAppointmentReason(value: String?) =
+        value.isNullOrBlank() || value.trim().length <= APPOINTMENT_REASON_MAX
+
+    fun isAppointmentCancelReason(value: String) =
+        value.isNotBlank() && value.trim().length <= APPOINTMENT_CANCEL_REASON_MAX
+
+    fun isOptionalDurationMinutes(value: Int?) = value == null || value >= APPOINTMENT_DURATION_MIN
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Segmento 1: evolución visual «Precisión Automotriz» -->
+    <string name="today_cars_empty">Sin autos</string>
+    <string name="today_figure_ready_short">listos</string>
+    <string name="today_live_bay_badge">En vivo</string>
+
+    <string name="bays_filter_all_short">Todas</string>
+    <string name="bays_filter_available_short">Libres</string>
+    <string name="bays_filter_occupied_short">Ocupadas</string>
+    <string name="bays_filter_maintenance_short">Mant.</string>
+    <string name="bays_occupancy_title">Ocupación de bahías</string>
+    <string name="bays_occupancy_fraction">%1$d/%2$d</string>
+    <string name="bays_occupancy_breakdown">%1$d libres · %2$d en mantenimiento</string>
+
+    <string name="sync_summary_title">Estado de la cola</string>
+    <string name="sync_summary_counts">%1$d en cola · %2$d enviando · %3$d con error</string>
+
+    <string name="notif_summary_title">Requieren atención</string>
+    <string name="notif_summary_body">Revisa alertas de stock, descargos y aprobaciones pendientes.</string>
+
+    <string name="profile_account_summary">Resumen de cuenta</string>
+</resources>

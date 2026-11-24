@@ -10,7 +10,7 @@ primary-color-dark: #031A6B
 primary-color-soft: #69B1FF
 accent-color: #F68B01
 accent-color-dark: #D87900
-accent-color'soft: #FFCD69
+accent-color-soft: #FFCD69
 success: #3AC530
 error: #FB2C36
 warning: #F0B100

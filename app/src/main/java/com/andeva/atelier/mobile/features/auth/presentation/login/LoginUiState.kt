@@ -14,7 +14,9 @@ data class LoginUiState(
     /** Llegó desde A6 tras cambiar la contraseña: se muestra el aviso de éxito. */
     val passwordReset: Boolean = false,
     /** Un solo uso: el backend rechazó el acceso porque el correo no está verificado. */
-    val unverifiedEmail: String? = null
+    val unverifiedEmail: String? = null,
+    /** Cantidad total de operaciones pendientes en el dispositivo (US04). */
+    val devicePendingCount: Int = 0
 ) {
     val canSubmit: Boolean
         get() = !isLoading && AuthValidation.isEmail(email.trim()) && password.isNotEmpty()

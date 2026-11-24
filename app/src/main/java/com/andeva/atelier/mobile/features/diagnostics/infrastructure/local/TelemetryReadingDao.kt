@@ -20,10 +20,28 @@ interface TelemetryReadingDao {
     suspend fun vehiclesWithUnbatched(): List<String>
 
     @Query(
+        "SELECT DISTINCT vehicle_id FROM telemetry_readings WHERE batch_operation_id IS NULL " +
+            "AND (user_id = :userId OR user_id IS NULL)"
+    )
+    suspend fun vehiclesWithUnbatchedForUser(userId: String): List<String>
+
+    @Query(
+        "SELECT MAX(timestamp) FROM telemetry_readings WHERE vehicle_id = :vehicleId AND batch_operation_id IS NULL " +
+            "AND (user_id = :userId OR user_id IS NULL)"
+    )
+    suspend fun maxTimestampUnbatchedForUser(vehicleId: String, userId: String): Long?
+
+    @Query(
         "SELECT * FROM telemetry_readings WHERE vehicle_id = :vehicleId AND batch_operation_id IS NULL " +
             "ORDER BY timestamp LIMIT :limit"
     )
     suspend fun unbatched(vehicleId: String, limit: Int): List<TelemetryReadingEntity>
+
+    @Query(
+        "SELECT * FROM telemetry_readings WHERE vehicle_id = :vehicleId AND batch_operation_id IS NULL " +
+            "AND (user_id = :userId OR user_id IS NULL) ORDER BY timestamp LIMIT :limit"
+    )
+    suspend fun unbatchedForUser(vehicleId: String, userId: String, limit: Int): List<TelemetryReadingEntity>
 
     @Query("UPDATE telemetry_readings SET batch_operation_id = :operationId WHERE id IN (:ids)")
     suspend fun assignBatch(ids: List<String>, operationId: String)

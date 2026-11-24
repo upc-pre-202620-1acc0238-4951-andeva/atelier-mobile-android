@@ -16,6 +16,8 @@ Documentación para construir la app Android de staff. Está escrita en Markdown
 | 8 | [06-offline-sync.md](06-offline-sync.md) | **Sin red**: tablas Room, cola de operaciones, idempotencia por endpoint y flujos offline (revisión del modelo local del informe) |
 | 9 | [07-roadmap.md](07-roadmap.md) | **En qué paso va** la construcción: orden de features, estado, rama y qué reutilizar del núcleo |
 | — | [01-requirements/technical-stories.md](01-requirements/technical-stories.md) | Historias técnicas TS01–TS24 del backend (contexto) |
+| — | [../PRODUCT.md](../PRODUCT.md) | **Para quién** es la app, su voz y qué no se puede inventar |
+| — | [../DESIGN.md](../DESIGN.md) | **Cómo se ve**: sistema visual de la app (tokens, componentes, estados, carga) |
 
 ## Fuentes y cómo se generaron
 

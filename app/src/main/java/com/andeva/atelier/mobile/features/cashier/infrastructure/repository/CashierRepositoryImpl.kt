@@ -4,6 +4,8 @@ import com.andeva.atelier.mobile.core.data.local.SessionManager
 import com.andeva.atelier.mobile.core.data.remote.PdfDownloader
 import com.andeva.atelier.mobile.core.data.remote.apiCall
 import com.andeva.atelier.mobile.core.data.remote.apiCallUnit
+import com.andeva.atelier.mobile.core.data.remote.tenant.TenantService
+import com.andeva.atelier.mobile.core.data.remote.tenant.UpdateTenantProfileRequestDto
 import com.andeva.atelier.mobile.core.domain.ApiException
 import com.andeva.atelier.mobile.core.domain.MissingBranchException
 import com.andeva.atelier.mobile.core.domain.Money
@@ -16,8 +18,11 @@ import com.andeva.atelier.mobile.features.cashier.domain.IssueOutcome
 import com.andeva.atelier.mobile.features.cashier.domain.Payment
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentOutcomeUnknownException
+import com.andeva.atelier.mobile.features.cashier.domain.TenantFiscalProfile
 import com.andeva.atelier.mobile.features.cashier.domain.Voucher
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherDraft
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherItemType
+import com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.infrastructure.local.VoucherDao
@@ -31,6 +36,9 @@ import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.Configur
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.UpdateSeriesStatusRequestDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.ElectronicVoucherDto
 import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.HandoverService
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.IssueCreditNoteRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoidVoucherRequestDto
+import com.andeva.atelier.mobile.features.cashier.infrastructure.remote.VoucherLineRequestDto
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.WorkOrderDao
 import com.andeva.atelier.mobile.features.workorders.infrastructure.local.saveHeaderOrDeleteClosed
@@ -47,6 +55,7 @@ import retrofit2.Response
 import java.io.File
 import java.io.IOException
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Clock
 import java.time.LocalDate
 import javax.inject.Inject
@@ -66,7 +75,8 @@ class CashierRepositoryImpl @Inject constructor(
     private val pdfDownloader: PdfDownloader,
     private val sessionManager: SessionManager,
     private val gson: Gson,
-    private val clock: Clock
+    private val clock: Clock,
+    private val tenantService: TenantService? = null
 ) : CashierRepository {
 
     private val issueLocks = KeyedMutex()
@@ -87,6 +97,111 @@ class CashierRepositoryImpl @Inject constructor(
             cacheHeader(dto, fallbackWorkOrderId = null)
             dto.toDomain()
         }
+
+    override suspend fun getVouchers(
+        type: VoucherType?,
+        status: VoucherStatus?,
+        from: LocalDate?,
+        to: LocalDate?
+    ): Result<List<Voucher>> {
+        val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
+        return apiCall(gson, {
+            cashierService.getVouchers(
+                branchId = branchId,
+                voucherType = type?.code,
+                status = status?.name,
+                from = from?.toString(),
+                to = to?.toString()
+            )
+        }) { it }.mapCatching { dtos ->
+            val vouchers = dtos.map { it.toDomain() }
+            dtos.forEach { cacheHeader(it, it.workOrderId) }
+            vouchers
+        }
+    }
+
+    override suspend fun voidVoucher(voucherId: String, reason: String): Result<Voucher> {
+        val trimmed = reason.trim()
+        if (!CashierValidation.isValidReason(trimmed)) {
+            return Result.failure(InvalidCashierInputException("reason"))
+        }
+        return apiCall(gson, { cashierService.voidVoucher(voucherId, VoidVoucherRequestDto(trimmed)) }) { it }
+            .mapCatching { dto ->
+                val voucher = dto.toDomain()
+                cacheHeader(dto, dto.workOrderId)
+                voucher
+            }
+    }
+
+    override suspend fun issueCreditNote(
+        referenceVoucher: Voucher,
+        serie: String,
+        reason: String,
+        amount: BigDecimal
+    ): Result<Voucher> {
+        val trimmedReason = reason.trim()
+        if (!CashierValidation.isValidReason(trimmedReason)) {
+            return Result.failure(InvalidCashierInputException("reason"))
+        }
+        if (!CashierValidation.isValidMoneyAmount(amount, referenceVoucher.totalAmount.amount)) {
+            return Result.failure(InvalidCashierInputException("amount"))
+        }
+        val trimmedSerie = serie.trim().uppercase()
+        if (!CashierValidation.isCreditNoteSeries(trimmedSerie, referenceVoucher.type)) {
+            return Result.failure(InvalidCashierInputException("serie"))
+        }
+        if (!referenceVoucher.isActiveSale || referenceVoucher.status == VoucherStatus.DRAFT) {
+            return Result.failure(InvalidCashierInputException("status"))
+        }
+        val customerId = referenceVoucher.customerId
+            ?: return Result.failure(InvalidCashierInputException("customerId"))
+        val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
+
+        val normalizedAmount = amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP)
+        val fullMatch = normalizedAmount.compareTo(referenceVoucher.totalAmount.amount) == 0 &&
+            referenceVoucher.lines.isNotEmpty() &&
+            referenceVoucher.lines.all {
+                it.description.isNotBlank() &&
+                    it.unitPrice != null &&
+                    it.unitPrice >= MIN_PAYMENT &&
+                    it.quantity >= MIN_PAYMENT
+            }
+        val lines = if (fullMatch) {
+            referenceVoucher.lines.map { line ->
+                VoucherLineRequestDto(
+                    description = line.description.take(CashierValidation.MAX_LINE_DESCRIPTION_LENGTH),
+                    itemType = (line.itemType ?: VoucherItemType.SERVICE).name,
+                    quantity = line.quantity,
+                    unitPriceWithIgv = line.unitPrice!!,
+                    itemId = line.itemId
+                )
+            }
+        } else {
+            listOf(
+                VoucherLineRequestDto(
+                    description = trimmedReason.take(CashierValidation.MAX_LINE_DESCRIPTION_LENGTH),
+                    itemType = VoucherItemType.SERVICE.name,
+                    quantity = BigDecimal.ONE,
+                    unitPriceWithIgv = normalizedAmount,
+                    itemId = null
+                )
+            )
+        }
+        val request = IssueCreditNoteRequestDto(
+            branchId = branchId,
+            customerId = customerId,
+            lines = lines,
+            reason = trimmedReason,
+            reasonDescription = trimmedReason,
+            referenceVoucherId = referenceVoucher.id,
+            serie = trimmedSerie
+        )
+        return apiCall(gson, { cashierService.issueCreditNote(request) }) { it }.mapCatching { dto ->
+            val voucher = dto.toDomain()
+            cacheHeader(dto, dto.workOrderId)
+            voucher
+        }
+    }
 
     override suspend fun getBranchSeries(): Result<List<FiscalSeries>> {
         val branchId = sessionBranchId().getOrElse { return Result.failure(it) }
@@ -253,6 +368,56 @@ class CashierRepositoryImpl @Inject constructor(
     override suspend fun deliver(workOrderId: String): Result<WorkOrder> =
         apiCall(gson, { handoverService.deliver(workOrderId) }) { it }.mapCatching { saveWorkOrderHeader(it) }
 
+    override suspend fun downloadVoucherDocument(url: String, fileNamePrefix: String): Result<File> {
+        val ext = fileNamePrefix.substringAfterLast('.', "pdf").ifBlank { "pdf" }
+        return pdfDownloader.downloadFromUrl(url = url, fallbackName = fileNamePrefix, extension = ext)
+    }
+
+    override suspend fun getTenantFiscalProfile(): Result<TenantFiscalProfile> {
+        val service = tenantService ?: return Result.failure(IllegalStateException("Servicio de taller no disponible"))
+        return apiCall(gson, { service.getCurrent() }) { dto ->
+            TenantFiscalProfile(
+                id = dto.id,
+                name = dto.name.orEmpty(),
+                legalName = dto.legalName.orEmpty(),
+                taxId = dto.taxId.orEmpty(),
+                status = dto.status
+            )
+        }.onSuccess { profile ->
+            if (profile.name.isNotBlank()) {
+                sessionManager.updateTenantName(profile.name)
+            }
+        }
+    }
+
+    override suspend fun updateTenantFiscalProfile(
+        name: String,
+        legalName: String
+    ): Result<TenantFiscalProfile> {
+        val trimmedName = name.trim()
+        val trimmedLegalName = legalName.trim()
+        if (trimmedName.length !in 1..100) return Result.failure(InvalidCashierInputException("tenantName"))
+        if (trimmedLegalName.length !in 1..150) return Result.failure(InvalidCashierInputException("tenantLegalName"))
+        val service = tenantService ?: return Result.failure(IllegalStateException("Servicio de taller no disponible"))
+        val body = UpdateTenantProfileRequestDto(
+            name = trimmedName,
+            legalName = trimmedLegalName
+        )
+        return apiCall(gson, { service.updateCurrent(body) }) { dto ->
+            TenantFiscalProfile(
+                id = dto.id,
+                name = dto.name.orEmpty(),
+                legalName = dto.legalName.orEmpty(),
+                taxId = dto.taxId.orEmpty(),
+                status = dto.status
+            )
+        }.onSuccess { profile ->
+            if (profile.name.isNotBlank()) {
+                sessionManager.updateTenantName(profile.name)
+            }
+        }
+    }
+
     /** Mejor esfuerzo, como [cacheHeader]: si Room falla se devuelve igual la orden que respondió el backend. */
     private suspend fun saveWorkOrderHeader(dto: WorkOrderDto): WorkOrder {
         val now = clock.millis()
@@ -279,6 +444,7 @@ class CashierRepositoryImpl @Inject constructor(
         val MIN_PAYMENT = BigDecimal("0.01")
         const val MONEY_SCALE = 2
         const val MAX_REFERENCE_LENGTH = 100
+        const val SERIES_LENGTH = 4
         const val SERVER_ERROR = 500
 
         /** Un 2xx que llega como error: `apiCall` lo da así si no hay cuerpo (`EMPTY_BODY`). */

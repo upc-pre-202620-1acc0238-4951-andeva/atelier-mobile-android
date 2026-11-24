@@ -3,6 +3,7 @@ package com.andeva.atelier.mobile.features.workorders.presentation.open
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.andeva.atelier.mobile.core.data.remote.ConnectivityObserver
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.workorders.application.AddWorkOrderTaskUseCase
@@ -37,7 +38,8 @@ class OpenWorkOrderViewModel @Inject constructor(
     private val findDraft: FindDraftWorkOrderForVehicleUseCase,
     private val getServices: GetServiceCatalogUseCase,
     private val getMechanics: GetBranchMechanicsUseCase,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    connectivity: ConnectivityObserver? = null
 ) : ViewModel() {
 
     private val vehicleId: String = savedStateHandle["vehicleId"] ?: ""
@@ -62,6 +64,11 @@ class OpenWorkOrderViewModel @Inject constructor(
                     draftChecked = true
                     lookForDraft(branchId)
                 }
+            }
+        }
+        if (connectivity != null) {
+            viewModelScope.launch {
+                connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } }
             }
         }
         loadCatalog()

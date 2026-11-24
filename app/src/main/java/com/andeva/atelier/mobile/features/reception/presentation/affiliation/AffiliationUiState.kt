@@ -18,11 +18,13 @@ data class AffiliationUiState(
     /** Campo que no pasó la validación local (`email`, `taxId`, `phone`). */
     val invalidField: String? = null,
     val canLookup: Boolean = false,
-    val canAffiliate: Boolean = false
+    val canAffiliate: Boolean = false,
+    val isOnline: Boolean = true
 ) {
     val isBusy: Boolean get() = isSearching || isAffiliating
     val step: AffiliationStep? get() = lookup?.nextStep
-    val canSearch: Boolean get() = canLookup && email.isNotBlank() && !isBusy
+    val canSearch: Boolean get() = isOnline && canLookup && email.isNotBlank() && !isBusy
     val canSubmitAffiliation: Boolean
-        get() = canAffiliate && step == AffiliationStep.AFFILIATE && affiliated == null && taxId.isNotBlank() && !isBusy
+        get() = isOnline && canAffiliate && step == AffiliationStep.AFFILIATE && affiliated == null &&
+            taxId.isNotBlank() && !isBusy
 }

@@ -28,11 +28,13 @@ class Elm327ObdLink @Inject constructor(
 ) : ObdLink {
 
     @Volatile private var lastAddress: String? = null
+    @Volatile private var isCanProtocol: Boolean? = null
 
     override val isConnected: Boolean get() = transport.isOpen
 
     override suspend fun connect(address: String): Result<ObdConnectionInfo> {
         lastAddress = address
+        isCanProtocol = null
         return try {
             transport.open(address)
             send("ATZ", RESET_TIMEOUT_MILLIS)
@@ -43,7 +45,9 @@ class Elm327ObdLink @Inject constructor(
                 transport.close()
                 return Result.failure(ObdNoResponseException())
             }
-            val protocol = ObdResponseParser.protocol(send("ATDPN"))
+            val atdpnRaw = send("ATDPN")
+            val protocol = ObdResponseParser.protocol(atdpnRaw)
+            isCanProtocol = ObdResponseParser.isCanProtocol(atdpnRaw)
             // El VIN es opcional: varias ECU anteriores a CAN no lo informan o tardan demasiado.
             val vin = try {
                 ObdResponseParser.vin(send("0902", VIN_TIMEOUT_MILLIS))
@@ -75,12 +79,12 @@ class Elm327ObdLink @Inject constructor(
         when {
             ObdResponseParser.isNoData(raw) -> emptyList()
             ObdResponseParser.isNoResponse(raw) -> throw ObdNoResponseException()
-            else -> ObdResponseParser.dtcs(raw)
+            else -> ObdResponseParser.dtcs(raw, isCanProtocol)
         }
     }
 
     override suspend fun readFreezeFrame() = query {
-        val dtc = ObdResponseParser.freezeFrameDtc(send("0202")) ?: return@query null
+        val dtc = ObdResponseParser.freezeFrameDtc(send("020200")) ?: return@query null
         val rpm = ObdResponseParser.freezeFrameData(send("020C00"), "0C")?.takeIf { it.size >= 2 }?.let { (it[0] * 256 + it[1]) / 4 }
         FreezeFrame(
             dtc = dtc,
@@ -105,7 +109,9 @@ class Elm327ObdLink @Inject constructor(
             speedKmh = ObdResponseParser.speed(send("010D")),
             batteryVoltage = ObdResponseParser.voltage(send("ATRV")),
             fuelPercentage = ObdResponseParser.fuelLevel(send("012F")),
-            intakePressureKpa = ObdResponseParser.intakePressure(send("010B"))
+            intakePressureKpa = ObdResponseParser.intakePressure(send("010B")),
+            engineLoadPercentage = ObdResponseParser.engineLoad(send("0104")),
+            throttlePositionPercentage = ObdResponseParser.throttlePosition(send("0111"))
         )
     }
 
