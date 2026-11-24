@@ -13,6 +13,8 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherPaymentStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherSummary
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
+import com.andeva.atelier.mobile.features.cashier.presentation.CreditNoteForm
+import com.andeva.atelier.mobile.features.cashier.presentation.VoidForm
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrder
 import com.andeva.atelier.mobile.features.workorders.domain.WorkOrderStatus
 import java.io.File
@@ -20,7 +22,26 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 /** Qué acción de la pantalla está en vuelo; deshabilita las demás y pone el botón en carga. */
-enum class CheckoutAction { Preparing, Issuing, Paying, MarkingPaid, ExitPass, Delivering }
+enum class CheckoutAction {
+    Preparing,
+    Issuing,
+    Paying,
+    MarkingPaid,
+    ExitPass,
+    Delivering,
+    Voiding,
+    IssuingCreditNote,
+    RefreshingSunat,
+    DownloadingDocument
+}
+
+enum class CheckoutDocumentActionMode { OPEN, SHARE }
+
+data class PendingDocumentFile(
+    val file: File,
+    val mimeType: String,
+    val mode: CheckoutDocumentActionMode
+)
 
 /** Lo que muestra la pantalla de un comprobante, venga de la red (con IGV desglosado) o de la caché Room. */
 data class VoucherView(
@@ -37,8 +58,15 @@ data class VoucherView(
     val pending: BigDecimal,
     val paymentStatus: VoucherPaymentStatus?,
     val status: VoucherStatus?,
-    val isActiveSale: Boolean
-)
+    val isActiveSale: Boolean,
+    val pdfUrl: String? = null,
+    val xmlUrl: String? = null,
+    val cdrUrl: String? = null,
+    val sunatResponseCode: String? = null,
+    val sunatDescription: String? = null
+) {
+    val canVoidOrCreditNote: Boolean get() = isActiveSale && status != VoucherStatus.DRAFT
+}
 
 fun Voucher.toView() = VoucherView(
     id = id,
@@ -53,7 +81,12 @@ fun Voucher.toView() = VoucherView(
     pending = pendingBalance.amount,
     paymentStatus = paymentStatus,
     status = status,
-    isActiveSale = isActiveSale
+    isActiveSale = isActiveSale,
+    pdfUrl = pdfUrl,
+    xmlUrl = xmlUrl,
+    cdrUrl = cdrUrl,
+    sunatResponseCode = sunatResponseCode,
+    sunatDescription = sunatDescription
 )
 
 fun VoucherSummary.toView() = VoucherView(
@@ -69,7 +102,8 @@ fun VoucherSummary.toView() = VoucherView(
     pending = pendingBalance,
     paymentStatus = paymentStatus,
     status = status,
-    isActiveSale = isActiveSale
+    isActiveSale = isActiveSale,
+    pdfUrl = pdfUrl
 )
 
 /**
@@ -139,7 +173,12 @@ data class PaymentForm(
             it >= MIN_PAYMENT && it.stripTrailingZeros().scale() <= 2 && it <= voucher.pending
         }
 
-    val canSubmit: Boolean get() = parsedAmount != null && reference.trim().length <= MAX_REFERENCE
+    val requiresReference: Boolean get() = method != PaymentMethod.CASH
+
+    val referenceValid: Boolean
+        get() = !requiresReference || (reference.isNotBlank() && reference.trim().length <= MAX_REFERENCE)
+
+    val canSubmit: Boolean get() = parsedAmount != null && referenceValid
 
     companion object {
         val MIN_PAYMENT = BigDecimal("0.01")
@@ -151,6 +190,8 @@ sealed interface CheckoutSheet {
     data class Issue(val form: IssueForm) : CheckoutSheet
     data class Payment(val form: PaymentForm) : CheckoutSheet
     data object Deliver : CheckoutSheet
+    data class Void(val voucher: VoucherView, val form: VoidForm) : CheckoutSheet
+    data class CreditNote(val voucher: VoucherView, val form: CreditNoteForm) : CheckoutSheet
 }
 
 /**
@@ -177,6 +218,8 @@ data class WorkOrderCheckoutUiState(
     val notice: UiText? = null,
     val delivered: Boolean = false,
     val exitPass: File? = null,
+    val exitPassActionMode: CheckoutDocumentActionMode = CheckoutDocumentActionMode.OPEN,
+    val pendingDocument: PendingDocumentFile? = null,
     val canReadInvoices: Boolean = false,
     val canIssueVoucher: Boolean = false,
     val canRegisterPayment: Boolean = false,
@@ -187,6 +230,17 @@ data class WorkOrderCheckoutUiState(
         get() = liveVouchers?.map { it.toView() } ?: cachedVouchers.map { it.toView() }
 
     val activeVoucher: VoucherView? get() = vouchers.firstOrNull { it.isActiveSale }
+
+    val hasRejectedVoucherWithoutActive: Boolean
+        get() = activeVoucher == null && vouchers.any { it.status == VoucherStatus.REJECTED_SUNAT }
+
+    /** H26: diferencia por redondeo o IGV por línea entre el estimado de la orden y el total fiscal del comprobante. */
+    val hasDifferentialCascadeNote: Boolean
+        get() {
+            val orderTotal = order?.totalAmount?.amount ?: return false
+            val voucherTotal = activeVoucher?.total ?: return false
+            return voucherTotal.compareTo(orderTotal) != 0
+        }
 
     val isCompleted: Boolean get() = order?.status == WorkOrderStatus.COMPLETED
     val isOrderPaid: Boolean get() = order?.status == WorkOrderStatus.PAID

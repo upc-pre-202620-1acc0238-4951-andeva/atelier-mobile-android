@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,20 +44,29 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermission
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRefreshBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierRequiresConnection
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.BannerKind
 import com.andeva.atelier.mobile.core.designsystem.component.ChipKind
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.bone
+import com.andeva.atelier.mobile.core.designsystem.component.rememberAtelierHaptics
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
+import com.andeva.atelier.mobile.features.cashier.domain.TenantFiscalProfile
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.presentation.ChoiceGrid
 import com.andeva.atelier.mobile.features.cashier.presentation.labelRes
 
 /**
- * "Series de facturación": las series SUNAT de la sede (F001, B001…). Solo quien administra la facturación las ve y
- * las cambia. Agregar y activar o desactivar se decide en hoja inferior; sin red, deshabilitado.
+ * "Series de facturación": información fiscal del taller (RUC, razón social, nombre comercial y PSE administrado)
+ * más las series SUNAT de la sede (F001, B001, FC01…).
  */
 @Composable
 fun FiscalSeriesScreen(
@@ -62,6 +74,15 @@ fun FiscalSeriesScreen(
     viewModel: FiscalSeriesViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptics = rememberAtelierHaptics()
+
+    LaunchedEffect(state.notice) {
+        if (state.notice != null) haptics.confirm()
+    }
+    LaunchedEffect(state.sheetError) {
+        if (state.sheetError != null) haptics.reject()
+    }
+
     FiscalSeriesContent(
         state = state,
         onBack = onBack,
@@ -73,6 +94,10 @@ fun FiscalSeriesScreen(
         onInitial = viewModel::onInitial,
         onSave = viewModel::onSave,
         onToggleActive = viewModel::onToggleActive,
+        onEditTenant = viewModel::onEditTenant,
+        onTenantName = viewModel::onTenantName,
+        onTenantLegalName = viewModel::onTenantLegalName,
+        onSaveTenant = viewModel::onSaveTenant,
         onDismissSheet = viewModel::onDismissSheet
     )
 }
@@ -89,8 +114,13 @@ private fun FiscalSeriesContent(
     onInitial: (String) -> Unit,
     onSave: () -> Unit,
     onToggleActive: () -> Unit,
+    onEditTenant: () -> Unit = {},
+    onTenantName: (String) -> Unit = {},
+    onTenantLegalName: (String) -> Unit = {},
+    onSaveTenant: () -> Unit = {},
     onDismissSheet: () -> Unit
 ) {
+    val showSkeleton = rememberDelayedLoading(state.showSkeleton && state.hasAccess)
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -108,7 +138,7 @@ private fun FiscalSeriesContent(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             AtelierRefreshBar(visible = state.isRefreshing && state.hasLoaded)
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
-                if (!state.canManage) {
+                if (!state.hasAccess) {
                     item(key = "no-access") {
                         AtelierNoPermissionState(
                             text = stringResource(R.string.cashier_series_no_access),
@@ -117,28 +147,88 @@ private fun FiscalSeriesContent(
                     }
                     return@LazyColumn
                 }
-                item(key = "hint") {
-                    Text(
-                        text = stringResource(R.string.cashier_series_hint),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AtelierTheme.colors.inkSecondary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                }
                 state.notice?.let { notice ->
                     item(key = "notice") {
                         AtelierBanner(
                             message = notice.asString(),
                             icon = Icons.Outlined.CheckCircle,
                             kind = BannerKind.Ok,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                }
+                if (state.canReadTenant || state.canUpdateTenant || state.tenantProfile != null) {
+                    item(key = "tenant-fiscal-header") {
+                        AtelierSectionHeader(
+                            title = stringResource(R.string.cashier_fiscal_tenant_section),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                    item(key = "tenant-fiscal-card") {
+                        TenantFiscalSectionCard(
+                            profile = state.tenantProfile,
+                            canUpdateTenant = state.canUpdateTenant,
+                            isOnline = state.isOnline,
+                            onEdit = onEditTenant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                item(key = "pse-managed-card") {
+                    PseManagedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+                if (state.canManage) {
+                    item(key = "series-section-header") {
+                        AtelierSectionHeader(
+                            title = stringResource(R.string.cashier_series_branch_section),
+                            count = state.series.size,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                    item(key = "hint") {
+                        Text(
+                            text = stringResource(R.string.cashier_series_nc_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AtelierTheme.colors.inkSecondary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                     }
                 }
                 when {
-                    state.showSkeleton -> items(3, key = { "bone-$it" }) {
-                        AtelierListRow(title = "B001", subtitle = "Boleta · Último número", loading = true)
+                    showSkeleton -> items(3, key = { "bone-$it" }) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "B001",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.bone(loading = true, widthFraction = 0.25f)
+                                )
+                                Text(
+                                    text = "Boleta · Último número",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.bone(loading = true, widthFraction = 0.6f)
+                                )
+                            }
+                            Text(
+                                text = "Activa",
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.bone(loading = true)
+                            )
+                        }
                     }
+                    state.showSkeleton -> Unit
                     state.error != null && state.series.isEmpty() -> item(key = "error") {
                         if (!state.isOnline) {
                             AtelierOfflineState(modifier = Modifier.padding(horizontal = 16.dp), onRetry = onRefresh)
@@ -150,7 +240,7 @@ private fun FiscalSeriesContent(
                             )
                         }
                     }
-                    state.series.isEmpty() -> item(key = "empty") {
+                    state.series.isEmpty() && state.canManage -> item(key = "empty") {
                         AtelierEmptyState(
                             text = stringResource(R.string.cashier_series_empty),
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -179,7 +269,98 @@ private fun FiscalSeriesContent(
             }
         }
     }
-    SeriesSheets(state, onType, onSerie, onInitial, onSave, onToggleActive, onDismissSheet)
+    SeriesSheets(
+        state = state,
+        onType = onType,
+        onSerie = onSerie,
+        onInitial = onInitial,
+        onSave = onSave,
+        onToggleActive = onToggleActive,
+        onTenantName = onTenantName,
+        onTenantLegalName = onTenantLegalName,
+        onSaveTenant = onSaveTenant,
+        onDismiss = onDismissSheet
+    )
+}
+
+@Composable
+private fun TenantFiscalSectionCard(
+    profile: TenantFiscalProfile?,
+    canUpdateTenant: Boolean,
+    isOnline: Boolean,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AtelierSurface(
+        tier = SurfaceTier.Card,
+        shape = CardLargeShape,
+        contentPadding = PaddingValues(Spacing.md),
+        modifier = modifier
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (profile != null) {
+                Text(
+                    text = profile.legalName.ifBlank { profile.name },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (profile.name.isNotBlank() && profile.name != profile.legalName) {
+                    Text(
+                        text = profile.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AtelierTheme.colors.inkSecondary
+                    )
+                }
+                if (profile.taxId.isNotBlank()) {
+                    Text(
+                        text = "${stringResource(R.string.cashier_doc_ruc)}: ${profile.taxId}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = AtelierTheme.colors.primaryText
+                    )
+                }
+            }
+            if (canUpdateTenant) {
+                AtelierButton(
+                    text = stringResource(R.string.cashier_fiscal_tenant_edit),
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
+                    style = AtelierButtonStyle.Tonal,
+                    enabled = isOnline
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PseManagedCard(modifier: Modifier = Modifier) {
+    AtelierSurface(
+        tier = SurfaceTier.Card,
+        shape = CardLargeShape,
+        contentPadding = PaddingValues(Spacing.md),
+        modifier = modifier
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.cashier_fiscal_pse_managed_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                AtelierChip(text = stringResource(R.string.cashier_series_active), kind = ChipKind.Ok)
+            }
+            Text(
+                text = stringResource(R.string.cashier_fiscal_pse_managed_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = AtelierTheme.colors.inkSecondary
+            )
+        }
+    }
 }
 
 @Composable
@@ -190,6 +371,9 @@ private fun SeriesSheets(
     onInitial: (String) -> Unit,
     onSave: () -> Unit,
     onToggleActive: () -> Unit,
+    onTenantName: (String) -> Unit,
+    onTenantLegalName: (String) -> Unit,
+    onSaveTenant: () -> Unit,
     onDismiss: () -> Unit
 ) {
     when (val sheet = state.sheet) {
@@ -230,6 +414,49 @@ private fun SeriesSheets(
         ) {
             SeriesDetailContent(sheet.series, state.sheetError?.asString())
         }
+        is SeriesSheet.EditTenant -> AtelierBottomSheet(
+            title = stringResource(R.string.cashier_fiscal_tenant_section),
+            onDismiss = onDismiss,
+            actions = {
+                AtelierButton(
+                    text = stringResource(R.string.cashier_fiscal_tenant_save),
+                    onClick = onSaveTenant,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = sheet.form.canSubmit && state.isOnline,
+                    loading = state.isSaving
+                )
+                if (!state.isOnline) AtelierRequiresConnection()
+                CancelButton(onDismiss, enabled = !state.isSaving)
+            }
+        ) {
+            if (sheet.form.taxId.isNotBlank()) {
+                AtelierTextField(
+                    label = stringResource(R.string.cashier_fiscal_tenant_ruc),
+                    value = sheet.form.taxId,
+                    onValueChange = {},
+                    enabled = false
+                )
+            }
+            AtelierTextField(
+                label = stringResource(R.string.cashier_fiscal_tenant_legal_name),
+                value = sheet.form.legalName,
+                onValueChange = onTenantLegalName,
+                isError = sheet.form.legalName.isNotEmpty() && !sheet.form.legalNameValid,
+                errorText = stringResource(R.string.cashier_err_tenant_name).takeIf {
+                    sheet.form.legalName.isNotEmpty() && !sheet.form.legalNameValid
+                }
+            )
+            AtelierTextField(
+                label = stringResource(R.string.cashier_fiscal_tenant_name),
+                value = sheet.form.name,
+                onValueChange = onTenantName,
+                isError = sheet.form.name.isNotEmpty() && !sheet.form.nameValid,
+                errorText = stringResource(R.string.cashier_err_tenant_name).takeIf {
+                    sheet.form.name.isNotEmpty() && !sheet.form.nameValid
+                }
+            )
+            state.sheetError?.let { AtelierBanner(message = it.asString(), icon = Icons.Outlined.ErrorOutline) }
+        }
         null -> Unit
     }
 }
@@ -259,19 +486,25 @@ private fun SeriesFormContent(
         color = AtelierTheme.colors.inkSecondary
     )
     ChoiceGrid(
-        options = listOf(VoucherType.BOLETA, VoucherType.FACTURA),
+        options = listOf(VoucherType.BOLETA, VoucherType.FACTURA, VoucherType.NOTA_CREDITO),
         selected = form.type,
         label = { stringResource(it.labelRes()) },
         onSelect = onType,
-        columns = 2
+        columns = 3
     )
     AtelierTextField(
         label = stringResource(R.string.cashier_series_serie),
         value = form.serie,
         onValueChange = onSerie,
-        placeholder = if (form.type == VoucherType.FACTURA) "F001" else "B001",
+        placeholder = when (form.type) {
+            VoucherType.FACTURA -> "F001"
+            VoucherType.BOLETA -> "B001"
+            VoucherType.NOTA_CREDITO -> "FC01"
+        },
         isError = form.serie.length == 4 && !form.serieValid,
-        errorText = stringResource(R.string.cashier_series_serie_error).takeIf { form.serie.length == 4 && !form.serieValid }
+        errorText = stringResource(
+            if (form.type == VoucherType.NOTA_CREDITO) R.string.cashier_nc_serie_error else R.string.cashier_series_serie_error
+        ).takeIf { form.serie.length == 4 && !form.serieValid }
     )
     AtelierTextField(
         label = stringResource(R.string.cashier_series_initial),
@@ -314,7 +547,19 @@ private val previewState = FiscalSeriesUiState(series = previewSeries, hasLoaded
 
 @Composable
 private fun PreviewContent(state: FiscalSeriesUiState) {
-    FiscalSeriesContent(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    FiscalSeriesContent(
+        state = state,
+        onBack = {},
+        onRefresh = {},
+        onAdd = {},
+        onOpenSeries = {},
+        onType = {},
+        onSerie = {},
+        onInitial = {},
+        onSave = {},
+        onToggleActive = {},
+        onDismissSheet = {}
+    )
 }
 
 @Preview(name = "Series · claro", widthDp = 390, heightDp = 844)

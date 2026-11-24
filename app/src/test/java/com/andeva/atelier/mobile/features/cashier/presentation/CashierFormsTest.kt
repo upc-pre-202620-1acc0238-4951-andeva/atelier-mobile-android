@@ -8,6 +8,8 @@ import com.andeva.atelier.mobile.features.cashier.domain.VoucherLineDraft
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherPaymentStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
+import com.andeva.atelier.mobile.features.cashier.presentation.CreditNoteForm
+import com.andeva.atelier.mobile.features.cashier.presentation.VoidForm
 import com.andeva.atelier.mobile.features.cashier.presentation.checkout.IssueForm
 import com.andeva.atelier.mobile.features.cashier.presentation.checkout.PaymentForm
 import com.andeva.atelier.mobile.features.cashier.presentation.checkout.VoucherView
@@ -87,6 +89,9 @@ class CashierFormsTest {
         assertNull(form.copy(amount = "0").parsedAmount)
         assertNull(form.copy(amount = "10.123").parsedAmount)
         assertFalse(form.copy(amount = "abc").canSubmit)
+        assertTrue(form.canSubmit)
+        assertFalse(form.copy(method = com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod.DIGITAL_WALLET_YAPE, reference = "   ").canSubmit)
+        assertTrue(form.copy(method = com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod.DIGITAL_WALLET_YAPE, reference = "OP-12345").canSubmit)
     }
 
     @Test
@@ -96,5 +101,30 @@ class CashierFormsTest {
         assertTrue(SeriesForm(VoucherType.BOLETA, "B01A", initial = "25").canSubmit)
         assertEquals(25, SeriesForm(initial = "25").initialCorrelative)
         assertFalse(SeriesForm(VoucherType.BOLETA, "B001", initial = "x").canSubmit)
+    }
+
+    @Test
+    fun `anular exige motivo de hasta 250 caracteres`() {
+        assertFalse(VoidForm("v1", "B001-00000001", reason = "   ").canSubmit)
+        assertTrue(VoidForm("v1", "B001-00000001", reason = "Error en datos").canSubmit)
+        assertFalse(VoidForm("v1", "B001-00000001", reason = "x".repeat(251)).canSubmit)
+    }
+
+    @Test
+    fun `nota de credito exige motivo y monto valido hasta el total`() {
+        val base = CreditNoteForm(
+            referenceVoucherId = "v1",
+            referenceLabel = "F001-00000001",
+            maxAmount = BigDecimal("500.00"),
+            currency = "PEN",
+            reason = "Descuento por demora",
+            amount = "500.00"
+        )
+        assertTrue(base.canSubmit)
+        assertEquals(BigDecimal("125.50"), base.copy(amount = "125,50").parsedAmount)
+        assertNull(base.copy(amount = "500.01").parsedAmount)
+        assertNull(base.copy(amount = "0").parsedAmount)
+        assertNull(base.copy(amount = "10.123").parsedAmount)
+        assertFalse(base.copy(reason = "  ").canSubmit)
     }
 }

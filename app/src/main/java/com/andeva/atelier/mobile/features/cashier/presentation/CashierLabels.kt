@@ -75,11 +75,15 @@ internal fun Throwable.toCashierText(): UiText = when (this) {
         when (field) {
             "lines" -> R.string.cashier_err_lines
             "taxId" -> R.string.cashier_err_tax_id
+            "legalName" -> R.string.cashier_err_legal_name
+            "tenantName", "tenantLegalName" -> R.string.cashier_err_tenant_name
             "serie" -> R.string.cashier_err_serie
             "initialCorrelative" -> R.string.cashier_err_initial
             "amount" -> R.string.cashier_err_amount
             "transactionReference" -> R.string.cashier_err_reference
             "status" -> R.string.cashier_err_status
+            "reason" -> R.string.cashier_err_reason
+            "customerId" -> R.string.cashier_err_customer
             else -> R.string.cashier_err_input
         }
     )

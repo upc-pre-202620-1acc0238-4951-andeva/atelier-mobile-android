@@ -8,7 +8,9 @@ import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.cashier.application.ConfigureSeriesUseCase
 import com.andeva.atelier.mobile.features.cashier.application.GetBranchSeriesUseCase
+import com.andeva.atelier.mobile.features.cashier.application.GetTenantFiscalProfileUseCase
 import com.andeva.atelier.mobile.features.cashier.application.SetSeriesActiveUseCase
+import com.andeva.atelier.mobile.features.cashier.application.UpdateTenantFiscalProfileUseCase
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalSeries
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
 import com.andeva.atelier.mobile.features.cashier.presentation.toCashierText
@@ -17,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,8 +29,10 @@ class FiscalSeriesViewModel @Inject constructor(
     private val getSeries: GetBranchSeriesUseCase,
     private val configureSeries: ConfigureSeriesUseCase,
     private val setSeriesActive: SetSeriesActiveUseCase,
-    observeSession: ObserveSessionUseCase,
-    connectivity: ConnectivityObserver
+    private val observeSession: ObserveSessionUseCase,
+    connectivity: ConnectivityObserver,
+    private val getTenantFiscalProfile: GetTenantFiscalProfileUseCase? = null,
+    private val updateTenantFiscalProfile: UpdateTenantFiscalProfileUseCase? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FiscalSeriesUiState())
@@ -36,7 +41,13 @@ class FiscalSeriesViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             observeSession().collect { session ->
-                _uiState.update { it.copy(canManage = session?.has(Permission.FISCAL_CONFIG_MANAGE) == true) }
+                _uiState.update {
+                    it.copy(
+                        canManage = session?.has(Permission.FISCAL_CONFIG_MANAGE) == true,
+                        canReadTenant = session?.has(Permission.TENANTS_READ) == true,
+                        canUpdateTenant = session?.has(Permission.TENANTS_UPDATE) == true
+                    )
+                }
             }
         }
         viewModelScope.launch { connectivity.isOnline.collect { online -> _uiState.update { it.copy(isOnline = online) } } }
@@ -50,12 +61,76 @@ class FiscalSeriesViewModel @Inject constructor(
     }
 
     private suspend fun load() {
-        getSeries()
-            .onSuccess { series ->
-                val sorted = series.sortedWith(compareBy({ it.type?.ordinal ?: Int.MAX_VALUE }, { it.serie }))
-                _uiState.update { it.copy(series = sorted, hasLoaded = true, isRefreshing = false) }
-            }
-            .onFailure { e -> _uiState.update { it.copy(hasLoaded = true, isRefreshing = false, error = e.toCashierText()) } }
+        val session = observeSession().firstOrNull()
+        val canManage = session?.has(Permission.FISCAL_CONFIG_MANAGE) == true || _uiState.value.canManage
+        val canReadTenant = session?.has(Permission.TENANTS_READ) == true ||
+            session?.has(Permission.TENANTS_UPDATE) == true ||
+            _uiState.value.canReadTenant ||
+            _uiState.value.canUpdateTenant
+
+        var failure: Throwable? = null
+        if (canReadTenant && getTenantFiscalProfile != null) {
+            getTenantFiscalProfile()
+                .onSuccess { profile -> _uiState.update { it.copy(tenantProfile = profile) } }
+                .onFailure { e -> failure = e }
+        }
+        if (canManage || session == null) {
+            getSeries()
+                .onSuccess { series ->
+                    val sorted = series.sortedWith(compareBy({ it.type?.ordinal ?: Int.MAX_VALUE }, { it.serie }))
+                    _uiState.update { it.copy(series = sorted) }
+                }
+                .onFailure { e -> failure = failure ?: e }
+        }
+        _uiState.update {
+            it.copy(
+                hasLoaded = true,
+                isRefreshing = false,
+                error = failure?.toCashierText()
+            )
+        }
+    }
+
+    fun onEditTenant() {
+        val state = _uiState.value
+        if (!state.canUpdateTenant) return
+        val profile = state.tenantProfile
+        val form = TenantProfileForm(
+            name = profile?.name.orEmpty(),
+            legalName = profile?.legalName?.ifBlank { profile.name }.orEmpty(),
+            taxId = profile?.taxId.orEmpty()
+        )
+        _uiState.update { it.copy(sheet = SeriesSheet.EditTenant(form), sheetError = null, notice = null) }
+    }
+
+    fun onTenantName(value: String) = updateTenantForm { it.copy(name = value.take(100)) }
+    fun onTenantLegalName(value: String) = updateTenantForm { it.copy(legalName = value.take(150)) }
+
+    private fun updateTenantForm(change: (TenantProfileForm) -> TenantProfileForm) = _uiState.update { state ->
+        val sheet = state.sheet as? SeriesSheet.EditTenant ?: return@update state
+        state.copy(sheet = SeriesSheet.EditTenant(change(sheet.form)), sheetError = null)
+    }
+
+    fun onSaveTenant() {
+        val state = _uiState.value
+        val form = (state.sheet as? SeriesSheet.EditTenant)?.form ?: return
+        val updater = updateTenantFiscalProfile ?: return
+        if (!state.canUpdateTenant || !form.canSubmit || !state.isOnline || state.isSaving) return
+        _uiState.update { it.copy(isSaving = true, sheetError = null) }
+        viewModelScope.launch {
+            updater(form.name, form.legalName)
+                .onSuccess { updated ->
+                    _uiState.update {
+                        it.copy(
+                            tenantProfile = updated,
+                            sheet = null,
+                            notice = UiText.Resource(R.string.cashier_fiscal_tenant_saved)
+                        )
+                    }
+                }
+                .onFailure { e -> _uiState.update { it.copy(sheetError = e.toCashierText()) } }
+            _uiState.update { it.copy(isSaving = false) }
+        }
     }
 
     fun onAdd() {

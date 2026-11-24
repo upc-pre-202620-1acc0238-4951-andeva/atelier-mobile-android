@@ -2,7 +2,10 @@ package com.andeva.atelier.mobile.features.cashier.presentation.dailycash
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,14 +39,28 @@ import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierEmptyState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierErrorState
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedCard
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierGroupedRow
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierListRow
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMainTopBar
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierMetricBar
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierNoPermissionState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierOfflineState
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierReportPanel
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierSectionHeader
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierSurface
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierTopBar
 import com.andeva.atelier.mobile.core.designsystem.component.PanelFigure
+import com.andeva.atelier.mobile.core.designsystem.component.SurfaceTier
+import com.andeva.atelier.mobile.core.designsystem.component.bone
+import com.andeva.atelier.mobile.core.designsystem.component.floatingBarPadding
+import com.andeva.atelier.mobile.core.designsystem.component.rememberDelayedLoading
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierBlue
+import com.andeva.atelier.mobile.core.designsystem.theme.AtelierBlueSoft
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierWorkshopTheme
+import com.andeva.atelier.mobile.core.designsystem.theme.CardLargeShape
+import com.andeva.atelier.mobile.core.designsystem.theme.Spacing
 import com.andeva.atelier.mobile.core.domain.Money
 import com.andeva.atelier.mobile.core.presentation.format
 import com.andeva.atelier.mobile.features.cashier.domain.DailyCashSummary
@@ -53,6 +73,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private val PanelDateFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale.forLanguageTag("es-PE"))
 private val FullDateFormatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale.forLanguageTag("es-PE"))
@@ -64,12 +85,16 @@ private val FullDateFormatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", 
 @Composable
 fun DailyCashScreen(
     onBack: () -> Unit,
+    onOpenVouchers: () -> Unit = {},
+    showBack: Boolean = true,
     viewModel: DailyCashViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     DailyCashContent(
         state = state,
+        showBack = showBack,
         onBack = onBack,
+        onOpenVouchers = onOpenVouchers,
         onRetry = viewModel::load,
         onPreviousDay = viewModel::onPreviousDay,
         onNextDay = viewModel::onNextDay,
@@ -80,19 +105,31 @@ fun DailyCashScreen(
 @Composable
 private fun DailyCashContent(
     state: DailyCashUiState,
+    showBack: Boolean = true,
     onBack: () -> Unit,
+    onOpenVouchers: () -> Unit,
     onRetry: () -> Unit,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit
 ) {
     val summary = state.summary
-    val showSkeleton = state.isLoading && summary == null
+    val showSkeleton = rememberDelayedLoading(state.isLoading && summary == null)
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            if (showBack) {
+                AtelierTopBar(title = stringResource(R.string.cashier_daily_title), onBack = onBack)
+            } else {
+                AtelierMainTopBar(title = stringResource(R.string.cashier_daily_title))
+            }
+        }
     ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
             item(key = "panel") {
                 AtelierReportPanel(
                     context = stringResource(R.string.cashier_daily_context, PanelDateFormatter.format(state.date)),
@@ -106,12 +143,7 @@ private fun DailyCashContent(
                                 pluralStringResource(R.plurals.cashier_daily_payments, it.paymentCount)
                             )
                         )
-                    }.orEmpty(),
-                    actions = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                        }
-                    }
+                    }.orEmpty()
                 )
             }
             if (!state.canRead) {
@@ -124,9 +156,34 @@ private fun DailyCashContent(
                 return@LazyColumn
             }
             item(key = "date") { DateSwitcher(state, onPreviousDay, onNextDay, onToday) }
+            item(key = "vouchers-shortcut") {
+                AtelierGroupedCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    AtelierGroupedRow(
+                        title = stringResource(R.string.cashier_daily_vouchers),
+                        subtitle = stringResource(R.string.cashier_daily_vouchers_sub),
+                        icon = Icons.Outlined.ReceiptLong,
+                        onClick = onOpenVouchers
+                    )
+                }
+            }
             when {
                 showSkeleton -> items(3, key = { "bone-$it" }) {
-                    AtelierListRow(title = "Efectivo", subtitle = "Detalle", loading = true)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Efectivo",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier
+                                .weight(1f)
+                                .bone(loading = true, widthFraction = 0.55f)
+                        )
+                        AmountText(value = PLACEHOLDER_TOTAL, loading = true)
+                    }
                 }
                 summary == null -> item(key = "error") {
                     if (!state.isOnline) {
@@ -152,11 +209,61 @@ private fun DailyCashContent(
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
-                    items(summary.byMethod.entries.sortedByDescending { it.value.amount }, key = { "method-${it.key}" }) { (method, total) ->
-                        AtelierListRow(
-                            title = stringResource(method.labelRes()),
-                            trailing = { AmountText(total.format()) }
-                        )
+                    item(key = "methods-card") {
+                        val methodEntries = summary.byMethod.entries.sortedByDescending { it.value.amount }
+                        val totalCollectedFloat = summary.totalCollected.amount.toFloat().coerceAtLeast(0f)
+                        AtelierSurface(
+                            tier = SurfaceTier.Card,
+                            shape = CardLargeShape,
+                            contentPadding = PaddingValues(Spacing.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                methodEntries.forEachIndexed { index, (method, total) ->
+                                    val ratio = if (totalCollectedFloat > 0f) {
+                                        (total.amount.toFloat() / totalCollectedFloat).coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                    val sharePercent = (ratio * 100f).roundToInt()
+                                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = stringResource(method.labelRes()),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.premium_daily_method_share, sharePercent),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = AtelierTheme.colors.inkSecondary
+                                                )
+                                                AmountText(total.format())
+                                            }
+                                        }
+                                        AtelierMetricBar(
+                                            progress = ratio,
+                                            color = methodMetricColor(method),
+                                            height = 6.dp
+                                        )
+                                    }
+                                    if (index < methodEntries.lastIndex) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                    }
+                                }
+                            }
+                        }
                     }
                     item(key = "payments-header") {
                         AtelierSectionHeader(
@@ -177,13 +284,33 @@ private fun DailyCashContent(
                     }
                 }
             }
+            item(key = "floating-bar-space") { Spacer(Modifier.floatingBarPadding()) }
         }
     }
 }
 
 @Composable
-private fun AmountText(value: String) {
-    Text(text = value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+private fun methodMetricColor(method: PaymentMethod?): Color {
+    val colors = AtelierTheme.colors
+    return when (method) {
+        PaymentMethod.CASH -> colors.okMark
+        PaymentMethod.DIGITAL_WALLET_YAPE,
+        PaymentMethod.DIGITAL_WALLET_PLIN -> AtelierBlue
+        PaymentMethod.CREDIT_CARD,
+        PaymentMethod.DEBIT_CARD -> AtelierBlueSoft
+        PaymentMethod.BANK_TRANSFER -> colors.info
+        null -> colors.muted
+    }
+}
+
+@Composable
+private fun AmountText(value: String, loading: Boolean = false) {
+    Text(
+        text = value,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.bone(loading)
+    )
 }
 
 @Composable
@@ -250,7 +377,7 @@ private val previewState = DailyCashUiState(
 
 @Composable
 private fun PreviewContent(state: DailyCashUiState) {
-    DailyCashContent(state, onBack = {}, onRetry = {}, onPreviousDay = {}, onNextDay = {}, onToday = {})
+    DailyCashContent(state, onBack = {}, onOpenVouchers = {}, onRetry = {}, onPreviousDay = {}, onNextDay = {}, onToday = {})
 }
 
 @Preview(name = "Caja del día · claro", widthDp = 390, heightDp = 844)

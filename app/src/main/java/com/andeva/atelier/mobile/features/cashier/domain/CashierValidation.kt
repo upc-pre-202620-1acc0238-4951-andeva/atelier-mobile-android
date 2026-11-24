@@ -10,6 +10,10 @@ object CashierValidation {
     private const val RUC_LENGTH = 11
     private const val DNI_LENGTH = 8
     private const val SERIES_LENGTH = 4
+    const val MAX_REASON_LENGTH = 250
+    const val MAX_LINE_DESCRIPTION_LENGTH = 200
+    val MIN_AMOUNT: BigDecimal = BigDecimal("0.01")
+    const val MONEY_SCALE = 2
 
     /** Nombres genéricos de `GET /work-orders/{id}` (H11): "Standard Service" y "Product {uuid}". */
     private const val SERVICE_PLACEHOLDER = "Standard Service"
@@ -40,4 +44,26 @@ object CashierValidation {
         return serie.length == SERIES_LENGTH && serie[0] == prefix &&
             serie.drop(1).all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' }
     }
+
+    /** Serie de 4 caracteres alfanuméricos para nota de crédito (`F` para factura, `B` para boleta). */
+    fun isCreditNoteSeries(serie: String, referenceType: VoucherType? = null): Boolean {
+        val trimmed = serie.trim()
+        if (trimmed.length != SERIES_LENGTH) return false
+        val first = trimmed[0]
+        val validPrefix = when (referenceType) {
+            VoucherType.FACTURA -> first == 'F'
+            VoucherType.BOLETA -> first == 'B'
+            else -> first == 'F' || first == 'B'
+        }
+        return validPrefix && trimmed.drop(1).all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' }
+    }
+
+    /** Motivo obligatorio para comunicación de baja o nota de crédito (1..250 caracteres). */
+    fun isValidReason(reason: String): Boolean = reason.trim().length in 1..MAX_REASON_LENGTH
+
+    /** Importe monetario positivo con hasta 2 decimales y, si se indica, sin superar [max]. */
+    fun isValidMoneyAmount(amount: BigDecimal, max: BigDecimal? = null): Boolean =
+        amount >= MIN_AMOUNT &&
+            amount.stripTrailingZeros().scale() <= MONEY_SCALE &&
+            (max == null || amount <= max)
 }

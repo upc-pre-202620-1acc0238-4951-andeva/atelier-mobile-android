@@ -9,19 +9,27 @@ import com.andeva.atelier.mobile.core.designsystem.text.UiText
 import com.andeva.atelier.mobile.core.domain.Permission
 import com.andeva.atelier.mobile.features.cashier.application.DeliverVehicleUseCase
 import com.andeva.atelier.mobile.features.cashier.application.DownloadExitPassUseCase
+import com.andeva.atelier.mobile.features.cashier.application.DownloadVoucherDocumentUseCase
 import com.andeva.atelier.mobile.features.cashier.application.GetVoucherPaymentsUseCase
 import com.andeva.atelier.mobile.features.cashier.application.GetWorkOrderVouchersUseCase
+import com.andeva.atelier.mobile.features.cashier.application.IssueCreditNoteUseCase
 import com.andeva.atelier.mobile.features.cashier.application.IssueVoucherUseCase
 import com.andeva.atelier.mobile.features.cashier.application.MarkWorkOrderPaidUseCase
 import com.andeva.atelier.mobile.features.cashier.application.ObserveWorkOrderVouchersUseCase
 import com.andeva.atelier.mobile.features.cashier.application.PrepareVoucherUseCase
+import com.andeva.atelier.mobile.features.cashier.application.RefreshVoucherStatusUseCase
 import com.andeva.atelier.mobile.features.cashier.application.RegisterPaymentUseCase
+import com.andeva.atelier.mobile.features.cashier.application.VoidVoucherUseCase
+import com.andeva.atelier.mobile.features.cashier.domain.CashierValidation
 import com.andeva.atelier.mobile.features.cashier.domain.FiscalDocumentType
 import com.andeva.atelier.mobile.features.cashier.domain.IssueOutcome
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentMethod
 import com.andeva.atelier.mobile.features.cashier.domain.PaymentOutcomeUnknownException
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherDraft
 import com.andeva.atelier.mobile.features.cashier.domain.VoucherType
+import com.andeva.atelier.mobile.features.cashier.presentation.CreditNoteForm
+import com.andeva.atelier.mobile.features.cashier.presentation.VoidForm
+import com.andeva.atelier.mobile.features.cashier.presentation.formatVoucherCode
 import com.andeva.atelier.mobile.features.cashier.presentation.toCashierText
 import com.andeva.atelier.mobile.features.main.application.ObserveSessionUseCase
 import com.andeva.atelier.mobile.features.workorders.application.GetWorkOrderDetailUseCase
@@ -48,11 +56,15 @@ class WorkOrderCheckoutViewModel @Inject constructor(
     private val getPayments: GetVoucherPaymentsUseCase,
     private val prepareVoucher: PrepareVoucherUseCase,
     private val issueVoucher: IssueVoucherUseCase,
+    private val voidVoucher: VoidVoucherUseCase,
+    private val issueCreditNote: IssueCreditNoteUseCase,
     private val registerPayment: RegisterPaymentUseCase,
     private val markPaid: MarkWorkOrderPaidUseCase,
     private val downloadExitPass: DownloadExitPassUseCase,
     private val deliverVehicle: DeliverVehicleUseCase,
-    connectivity: ConnectivityObserver
+    connectivity: ConnectivityObserver,
+    private val downloadVoucherDocument: DownloadVoucherDocumentUseCase? = null,
+    private val refreshVoucherStatus: RefreshVoucherStatusUseCase? = null
 ) : ViewModel() {
 
     private val workOrderId: String = savedStateHandle["workOrderId"] ?: ""
@@ -181,6 +193,151 @@ class WorkOrderCheckoutViewModel @Inject constructor(
         lines = lines
     )
 
+    fun onOpenVoid(voucher: VoucherView) {
+        if (!_uiState.value.canIssueVoucher || !voucher.canVoidOrCreditNote || !canAct()) return
+        val label = formatVoucherCode(voucher.serie, voucher.number)
+        _uiState.update {
+            it.copy(
+                sheet = CheckoutSheet.Void(voucher, VoidForm(voucher.id, label)),
+                sheetError = null,
+                notice = null,
+                actionError = null
+            )
+        }
+    }
+
+    fun onVoidReason(value: String) = _uiState.update { state ->
+        val sheet = state.sheet as? CheckoutSheet.Void ?: return@update state
+        state.copy(
+            sheet = sheet.copy(form = sheet.form.copy(reason = value.take(CashierValidation.MAX_REASON_LENGTH))),
+            sheetError = null
+        )
+    }
+
+    fun onConfirmVoid() {
+        val sheet = _uiState.value.sheet as? CheckoutSheet.Void ?: return
+        if (!_uiState.value.canIssueVoucher || !sheet.form.canSubmit || !canAct()) return
+        _uiState.update { it.copy(busy = CheckoutAction.Voiding, sheetError = null) }
+        viewModelScope.launch {
+            voidVoucher(sheet.voucher.id, sheet.form.reason)
+                .onSuccess {
+                    _uiState.update { it.copy(sheet = null, notice = UiText.Resource(R.string.cashier_void_done)) }
+                    load()
+                }
+                .onFailure { e -> _uiState.update { it.copy(sheetError = e.toCashierText()) } }
+            _uiState.update { it.copy(busy = null) }
+        }
+    }
+
+    fun onOpenCreditNote(voucher: VoucherView) {
+        if (!_uiState.value.canIssueVoucher || !voucher.canVoidOrCreditNote || !canAct()) return
+        val label = formatVoucherCode(voucher.serie, voucher.number)
+        val initialAmount = voucher.total.setScale(2, RoundingMode.HALF_UP).toPlainString()
+        val form = CreditNoteForm(
+            referenceVoucherId = voucher.id,
+            referenceLabel = label,
+            maxAmount = voucher.total,
+            currency = voucher.currency,
+            amount = initialAmount
+        )
+        _uiState.update {
+            it.copy(
+                sheet = CheckoutSheet.CreditNote(voucher, form),
+                sheetError = null,
+                notice = null,
+                actionError = null
+            )
+        }
+    }
+
+    fun onCreditNoteReason(value: String) = _uiState.update { state ->
+        val sheet = state.sheet as? CheckoutSheet.CreditNote ?: return@update state
+        state.copy(
+            sheet = sheet.copy(form = sheet.form.copy(reason = value.take(CashierValidation.MAX_REASON_LENGTH))),
+            sheetError = null
+        )
+    }
+
+    fun onCreditNoteAmount(value: String) = _uiState.update { state ->
+        val sheet = state.sheet as? CheckoutSheet.CreditNote ?: return@update state
+        state.copy(sheet = sheet.copy(form = sheet.form.copy(amount = value)), sheetError = null)
+    }
+
+    fun onConfirmCreditNote() {
+        val sheet = _uiState.value.sheet as? CheckoutSheet.CreditNote ?: return
+        val amount = sheet.form.parsedAmount ?: return
+        if (!_uiState.value.canIssueVoucher || !sheet.form.canSubmit || !canAct()) return
+        _uiState.update { it.copy(busy = CheckoutAction.IssuingCreditNote, sheetError = null) }
+        viewModelScope.launch {
+            issueCreditNote(sheet.voucher.id, sheet.form.reason, amount, sheet.form.selectedSerie.ifBlank { null })
+                .onSuccess {
+                    _uiState.update { it.copy(sheet = null, notice = UiText.Resource(R.string.cashier_nc_done)) }
+                    load()
+                }
+                .onFailure { e -> _uiState.update { it.copy(sheetError = e.toCashierText()) } }
+            _uiState.update { it.copy(busy = null) }
+        }
+    }
+
+    fun onRefreshVoucherSunat(voucher: VoucherView) {
+        val refreshUseCase = refreshVoucherStatus ?: return
+        if (!canAct()) return
+        _uiState.update { it.copy(busy = CheckoutAction.RefreshingSunat, actionError = null, notice = null) }
+        viewModelScope.launch {
+            refreshUseCase(voucher.id)
+                .onSuccess { updated ->
+                    val noticeRes = when (updated.status) {
+                        com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus.ACCEPTED_SUNAT ->
+                            R.string.cashier_sunat_status_accepted_notice
+                        com.andeva.atelier.mobile.features.cashier.domain.VoucherStatus.REJECTED_SUNAT ->
+                            R.string.cashier_sunat_status_rejected_notice
+                        else -> R.string.cashier_sunat_status_pending_pse_notice
+                    }
+                    _uiState.update { it.copy(notice = UiText.Resource(noticeRes)) }
+                    load()
+                }
+                .onFailure { e -> _uiState.update { it.copy(actionError = e.toCashierText()) } }
+            _uiState.update { it.copy(busy = null) }
+        }
+    }
+
+    fun onOpenVoucherPdf(voucher: VoucherView) =
+        downloadFiscalFile(voucher.pdfUrl, "${voucher.serie}-${voucher.number}.pdf", "application/pdf", CheckoutDocumentActionMode.OPEN)
+
+    fun onShareVoucherPdf(voucher: VoucherView) =
+        downloadFiscalFile(voucher.pdfUrl, "${voucher.serie}-${voucher.number}.pdf", "application/pdf", CheckoutDocumentActionMode.SHARE)
+
+    fun onShareVoucherXml(voucher: VoucherView) =
+        downloadFiscalFile(voucher.xmlUrl, "${voucher.serie}-${voucher.number}.xml", "application/xml", CheckoutDocumentActionMode.SHARE)
+
+    fun onShareVoucherCdr(voucher: VoucherView) =
+        downloadFiscalFile(voucher.cdrUrl, "cdr-${voucher.serie}-${voucher.number}.zip", "application/zip", CheckoutDocumentActionMode.SHARE)
+
+    private fun downloadFiscalFile(
+        url: String?,
+        fileNamePrefix: String,
+        mimeType: String,
+        mode: CheckoutDocumentActionMode
+    ) {
+        val targetUrl = url?.takeIf { it.isNotBlank() } ?: return
+        val downloader = downloadVoucherDocument ?: return
+        if (!canAct()) return
+        _uiState.update { it.copy(busy = CheckoutAction.DownloadingDocument, actionError = null, notice = null) }
+        viewModelScope.launch {
+            downloader(targetUrl, fileNamePrefix)
+                .onSuccess { file ->
+                    _uiState.update { it.copy(pendingDocument = PendingDocumentFile(file, mimeType, mode)) }
+                }
+                .onFailure { e -> _uiState.update { it.copy(actionError = e.toCashierText()) } }
+            _uiState.update { it.copy(busy = null) }
+        }
+    }
+
+    fun onDocumentHandled() = _uiState.update { it.copy(pendingDocument = null) }
+
+    fun onDocumentOpenFailed() =
+        _uiState.update { it.copy(pendingDocument = null, actionError = UiText.Resource(R.string.cashier_exit_pass_no_app)) }
+
     // endregion
 
     // region Cobros
@@ -245,10 +402,17 @@ class WorkOrderCheckoutViewModel @Inject constructor(
 
     // region Pase de salida y entrega
 
-    fun onDownloadExitPass() {
+    fun onDownloadExitPass(mode: CheckoutDocumentActionMode = CheckoutDocumentActionMode.OPEN) {
         val state = _uiState.value
         if (!state.canIssueExitPass || !state.isOrderPaid || !canAct()) return
-        _uiState.update { it.copy(busy = CheckoutAction.ExitPass, actionError = null, notice = null) }
+        _uiState.update {
+            it.copy(
+                busy = CheckoutAction.ExitPass,
+                exitPassActionMode = mode,
+                actionError = null,
+                notice = null
+            )
+        }
         viewModelScope.launch {
             downloadExitPass(workOrderId)
                 .onSuccess { file -> _uiState.update { state -> state.copy(exitPass = file) } }
@@ -256,6 +420,10 @@ class WorkOrderCheckoutViewModel @Inject constructor(
             _uiState.update { it.copy(busy = null) }
         }
     }
+
+    fun onOpenExitPass() = onDownloadExitPass(CheckoutDocumentActionMode.OPEN)
+
+    fun onShareExitPass() = onDownloadExitPass(CheckoutDocumentActionMode.SHARE)
 
     fun onExitPassHandled() = _uiState.update { it.copy(exitPass = null) }
 

@@ -9,19 +9,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.andeva.atelier.mobile.R
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierBanner
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButton
 import com.andeva.atelier.mobile.core.designsystem.component.AtelierButtonStyle
+import com.andeva.atelier.mobile.core.designsystem.component.AtelierTextField
 import com.andeva.atelier.mobile.core.designsystem.theme.AtelierTheme
 import com.andeva.atelier.mobile.core.domain.BusinessTime
+import com.andeva.atelier.mobile.core.presentation.DocumentIntents
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -32,6 +41,10 @@ private val DateTimeLima = DateTimeFormatter.ofPattern("dd/MM HH:mm", Locale.for
 
 /** `16/11 14:35`, hora de Lima. */
 internal fun Instant.formatLimaDateTime(): String = DateTimeLima.format(this)
+
+/** `B001-00000045` con correlativo a 8 dígitos. */
+internal fun formatVoucherCode(serie: String, number: Int): String =
+    "$serie-${number.toString().padStart(8, '0')}"
 
 /** Fila de cifras: rótulo a la izquierda, monto a la derecha. [emphasized] para el total. */
 @Composable
@@ -89,18 +102,85 @@ internal fun <T> ChoiceGrid(
     }
 }
 
-/** Abre el menú de compartir con el PDF descargado en `cacheDir/pdfs`; false si no hay app que lo reciba. */
-internal fun shareOrOpenPdf(context: Context, pdfFile: File, chooserTitle: String): Boolean = try {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+/** Abre o comparte el PDF descargado en `cacheDir/pdfs` mediante [DocumentIntents]. */
+internal fun shareOrOpenPdf(context: Context, pdfFile: File, chooserTitle: String): Boolean =
+    DocumentIntents.openPdf(context, pdfFile, chooserTitle)
+
+/** Contenido reutilizable de la hoja de anulación de comprobante. */
+@Composable
+internal fun VoidSheetContent(
+    form: VoidForm,
+    onReasonChange: (String) -> Unit,
+    error: String?
+) {
+    val reasonTooLong = form.reason.trim().length > 250
+    Text(
+        text = stringResource(R.string.cashier_void_body),
+        style = MaterialTheme.typography.bodyLarge,
+        color = AtelierTheme.colors.inkSecondary
+    )
+    AtelierTextField(
+        label = stringResource(R.string.cashier_void_reason_label),
+        value = form.reason,
+        onValueChange = onReasonChange,
+        placeholder = stringResource(R.string.cashier_void_reason_placeholder),
+        isError = form.reason.isNotEmpty() && !form.reasonValid || reasonTooLong,
+        errorText = stringResource(R.string.cashier_void_reason_error).takeIf {
+            (form.reason.isNotEmpty() && !form.reasonValid) || reasonTooLong
+        }
+    )
+    error?.let { AtelierBanner(message = it, icon = Icons.Outlined.ErrorOutline) }
+}
+
+/** Contenido reutilizable de la hoja de emisión de nota de crédito. */
+@Composable
+internal fun CreditNoteSheetContent(
+    form: CreditNoteForm,
+    onReasonChange: (String) -> Unit,
+    onAmountChange: (String) -> Unit,
+    error: String?,
+    onSerieChange: (String) -> Unit = {}
+) {
+    val amountInvalid = form.amount.isNotBlank() && form.parsedAmount == null
+    Text(
+        text = stringResource(R.string.cashier_nc_reference, form.referenceLabel),
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    if (form.availableSeries.size > 1) {
+        Text(
+            text = stringResource(R.string.cashier_nc_serie_label),
+            style = MaterialTheme.typography.titleSmall,
+            color = AtelierTheme.colors.inkSecondary
+        )
+        ChoiceGrid(
+            options = form.availableSeries.map { it.serie },
+            selected = form.selectedSerie.ifBlank { form.availableSeries.first().serie },
+            label = { it },
+            onSelect = onSerieChange,
+            columns = 3
+        )
     }
-    context.startActivity(Intent.createChooser(send, chooserTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    true
-} catch (_: ActivityNotFoundException) {
-    false
-} catch (_: IllegalArgumentException) {
-    false
+    AtelierTextField(
+        label = stringResource(R.string.cashier_nc_reason_label),
+        value = form.reason,
+        onValueChange = onReasonChange,
+        placeholder = stringResource(R.string.cashier_nc_reason_placeholder),
+        isError = form.reason.isNotEmpty() && !form.reasonValid,
+        errorText = stringResource(R.string.cashier_nc_reason_error).takeIf { form.reason.isNotEmpty() && !form.reasonValid }
+    )
+    AtelierTextField(
+        label = stringResource(R.string.cashier_nc_amount_label),
+        value = form.amount,
+        onValueChange = onAmountChange,
+        isError = amountInvalid,
+        errorText = stringResource(R.string.cashier_nc_amount_error).takeIf { amountInvalid },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+    )
+    Text(
+        text = stringResource(R.string.cashier_nc_irreversible),
+        style = MaterialTheme.typography.bodyMedium,
+        color = AtelierTheme.colors.inkSecondary
+    )
+    error?.let { AtelierBanner(message = it, icon = Icons.Outlined.ErrorOutline) }
 }
