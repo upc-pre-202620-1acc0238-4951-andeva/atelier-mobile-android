@@ -57,6 +57,9 @@ rounded:
   placa: "6dp"
   control: "12dp"
   panel: "16dp"
+  tarjeta-grande: "18dp"
+  hero: "20dp"
+  hoja-superior: "24dp"
 spacing:
   xs: "4dp"
   sm: "8dp"
@@ -116,13 +119,13 @@ El sistema rechaza dos salidas fáciles: el panel de tarjetas de indicadores con
 
 **Key Characteristics:**
 
-- Una región domina cada pantalla. El panel azul es dueño del primer tercio y nada compite con él.
+- Una región domina cada pantalla. El panel o tarjeta hero azul es dueño del primer tercio y nada compite con él.
 - Una cifra por pantalla a escala de señal; el resto se queda en tamaño de lectura.
 - El ámbar significa una sola cosa: algo espera una decisión humana.
 - Cada vehículo es su placa, siempre con la misma forma.
 - Una sola familia tipográfica. Satoshi lleva leyendas, datos y etiquetas.
-- Plano. La profundidad la dan los campos de color y el filete, no las sombras.
-- Los paneles no cambian de color de noche, como una señal: cambian el fondo y la tinta.
+- **Precisión Automotriz (profundidad multi-plano):** sobre la vía señalizada, el sistema introduce planos físicos calibrados (`Recessed`, `Card`, `Elevated`, `Floating`, `HeroNavy`, `DecisionAmber`) con iluminación especular vertical (como aluminio o carbón mecanizado en oscuro) y sombras ambientales teñidas.
+- Los paneles no cambian de sentido de noche, como una señal: cambian el fondo, los planos y la tinta manteniendo contraste WCAG 2.2 AA.
 
 ## Colors
 
@@ -152,14 +155,23 @@ Estados del sistema. El tono de marca va en **marcas y rellenos**; el texto usa 
 - **Error** (#FB2C36): rechazado, falló, sin stock. Texto en claro: #B3101D.
 - **Advertencia** (#F0B100): tardanza, stock mínimo, por vencer. Solo como marca de estado, nunca como panel. Texto en claro: #9A5300.
 
-### Neutral
+### Neutral & Profundidad («Precisión Automotriz»)
 
-- **Fondo claro** (#F8F8FA) y **Tarjeta clara** (#FFFFFF): suelo y superficies en tema claro.
-- **Fondo oscuro** (#262626) y **Tarjeta oscura** (#272727): suelo y superficies en tema oscuro. La separación entre ambos es mínima a propósito; la da el divisor, no el tono. Pasos tonales fijados en `Theme.kt`: barra inferior y hoja inferior usan `surfaceContainer` (#2E2E2E); el borde de separación es `outlineVariant` (blanco al 12 %). Falta verificar contraste en dispositivo.
-- **Tinta** (#262626) y **Tinta inversa** (#FFFFFF): texto principal.
-- **Tinta secundaria**: #454B55 en claro, #C6C6C6 en oscuro. El #C6C6C6 de marca nunca es texto sobre fondo claro (1.7:1).
-- **Bordes**: #C6C6C6 en claro. En oscuro, #EBEBEB a baja opacidad para divisores; a plena fuerza solo en el filete de un panel.
-- **Tinta azul clara** (#005DC2): texto y enlaces azules sobre fondo claro, porque #0071EB sobre #F8F8FA queda en 4.3:1.
+- **Fondo claro** (`#F8F8FA`) y **Tarjeta clara** (`#FFFFFF`): suelo y plano base en tema claro.
+- **Fondo oscuro** (`#262626`) y **Tarjeta oscura** (`#272727`): suelo y plano base en tema oscuro.
+- **Planos tonales (`AtelierColors` + `MaterialTheme.colorScheme`):**
+  - `surfaceRecessed`: `#ECEFF4` (claro) / `#1C1D20` (`surfaceContainerLowest` oscuro) — pozos hundidos, pistas de segmented control y barras métricas.
+  - `surfaceElevated`: `#FFFFFF` (claro) / `#2F3136` (`surfaceContainer` oscuro) — cápsulas activas y superficies elevadas.
+  - `surfaceFloating`: `#FFFFFF` (claro) / `#33363C` (`surfaceContainerHigh` oscuro) — elementos flotantes despegados del contenido.
+- **Iluminación especular y sombras ambientales:**
+  - `specularTop` → `specularBottom`: `#FFFFFF @ 90% → #C6C6C6 @ 38%` (claro) y `#EBEBEB @ 18% → #EBEBEB @ 5%` (oscuro) en degradado vertical de 1 dp sobre `Card`, `Elevated` y `Floating`.
+  - `shadowAmbient` / `shadowSpot`: `#031A6B @ 14% / 20%` (claro) y `#000000 @ 55% / 70%` (oscuro).
+- **Superficies Hero y Botón primario:** `heroStart` (`#031A6B`) → `heroMid` (`#08349C`) → `heroEnd` (`#0071EB`), `heroSpecular` (`#69B1FF @ 30%`), `primaryGlow` (`#0071EB @ 24%`), y `buttonTop` (`#0E7FF5`) → `buttonBottom` (`#0062D1`).
+- **Decisiones ámbar refinadas:** `decisionSurface` (`#FFFBF4` claro / `#2D2924` oscuro), `decisionWash` (`#F68B01 @ 8%` claro / `14%` oscuro), `decisionBorder` (`#F68B01 @ 38%` claro / `#FFCD69 @ 32%` oscuro) y `decisionAccent` (`#D87900` claro / `#FFCD69` oscuro).
+- **Tinta** (`#262626`) y **Tinta inversa** (`#FFFFFF`): texto principal.
+- **Tinta secundaria**: `#454B55` en claro, `#C6C6C6` en oscuro. El `#C6C6C6` de marca nunca es texto sobre fondo claro (1.7:1).
+- **Bordes**: `#C6C6C6` en claro. En oscuro, `#EBEBEB` al 12 % para divisores suaves y al 18 %–5 % en el bisel especular.
+- **Tinta azul clara** (`#005DC2`): texto y enlaces azules sobre fondo claro, porque `#0071EB` sobre `#F8F8FA` queda en 4.3:1.
 
 ### Named Rules
 
@@ -220,38 +232,46 @@ Mapeada a los roles de Material 3. Tamaños en `sp`, para que sigan el ajuste de
 
 ## Elevation & Depth
 
-Plano. La profundidad se construye con campos de color y con el filete, no con sombras. Una tarjeta no flota: se distingue por su fondo y un divisor de 1 dp.
+**Profundidad multi-plano («Precisión Automotriz»).** En lugar de tarjetas planas indiferenciadas, el sistema ordena la jerarquía espacial mediante seis planos en `AtelierSurface` (`SurfaceTier`), combinando elevación tonal, borde especular vertical de 1 dp y sombra ambiental teñida (`shadowAmbient` / `shadowSpot`):
 
-Solo llevan elevación de Material 3, sin sombras a medida, las piezas que de verdad están encima: el FAB, la hoja inferior con su velo, los diálogos y el snackbar. La barra inferior se separa con un divisor, no con sombra.
+- **`Recessed` (0 dp):** pozo hundido (`#ECEFF4` / `#1C1D20`) para pistas de `AtelierSegmentedControl` y fondo de `AtelierMetricBar`.
+- **`Card` (3 dp):** plano base de lectura (`#FFFFFF` / `#272727`) con bisel especular vertical.
+- **`Elevated` (8 dp):** plano intermedio (`#FFFFFF` / `#2F3136`) para cápsulas activas y módulos destacados.
+- **`Floating` (14 dp):** plano superior (`#FFFFFF` / `#33363C`) para barras flotantes y controles despegados.
+- **`HeroNavy` (12 dp):** degradado direccional `#031A6B → #08349C → #0071EB`, arco de luz geométrico en `Canvas` (`#69B1FF @ 8%`) y borde especular `#69B1FF @ 28%`.
+- **`DecisionAmber` (4 dp):** superficie cálida (`decisionSurface`) con baño sutil (`decisionWash`) y borde ámbar preciso (`decisionBorder`).
 
-No hay vidrio ni desenfoque: una señal es opaca, y a contraluz del portón la translucidez se vuelve ilegible.
+No hay vidrio ni desenfoque de fondo: las superficies son sólidas u opacas en su lectura principal para resistir el contraluz del portón del taller.
 
 ### Named Rules
 
-**La Regla de la Lámina Plana.** Si algo necesita sombra para entenderse, está mal ubicado o mal coloreado. Sombra solo para lo que tapa contenido.
+**La Regla de la Jerarquía por Plano.** La elevación y la luz sirven al orden de lectura: primero el plano hero o la decisión ámbar, luego las tarjetas de trabajo, y al fondo los pozos hundidos de filtros o métricas. Nunca se apila sombra arbitraria fuera de `AtelierSurface`.
 
 ## Shapes
 
-Una familia de rectángulos de esquina redondeada, como una lámina de señal. Tres radios y nada más:
+Una familia de rectángulos de esquina redondeada inspirada en piezas mecanizadas y láminas de señal (`Shape.kt`):
 
-- **Placa** (6 dp): la ficha de placa y los huesos del esqueleto.
-- **Control** (12 dp): botones, campos, chips, tarjetas y paneles de decisión.
-- **Panel** (16 dp): el filete del panel de cabecera y el FAB.
+- **Placa (`PlateShape`, 6 dp):** la ficha de placa, badges de conteo y los huesos del esqueleto.
+- **Control (`ControlShape`, 12 dp):** botones, campos, chips, paneles compactos y pista del control segmentado.
+- **Panel (`PanelShape`, 16 dp):** paneles estándar y FAB extendido.
+- **Tarjeta grande (`CardLargeShape`, 18 dp):** forma por defecto de `AtelierSurface` y tarjetas principales.
+- **Hero (`HeroShape`, 20 dp):** tarjetas y cabeceras `HeroNavy`.
+- **Hoja superior (`SheetTopShape`, 24 dp arriba):** esquinas superiores de hojas inferiores.
 
-**El filete.** El panel de cabecera lleva un borde interior blanco de 2 dp, separado 16 dp del borde de pantalla, como el filete de una señal informativa. Es el único borde decorativo del sistema y solo existe ahí.
+**Cabeceras limpias.** Los paneles y tarjetas `HeroNavy` abandonan el filete interior blanco de 2 dp en favor de un borde especular fino de 1 dp (`#69B1FF @ 28%`) y el arco de luz geométrico sobre el degradado direccional `#031A6B → #0071EB`.
 
-Sin píldoras: los botones son rectángulos redondeados. **Única excepción (decisión del 2026-11-20): la barra inferior flotante y su botón de acción**, que usan forma completa (`FloatingBarShape`). Sin tarjetas dentro de tarjetas. La hoja inferior y los diálogos usan la forma estándar de Material 3.
+Sin píldoras en botones: los botones son rectángulos redondeados (`ControlShape`). **Única excepción (decisión del 2026-11-20): la barra inferior flotante y su botón de acción**, que usan forma completa (`FloatingBarShape`). Sin tarjetas dentro de tarjetas. La hoja inferior y los diálogos usan `SheetTopShape` / formas de Material 3.
 
 ## Components
 
 Controles de Material 3 con el tema de Atelier. La regla del mundo es que entra por tipo, color, densidad y la placa; nunca reemplaza un control conocido. Todo vive en `core/designsystem/component/`.
 
-### Panel de cabecera
+### Panel de cabecera y HeroNavy
 
-La región que domina la pantalla. Tres tamaños, un solo componente:
+La región que domina la pantalla, con cabeceras limpias y profundidad direccional (`HeroNavy`):
 
-- **Parte** (pantallas de supervisión, como "Hoy"): fondo Azul Señal a sangre, filete blanco, una línea de contexto (sede y fecha), la leyenda en Display y hasta tres cifras secundarias en Headline separadas por una regla blanca superior. Ocupa cerca de un tercio de la pantalla.
-- **Ficha** (detalle de un objeto: una orden, un vehículo, un colaborador): la identidad del objeto —la placa en grande, o el nombre— más su estado actual. Sin filete.
+- **Parte / HeroNavy** (pantallas de supervisión, como "Hoy"): degradado direccional `#031A6B → #08349C → #0071EB`, arco de luz geométrico sutil (`#69B1FF @ 8%`) y borde especular (`#69B1FF @ 28%`), con una línea de contexto (sede y fecha), la leyenda en Display y hasta tres cifras secundarias en Headline. Ocupa cerca de un tercio de la pantalla.
+- **Ficha** (detalle de un objeto: una orden, un vehículo, un colaborador): la identidad del objeto —la placa en grande, o el nombre— más su estado actual.
 - **Barra** (formularios y listas largas): la barra superior de Material 3 en Azul Señal con título y Atrás. Al hacer scroll, Parte y Ficha se colapsan a Barra.
 
 Las cifras del panel no se animan al cambiar ni cuentan hacia arriba: cambian. Tocar una cifra secundaria lleva a su lista filtrada.
@@ -266,14 +286,21 @@ La firma del sistema. Un vehículo se muestra siempre como su placa.
 - **Solo para placas.** Números de orden, códigos de repuesto y documentos son texto normal.
 - **Accesibilidad:** se anuncia como "placa B K L 4 8 2", no como una palabra.
 
-### Panel de decisión
+### Panel de decisión (`DecisionAmber`)
 
 Lo que espera al dueño: propuestas por aprobar, proformas sin respuesta, descargos por revisar, suspensiones por validar.
 
-- **Estilo:** fondo Ámbar Preventivo, texto Tinta, radio 12 dp, sin borde. Placa a la izquierda, qué se decide y quién lo originó al centro, el monto a la derecha.
+- **Estilo refinado («Precisión Automotriz»):** superficie cálida (`decisionSurface`: `#FFFBF4` en claro / `#2D2924` en oscuro), baño ámbar sutil (`decisionWash`: `#F68B01 @ 8% / 14%`) y borde preciso (`decisionBorder`: `#F68B01 @ 38%` / `#FFCD69 @ 32%`) con acento `decisionAccent` (`#D87900` / `#FFCD69`) y texto de alto contraste (`onSurface`), conservando el panel ámbar sólido cuando se requiere señal plena. Placa a la izquierda, qué se decide y quién lo originó al centro, el monto a la derecha.
 - **Encabezado de sección:** "Esperan tu decisión · 3", siempre con el conteo.
-- **Comportamiento:** toda la fila es presionable y abre la decisión en una hoja inferior con las acciones al alcance del pulgar. Al resolverse, el panel muestra su resultado (ícono y texto: "Aprobada", "Rechazada") y se retira.
+- **Comportamiento:** toda la fila es presionable (con `springPressScale`) y abre la decisión en una hoja inferior con las acciones al alcance del pulgar. Al resolverse, el panel muestra su resultado (ícono y texto: "Aprobada", "Rechazada") y se retira.
 - **Vacío:** si no hay nada, la sección dice "Nada espera tu decisión" en una línea. No desaparece: su ausencia también informa.
+
+### Componentes propios de profundidad y fluidez («Precisión Automotriz»)
+
+- **`AtelierSurface` (`SurfaceTier`):** contenedor multi-plano (`Recessed`, `Card`, `Elevated`, `Floating`, `HeroNavy`, `DecisionAmber`) con sombra ambiental teñida, bisel especular vertical y respuesta `springPressScale` automática cuando es interactivo.
+- **`AtelierSegmentedControl`:** selector de pestañas/filtros sobre pista `Recessed` (`heightIn(min = 44.dp)`, `padding(4.dp)`) con cápsula `Elevated` deslizante mediante `AtelierSprings.dock()`, badges numéricos opcionales y adaptación automática a carril horizontal desplazable cuando hay más de 3 opciones o `fontScale >= 1.15f`.
+- **`AtelierLiveBeacon`:** baliza de estado en vivo en `Canvas` (punto sólido + halo pulsante suave que se detiene con `rememberReducedMotion()`), siempre acompañada de etiqueta de texto.
+- **`AtelierMetricBar`:** barra fina en `Canvas` (6 dp por defecto) sobre pista `Recessed` con extremos redondeados, relleno degradado suave animado con `AtelierSprings.criticallyDamped()` y marca de umbral opcional (`markerAt`).
 
 ### Buttons
 
@@ -282,7 +309,7 @@ Lo que espera al dueño: propuestas por aprobar, proformas sin respuesta, descar
 - **Sobre el panel azul:** fondo blanco, etiqueta Azul Profundo.
 - **Secondary:** contorno de 1 dp en el color de borde, etiqueta Tinta. **Text:** etiqueta en tinta azul.
 - **Destructivo:** etiqueta y contorno en tinta de error; relleno rojo solo en la confirmación final.
-- **Pressed:** escala a 0.97 en 120 ms con ease-out, al tocar, no al soltar. **Disabled:** 38 % de opacidad, y siempre con el motivo visible cerca. **Loading:** el botón conserva su ancho, bloquea toques y muestra progreso junto a la etiqueta.
+- **Pressed:** escala a 0.97 mediante `springPressScale` (resorte críticamente amortiguado, interruptible al instante al tocar) o `pressScale` (120 ms ease-out). **Disabled:** 38 % de opacidad, y siempre con el motivo visible cerca. **Loading:** el botón conserva su ancho, bloquea toques y muestra progreso junto a la etiqueta.
 - **FAB:** uno por pantalla, extendido, con verbo y objeto. Azul Profundo en claro, Azul Suave con tinta Azul Profundo en oscuro. **No va en las raíces de pestaña**: ahí la acción principal ("Recibir vehículo") es el botón circular de la barra flotante; el FAB queda para pantallas sin barra (p. ej. "Nueva bahía").
 
 ### Chips y marcas de estado
@@ -307,12 +334,21 @@ Lo que espera al dueño: propuestas por aprobar, proformas sin respuesta, descar
 - **Focus:** borde Azul Señal de 2 dp.
 - **Error:** borde y mensaje en tinta de error debajo del campo, con ícono; el mensaje dice cómo corregir. Los errores del backend muestran su `message` tal cual.
 - **Teclado:** el tipo correcto por campo (numérico para montos y kilometraje, mayúsculas para placa).
-- La placa se escribe en un campo propio que da formato mientras se teclea.
+- La placa se escribe en un campo propio (`AtelierPlateField`) que da formato (`ABC-123`) mientras se teclea.
+
+### Primitivas de piso y diagnóstico (Segmento 2)
+
+- **Cronómetro (`AtelierChronometer`):** cifra única en `displaySmall` Satoshi Black `tnum` dentro de contenedor plano de 12 dp, acompañado de marca de estado (ícono + texto: En curso, En pausa, Suspendida, Sin iniciar) y tiempo estimado; sin saltos horizontales ni animaciones distractoras.
+- **Ficha de lectura OBD-II (`AtelierPidTile`):** reemplaza tacómetros o relojes neón por una lámina plana con nombre del parámetro, cifra tabular en `headlineMedium`, unidad y borde/marca semántica (`NORMAL`, `WARNING`, `CRITICAL`) siempre acompañada de ícono y texto.
+- **Grilla de evidencias (`AtelierPhotoGrid`):** soporta URLs remotas y archivos locales en cola offline con marca de estado (`Pendiente`, `Falló`) y botón de cámara de ≥ 56 dp; tocar un ítem `Falló` abre la hoja de reintento o descarte con el `lastErrorMessage` del servidor.
+- **Densidad táctil de fosa (`LocalAtelierMinTouchTarget`):** `CompositionLocal` con valor base de `48.dp` que se eleva a `56.dp` en las pantallas de fosa, bahías y diagnóstico OBD-II (`TaskDetailScreen`, `LiveTelemetryScreen`, `VehicleFaultsScreen`, `FloorHubScreen`) para operación con manos engrasadas o guantes. `AtelierButton`, `AtelierListRow`, `AtelierGroupedRow`, `AtelierChip` (interactivo) y `AtelierSegmentedControl` respetan este umbral automáticamente.
+- **Fila adaptable (`AtelierAdaptiveRow`):** coloca acciones gemelas lado a lado con pesos iguales en escala normal y las apila verticalmente a ancho completo cuando `LocalDensity.current.fontScale >= 1.15f`, evitando truncamiento en español a `1.3x`.
+- **Resortes y háptica (`AtelierSprings` / `rememberAtelierHaptics`):** amortiguación crítica (`DampingRatioNoBouncy`) por defecto (`criticallyDamped()`, `snappy()`, `dock()` para el dock y `AtelierSegmentedControl`), rebote (`0.8f`) solo en gestos con impulso (`flick()`), `springPressScale` para respuesta continua al toque, y háptica sincronizada en el mismo cuadro visual en confirmaciones, errores y marcaciones.
 
 ### Navigation
 
-- **Barra inferior flotante** (estilo Lemon, medidas de quina-webapp): una píldora de 64 dp con 3 a 5 destinos (ícono 22 dp y etiqueta Label S, siempre visibles), margen de 12 dp a los lados y abajo, borde de 1 dp y relleno opaco, **sin sombra**. Flota sobre el contenido: las listas suman su alto al final (`LocalFloatingBarInset`). El destino activo lleva un indicador `primaryContainer` que se desliza (250 ms, ease-out-expo; sin movimiento con "quitar animaciones"). A la derecha, separado por 12 dp, un botón circular de 64 dp con la acción más importante ("Recibir vehículo", solo con `operations:work_orders:create`). Para dueño y administrador: Hoy · Órdenes · Equipo · **Módulos**; "Módulos" no navega, abre la hoja de módulos. La escala de fuente se detiene en 1,15 dentro de la píldora.
-- **Hoja de módulos:** hoja inferior que se arrastra para cerrar, con cuadrícula de 4 columnas de baldosas (ícono 24 dp y nombre, mínimo 80 dp) agrupadas por tarea (Taller, Caja y reportes, Repuestos) y, al pie, la cuenta (Notificaciones, Pendientes de sincronizar, Mi cuenta). Cada baldosa aparece solo con el permiso de su fuente.
+- **Barra inferior flotante** (estilo Lemon, medidas de quina-webapp): una píldora de 64 dp con 3 a 4 destinos (ícono 22 dp y etiqueta Label S, siempre visibles), margen de 12 dp a los lados y abajo, borde de 1 dp y relleno opaco, **sin sombra**. Flota sobre el contenido: las listas suman su alto al final (`LocalFloatingBarInset`). El destino activo lleva un indicador `primaryContainer` que se desliza (250 ms, ease-out-expo; sin movimiento con "quitar animaciones"). A la derecha, separado por 12 dp, un botón circular de 64 dp con la acción más importante resuelta por permiso ("Recibir" con `operations:work_orders:create`, "Cita" con `crm:appointments:create`, "Cobrar" con `invoicing:invoices:issue_sunat`/`payments:create`, "SKU" con `inventory:parts:manage`/`purchase_orders:create`, o "Tareas" con `operations:tasks:track_time`). Todas las sesiones incluyen el slot **Módulos** al final de la píldora, que abre la hoja universal de módulos sin bloquear ningún perfil. La escala de fuente se detiene en 1,15 dentro de la píldora.
+- **Hoja de módulos:** hoja inferior que se arrastra para cerrar, con cuadrícula de 4 columnas de baldosas (ícono 24 dp y nombre, mínimo 80 dp) agrupadas por tarea (Taller —incluyendo Mi asistencia, Mis tareas, Recepción, Bahías, OBD-II—, Caja y reportes —incluyendo Caja del día, Comprobantes SUNAT, Reportes, Series—, Repuestos —Catálogo, Alertas, Compras, Proveedores, Valorización—) y, al pie, la cuenta (Notificaciones, Pendientes de sincronizar, Mi cuenta). Cada baldosa aparece solo con el permiso de su fuente.
   Etiquetas con el nombre de lo que contienen ("Hoy", "Órdenes", "Equipo", "Módulos"), no "Inicio" ni "Panel".
 - **Activo:** indicador azul tenue, ícono y etiqueta en Azul Profundo (Azul Suave en oscuro). **Inactivo:** tinta secundaria.
 - Los destinos que el usuario no puede abrir no se muestran. El gesto Atrás del sistema siempre funciona y nunca pierde un formulario sin avisar.
@@ -379,7 +415,7 @@ Toda pantalla resuelve los cinco, con las palabras del taller:
 - **Don't** poner texto blanco sobre ámbar, ni texto en verde, rojo o amarillo de marca sobre fondo claro.
 - **Don't** usar #C6C6C6 como texto sobre fondo claro.
 - **Don't** añadir una segunda familia tipográfica ni fuente mono; Albert Sans es solo del imagotipo.
-- **Don't** agregar sombras a tarjetas o paneles, ni vidrio, desenfoque o degradados.
+- **Don't** agregar sombras, bordes especulares ni degradados fuera de los planos y tokens de `AtelierSurface` / `HeroNavy` / `AtelierMetricBar`, ni usar vidrio o desenfoque.
 - **Don't** usar botones píldora (salvo la barra flotante y su botón), tarjetas dentro de tarjetas ni franjas de color en el borde de una tarjeta.
 - **Don't** disfrazar la app de carretera: sin flechas viales, postes, pictogramas de tránsito ni texturas reflectivas.
 - **Don't** mostrar una pantalla en blanco ni un spinner a pantalla completa.

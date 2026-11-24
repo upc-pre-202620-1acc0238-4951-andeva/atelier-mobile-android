@@ -22,15 +22,15 @@ Reglas para todas las sesiones:
 | # | Paso | Estado | Rama |
 | --- | --- | --- | --- |
 | 0 | Configuración general (Gradle, paquete `com.andeva.atelier.mobile`) | ✅ Hecho | `release/0.1.0`, `release/0.1.1` |
-| 1 | Núcleo `core/` | ✅ Hecho | `feature/core`, `release/0.2.0` |
-| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` con A5 login, A3 registro por invitación, A4 código, A5b elegir sede y A6 recuperar contraseña (faltan Google y probar con backend) | `feature/auth`, `login` |
-| 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho sin `presentation` (falta UI) | `feature/main` |
-| 4 | `attendance` — asistencia y turnos | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/attendance` |
-| 5 | `tasks` — tareas del mecánico | ✅ Hecho; `presentation` de US26, US27 y US33 entregada (faltan fotos de desmontaje, suspensión y probar con backend) | `feature/tasks`, `feature/tasks-inventory-ui` |
-| 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho; `presentation` de EP03 (US11–US15, US44) y EP05 (US22–US25) entregada (falta el acceso desde `main` y probar con backend) | `feature/reception-workorders`, `feature/reception-workorders-ui`, `feature/quotation-ui` |
-| 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho; `presentation` de US31 y US32 entregada (faltan lector de código, alertas, órdenes de compra y probar con backend) | `feature/inventory`, `feature/tasks-inventory-ui` |
-| 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho sin `presentation` (falta UI y probar con un ELM327 y el backend) | `feature/diagnostics` |
-| 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho sin `presentation` (falta UI y probar con backend) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team` |
+| 1 | Núcleo `core/` | ✅ Hecho (incluye Room v3, `TokenCipher` AES-GCM Keystore, `IdempotentGetRetryInterceptor`, `PreSyncHook`, `WorkshopCacheEventBus`, `DocumentIntents`) | `feature/core`, `release/0.2.0`, `feature/segment2-floor-counter-redesign` |
+| 2 | `auth` — sesión y acceso | ✅ Hecho; `presentation` completa con US04 (cierre seguro + banner de pendientes del dispositivo) y US05 (App Links `AuthDeepLinkInbox` + restablecimiento endurecido) | `feature/auth`, `login`, `feature/segment2-floor-counter-redesign` |
+| 3 | `main` — contenedor con pestañas por permiso | ✅ Hecho; `AdminDashboard`, `MainNavigationBar`, `ModulesSheet`, `PendingOperationsScreen`, `ProfileScreen`, `PendingSuspensionMonitor` (H5) | `feature/main`, `feature/segment2-floor-counter-redesign` |
+| 4 | `attendance` — asistencia y turnos | ✅ Hecho; `AttendanceScreen` y `FloorHubScreen` (Segmento 2) | `feature/attendance`, `feature/segment2-floor-counter-redesign` |
+| 5 | `tasks` — tareas del mecánico | ✅ Hecho; `presentation` completa con US26–US30 (evidencia fotográfica US28 con reintento/descarte, suspensión US29, cierre US30 con horas efectivas y aviso de montaje) y US33 | `feature/tasks`, `feature/tasks-inventory-ui`, `feature/segment2-floor-counter-redesign` |
+| 6 | `reception` + `workorders` — recepción y órdenes | ✅ Hecho; `presentation` completa de EP03 (US11–US15, US44) y EP05 (US22–US25, US35 E2 rentabilidad FIFO, H5 suspensiones) | `feature/reception-workorders`, `feature/reception-workorders-ui`, `feature/quotation-ui`, `feature/segment2-floor-counter-redesign` |
+| 7 | `inventory` — catálogo, lotes y alertas | ✅ Hecho; `presentation` completa de US31, US32, US34 (alertas en vivo + offline, banner en detalle) y US35 (conciliación FIFO) | `feature/inventory`, `feature/tasks-inventory-ui`, `feature/segment2-floor-counter-redesign` |
+| 8 | `diagnostics` — OBD-II, DTC e informe IA | ✅ Hecho; `presentation` completa de US16–US21 y US43 E1 (detección CAN `ATDPN`, `010B` presión admisión, reconexión en vivo, buffer resiliente US19 por usuario, PDF IA abrir/compartir) | `feature/diagnostics`, `feature/segment2-floor-counter-redesign` |
+| 9 | `bays`, `cashier`, `reports`, `team` | ✅ Hecho; `presentation` completa de US36–US43 (tablero de bahías en vivo 30 s + reasignación de mecánico US40, liquidación H26 + PDF/XML/CDR + consulta SUNAT US36–US39, perfil fiscal del taller + PSE + series US42, reportes con rango UTC + PDF flujo de caja y flota US41/US43) | `feature/bays`, `feature/cashier`, `feature/reports`, `feature/team`, `feature/segment2-floor-counter-redesign` |
 
 Leyenda: ⬜ pendiente · 🔄 en curso · ✅ hecho.
 
@@ -404,9 +404,8 @@ Solo `domain`, `application` e `infrastructure`; las pantallas, las rutas y los 
 | --- | --- | --- |
 | Prueba en emulador | Hecha el 2026-11-20 solo para Hoy, Órdenes, Equipo, Más, Recibir vehículo y la ficha de orden (claro, oscuro y fuente 1,3). Falta recorrer Caja, Reportes, Series, Repuestos (alertas, compras, valorización), Bahías, Perfil y las hojas de decisión | Rediseño dueño/admin |
 | Configuración local | Faltan `API_BASE_URL`, `GOOGLE_WEB_CLIENT_ID`, `SUPABASE_*` en `local.properties` y `app/google-services.json` | Pasos 2, 5, 6 |
-| Tokens en DataStore sin cifrar | `SessionManager` guarda ambos tokens en DataStore normal ([api/README.md](api/README.md) §2). Cifrarlos (Tink / Android Keystore) es decisión de la app, no del backend | Decidir antes de producción |
-| Rediseño dueño y administrador | Hecho: tema y componentes nuevos, barra flotante Hoy · Órdenes · Equipo · Módulos (hoja de módulos y botón "Recibir"), Hoy con la composición anterior, pantallas de Órdenes, Recepción, Repuestos, Equipo, Bahías, Perfil y las nuevas Caja del día, Cobrar y entregar, Series, Reportes, Alertas, Compras y Valorización. Falta el recorrido completo en dispositivo y las `@Preview` sin renderizar | Segmento 1 |
-| Pantallas de otros segmentos | Mecánico, asesor y demás conservan su barra y su estilo anterior hasta que se pida su rediseño | Segmentos 2+ |
-| Ficha de orden con esqueleto | `WorkOrderDetailScreen` espera la respuesta del backend y no pinta la placa que ya está en Room | Rediseño |
+| Tokens en DataStore sin cifrar | ✅ Resuelto en Sprint 3: `SessionManager` cifra `TOKEN` y `REFRESH_TOKEN` con AES-256-GCM en Android Keystore (`TokenCipher`, prefijo `enc:v1:`) y migra sesiones existentes con `PlaintextTokenEncryptionMigration` | Paso 1 / Paso 2 |
+| Rediseño dueño y administrador | ✅ Hecho: tema y componentes nuevos, barra flotante Hoy · Órdenes · Equipo · Módulos, todas las pantallas de Segmento 1 y Segmento 2 con pares `@Preview` claro/oscuro y densidad táctil adaptable (`LocalAtelierMinTouchTarget`) | Segmentos 1 y 2 |
+| Ficha de orden con esqueleto | ✅ Resuelto en Sprint 3: `WorkOrderDetailViewModel` observa `ObserveWorkOrderUseCase(workOrderId)` (Room) para pintar placa y cabecera de inmediato mientras refresca el detalle en red | Paso 6 |
 | Tiempo de espera de red | OkHttp espera 60 s: con el backend dormido el esqueleto dura un minuto | Todos |
-| `retryOnConnectionFailure` de OkHttp | Queda en su valor por defecto (`true`) en `NetworkModule` del núcleo: podría reenviar un `POST` no idempotente (comprobantes, cobros) tras un fallo de conexión antes de que la guarda de la app lo vea. Decidirlo en `core` antes de producción | Paso 9 (`cashier`) |
+| `retryOnConnectionFailure` de OkHttp | ✅ Resuelto en Sprint 3: `retryOnConnectionFailure(false)` en todos los clientes OkHttp + `IdempotentGetRetryInterceptor` que reintenta una sola vez exclusivamente `GET`/`HEAD` ante `IOException` de socket reciclado, evitando duplicar `POST`/`PUT`/`DELETE` | Paso 1 / Paso 9 (`cashier`) |
